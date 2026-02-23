@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings } from "lucide-react";
+import { Settings, ChevronDown } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const SENTIMENTS = ["Happy", "Neutral", "Slightly Concerned", "Unhappy"];
