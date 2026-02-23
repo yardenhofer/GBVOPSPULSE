@@ -34,6 +34,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
       ...form,
       target_leads_per_week: form.target_leads_per_week !== "" ? Number(form.target_leads_per_week) : null,
       revenue: form.revenue !== "" ? Number(form.revenue) : null,
+      group: form.group !== "" ? Number(form.group) : null,
     };
     // Auto-set unhappy_since if sentiment changed to Unhappy and not already set
     if (form.client_sentiment === "Unhappy" && !form.unhappy_since) {
