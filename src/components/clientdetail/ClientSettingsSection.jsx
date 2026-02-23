@@ -96,19 +96,13 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
         <F label="Assigned AM (email)"><input type="text" className={inputCls} value={form.assigned_am} onChange={e => setForm(f => ({ ...f, assigned_am: e.target.value }))} /></F>
         <F label="Group #"><input type="number" min="1" className={inputCls} value={form.group} placeholder="—" onChange={e => setForm(f => ({ ...f, group: e.target.value }))} /></F>
         <F label="Package">
-          <select className={selectCls} value={form.package_type} onChange={e => setForm(f => ({ ...f, package_type: e.target.value }))}>
-            {PACKAGES.map(p => <option key={p}>{p}</option>)}
-          </select>
+          <Sel value={form.package_type} onChange={e => setForm(f => ({ ...f, package_type: e.target.value }))} options={PACKAGES} />
         </F>
         <F label="Status">
-          <select className={selectCls} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-            {STATUSES.map(s => <option key={s}>{s}</option>)}
-          </select>
+          <Sel value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} options={STATUSES} />
         </F>
         <F label="Sentiment">
-          <select className={selectCls} value={form.client_sentiment} onChange={e => setForm(f => ({ ...f, client_sentiment: e.target.value }))}>
-            {SENTIMENTS.map(s => <option key={s}>{s}</option>)}
-          </select>
+          <Sel value={form.client_sentiment} onChange={e => setForm(f => ({ ...f, client_sentiment: e.target.value }))} options={SENTIMENTS} />
         </F>
         <F label="Target Leads / Week"><input type="number" className={inputCls} value={form.target_leads_per_week} onChange={e => setForm(f => ({ ...f, target_leads_per_week: e.target.value }))} /></F>
         <F label="Revenue (monthly $)"><input type="number" className={inputCls} value={form.revenue} onChange={e => setForm(f => ({ ...f, revenue: e.target.value }))} /></F>
