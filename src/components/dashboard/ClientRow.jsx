@@ -38,7 +38,12 @@ export default function ClientRow({ client, flags, status, isOwn, onClick }) {
       <div className="p-4 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[200px_90px_120px_100px_90px_90px_90px_auto] lg:gap-4 items-center">
         {/* Name + AM */}
         <div className="min-w-0">
-          <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
+            {client.group != null && (
+              <span className="shrink-0 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full">G{client.group}</span>
+            )}
+          </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.assigned_am || "—"}</p>
         </div>
 
