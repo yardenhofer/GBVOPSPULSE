@@ -1,4 +1,4 @@
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, ChevronDown, ArrowUpDown } from "lucide-react";
 
 const SORT_OPTIONS = [
   { value: "risk", label: "Risk Level" },
@@ -7,13 +7,53 @@ const SORT_OPTIONS = [
   { value: "name", label: "Client Name" },
 ];
 
-const PACKAGE_OPTIONS = ["All", "PPL", "Retainer", "Hybrid"];
-const STATUS_OPTIONS = ["All", "Healthy", "Monitor", "At Risk", "Critical"];
+const PACKAGE_OPTIONS = [
+  { value: "All", label: "All Packages" },
+  { value: "PPL", label: "PPL" },
+  { value: "Retainer", label: "Retainer" },
+  { value: "Hybrid", label: "Hybrid" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "All", label: "All Statuses" },
+  { value: "Healthy", label: "Healthy" },
+  { value: "Monitor", label: "Monitor" },
+  { value: "At Risk", label: "At Risk" },
+  { value: "Critical", label: "Critical" },
+];
+
+function FilterPill({ value, options, onChange, icon: Icon }) {
+  const selected = options.find(o => o.value === value) || options[0];
+  const isDefault = value === options[0].value;
+
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="appearance-none cursor-pointer pl-3 pr-7 py-1.5 rounded-full text-xs font-medium border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500
+          bg-white dark:bg-gray-900
+          border-gray-200 dark:border-gray-700
+          text-gray-700 dark:text-gray-200
+          hover:border-gray-300 dark:hover:border-gray-600
+          hover:bg-gray-50 dark:hover:bg-gray-800"
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+    </div>
+  );
+}
 
 export default function ClientFilters({ filters, onFiltersChange, groups = [] }) {
-  const groupOptions = ["All", ...groups.map(String)];
+  const groupOptions = [
+    { value: "All", label: "All Groups" },
+    ...groups.map(g => ({ value: String(g), label: `Group ${g}` })),
+  ];
+
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 flex flex-wrap gap-2 items-center">
+    <div className="flex flex-wrap gap-2 items-center">
+      {/* Search */}
       <div className="relative flex-1 min-w-[180px]">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
         <input
@@ -21,46 +61,41 @@ export default function ClientFilters({ filters, onFiltersChange, groups = [] })
           placeholder="Search clients..."
           value={filters.search}
           onChange={e => onFiltersChange({ ...filters, search: e.target.value })}
-          className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm bg-gray-100 dark:bg-gray-800 border-0 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full pl-8 pr-3 py-1.5 rounded-full text-xs bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors hover:border-gray-300 dark:hover:border-gray-600"
         />
       </div>
 
-      <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 shrink-0">
-        <SlidersHorizontal className="w-3.5 h-3.5" />
-        <span>Sort:</span>
+      {/* Sort */}
+      <div className="flex items-center gap-1.5">
+        <ArrowUpDown className="w-3 h-3 text-gray-400 shrink-0" />
+        <FilterPill
+          value={filters.sort}
+          options={SORT_OPTIONS}
+          onChange={v => onFiltersChange({ ...filters, sort: v })}
+        />
       </div>
-      <select
-        value={filters.sort}
-        onChange={e => onFiltersChange({ ...filters, sort: e.target.value })}
-        className="text-sm py-1.5 px-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
 
-      <select
+      {/* Package */}
+      <FilterPill
         value={filters.package}
-        onChange={e => onFiltersChange({ ...filters, package: e.target.value })}
-        className="text-sm py-1.5 px-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {PACKAGE_OPTIONS.map(o => <option key={o} value={o}>{o === "All" ? "All Packages" : o}</option>)}
-      </select>
+        options={PACKAGE_OPTIONS}
+        onChange={v => onFiltersChange({ ...filters, package: v })}
+      />
 
-      <select
+      {/* Status */}
+      <FilterPill
         value={filters.status}
-        onChange={e => onFiltersChange({ ...filters, status: e.target.value })}
-        className="text-sm py-1.5 px-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {STATUS_OPTIONS.map(o => <option key={o} value={o}>{o === "All" ? "All Statuses" : o}</option>)}
-      </select>
+        options={STATUS_OPTIONS}
+        onChange={v => onFiltersChange({ ...filters, status: v })}
+      />
 
+      {/* Group */}
       {groupOptions.length > 1 && (
-        <select
+        <FilterPill
           value={filters.group || "All"}
-          onChange={e => onFiltersChange({ ...filters, group: e.target.value })}
-          className="text-sm py-1.5 px-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {groupOptions.map(o => <option key={o} value={o}>{o === "All" ? "All Groups" : `Group ${o}`}</option>)}
-        </select>
+          options={groupOptions}
+          onChange={v => onFiltersChange({ ...filters, group: v })}
+        />
       )}
     </div>
   );
