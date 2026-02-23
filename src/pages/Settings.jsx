@@ -176,6 +176,24 @@ export default function Settings() {
                   </button>
                 </div>
 
+                {/* Group */}
+                <div className="flex items-center gap-2 lg:justify-center">
+                  <span className="text-xs text-gray-500 lg:hidden">Group:</span>
+                  <div className="relative flex items-center">
+                    {updating[`${u.id}-group`] && (
+                      <Loader2 className="w-3 h-3 animate-spin text-blue-400 absolute -right-4" />
+                    )}
+                    <input
+                      type="number"
+                      min="1"
+                      value={u.group ?? ""}
+                      onChange={e => updateGroup(u, e.target.value)}
+                      placeholder="—"
+                      className="w-14 text-center text-sm font-semibold px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
+                    />
+                  </div>
+                </div>
+
                 {/* Permission toggles */}
                 {PERMISSIONS.map(({ key, label }) => {
                   const enabled = u[key] ?? true;
