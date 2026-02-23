@@ -88,7 +88,7 @@ export default function Dashboard() {
       <SummaryBar clients={clients} computeAutoStatus={computeAutoStatus} />
 
       {/* Filters */}
-      <ClientFilters filters={filters} onFiltersChange={setFilters} />
+      <ClientFilters filters={filters} onFiltersChange={setFilters} groups={groups} />
 
       {/* Table header */}
       <ClientTableHeader />
