@@ -58,7 +58,19 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
   );
 
   const inputCls = "w-full text-sm px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500";
-  const selectCls = inputCls;
+
+  const Sel = ({ value, onChange, options }) => (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={onChange}
+        className="appearance-none w-full text-sm pl-3 pr-8 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+      >
+        {options.map(o => <option key={o}>{o}</option>)}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+    </div>
+  );
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
