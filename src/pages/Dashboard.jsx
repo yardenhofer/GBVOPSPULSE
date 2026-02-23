@@ -11,7 +11,7 @@ import ClientRow from "../components/dashboard/ClientRow";
 import ClientTableHeader from "../components/dashboard/ClientTableHeader";
 import { computeRedFlags, computeAutoStatus } from "../components/utils/redFlagEngine";
 
-const DEFAULT_FILTERS = { search: "", sort: "risk", package: "All", status: "All" };
+const DEFAULT_FILTERS = { search: "", sort: "risk", package: "All", status: "All", group: "All" };
 
 const STATUS_ORDER = { Critical: 0, "At Risk": 1, Monitor: 2, Healthy: 3 };
 
