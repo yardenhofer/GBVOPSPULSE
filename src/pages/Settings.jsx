@@ -94,7 +94,7 @@ export default function Settings() {
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
         <div className="flex items-center gap-2 mb-4">
           <UserPlus className="w-4 h-4 text-blue-400" />
-          <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Invite a Rep</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Invite an AM</h2>
         </div>
         <form onSubmit={handleInvite} className="flex gap-2">
           <input
