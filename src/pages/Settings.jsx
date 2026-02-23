@@ -172,7 +172,7 @@ export default function Settings() {
                       ? <Loader2 className="w-3 h-3 animate-spin" />
                       : u.role === "admin" ? <Crown className="w-3 h-3" /> : <User className="w-3 h-3" />
                     }
-                    {u.role === "admin" ? "Admin" : "Rep"}
+                    {u.role === "admin" ? "Admin" : "AM"}
                   </button>
                 </div>
 
