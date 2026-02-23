@@ -47,20 +47,22 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import Dashboard from './pages/Dashboard';
+import Alerts from './pages/Alerts';
 import ClientDetail from './pages/ClientDetail';
 import DailyCheckIn from './pages/DailyCheckIn';
-import Alerts from './pages/Alerts';
+import Dashboard from './pages/Dashboard';
 import ExecutiveView from './pages/ExecutiveView';
+import Settings from './pages/Settings';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "Dashboard": Dashboard,
+    "Alerts": Alerts,
     "ClientDetail": ClientDetail,
     "DailyCheckIn": DailyCheckIn,
-    "Alerts": Alerts,
+    "Dashboard": Dashboard,
     "ExecutiveView": ExecutiveView,
+    "Settings": Settings,
 }
 
 export const pagesConfig = {
