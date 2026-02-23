@@ -10,7 +10,8 @@ const SORT_OPTIONS = [
 const PACKAGE_OPTIONS = ["All", "PPL", "Retainer", "Hybrid"];
 const STATUS_OPTIONS = ["All", "Healthy", "Monitor", "At Risk", "Critical"];
 
-export default function ClientFilters({ filters, onFiltersChange }) {
+export default function ClientFilters({ filters, onFiltersChange, groups = [] }) {
+  const groupOptions = ["All", ...groups.map(String)];
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 flex flex-wrap gap-2 items-center">
       <div className="relative flex-1 min-w-[180px]">
