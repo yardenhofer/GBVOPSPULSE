@@ -99,7 +99,7 @@ export default function Settings() {
         <form onSubmit={handleInvite} className="flex gap-2">
           <input
             type="email"
-            placeholder="rep@yourcompany.com"
+            placeholder="am@yourcompany.com"
             value={inviteEmail}
             onChange={e => setInviteEmail(e.target.value)}
             className="flex-1 text-sm px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
