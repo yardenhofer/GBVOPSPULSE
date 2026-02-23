@@ -87,7 +87,7 @@ export default function Settings() {
     <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Team Settings</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage reps and control their access</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage AMs and control their access</p>
       </div>
 
       {/* Invite */}
