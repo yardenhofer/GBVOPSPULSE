@@ -34,6 +34,8 @@ export default function Dashboard() {
     setLoading(false);
   }
 
+  const groups = [...new Set(clients.map(c => c.group).filter(g => g != null))].sort((a, b) => a - b);
+
   const filtered = clients
     .filter(c => {
       if (filters.search && !c.name.toLowerCase().includes(filters.search.toLowerCase()) &&
@@ -41,6 +43,7 @@ export default function Dashboard() {
       if (filters.package !== "All" && c.package_type !== filters.package) return false;
       const status = computeAutoStatus(c);
       if (filters.status !== "All" && status !== filters.status) return false;
+      if (filters.group !== "All" && String(c.group) !== filters.group) return false;
       return true;
     })
     .sort((a, b) => {
