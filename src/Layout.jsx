@@ -9,6 +9,7 @@ const NAV = [
   { label: "Daily Check-In", page: "DailyCheckIn",  icon: ClipboardCheck },
   { label: "Alerts",         page: "Alerts",         icon: Bell },
   { label: "Executive View", page: "ExecutiveView",  icon: TrendingUp },
+  { label: "Settings",       page: "Settings",       icon: Settings, adminOnly: true },
 ];
 
 export default function Layout({ children, currentPageName }) {
