@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2 } from "lucide-react";
+import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash } from "lucide-react";
 
 const PERMISSIONS = [
   { key: "can_view_all_clients", label: "View All Clients", desc: "See every client, not just assigned ones" },
