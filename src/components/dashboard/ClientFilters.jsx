@@ -52,6 +52,16 @@ export default function ClientFilters({ filters, onFiltersChange, groups = [] })
       >
         {STATUS_OPTIONS.map(o => <option key={o} value={o}>{o === "All" ? "All Statuses" : o}</option>)}
       </select>
+
+      {groupOptions.length > 1 && (
+        <select
+          value={filters.group || "All"}
+          onChange={e => onFiltersChange({ ...filters, group: e.target.value })}
+          className="text-sm py-1.5 px-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {groupOptions.map(o => <option key={o} value={o}>{o === "All" ? "All Groups" : `Group ${o}`}</option>)}
+        </select>
+      )}
     </div>
   );
 }
