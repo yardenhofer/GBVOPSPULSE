@@ -60,6 +60,15 @@ export default function Settings() {
     setUpdating(u => ({ ...u, [`${user.id}-role`]: false }));
   }
 
+  async function updateGroup(user, rawVal) {
+    const val = rawVal === "" ? null : parseInt(rawVal, 10);
+    if (rawVal !== "" && isNaN(val)) return;
+    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, group: val } : u));
+    setUpdating(u => ({ ...u, [`${user.id}-group`]: true }));
+    await base44.entities.User.update(user.id, { group: val });
+    setUpdating(u => ({ ...u, [`${user.id}-group`]: false }));
+  }
+
   if (loading) {
     return <div className="space-y-3">{Array(4).fill(0).map((_, i) => <div key={i} className="h-20 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />)}</div>;
   }
