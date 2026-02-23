@@ -11,6 +11,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     name: client.name || "",
     package_type: client.package_type || "PPL",
     assigned_am: client.assigned_am || "",
+    group: client.group ?? "",
     status: client.status || "Healthy",
     client_sentiment: client.client_sentiment || "Happy",
     target_leads_per_week: client.target_leads_per_week ?? "",
