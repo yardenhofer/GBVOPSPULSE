@@ -126,9 +126,10 @@ export default function Settings() {
         </div>
 
         {/* Header row */}
-        <div className="hidden lg:grid grid-cols-[1fr_100px_repeat(3,90px)] gap-4 px-5 py-2 bg-gray-50 dark:bg-gray-800/50 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+        <div className="hidden lg:grid grid-cols-[1fr_80px_80px_repeat(3,80px)] gap-4 px-5 py-2 bg-gray-50 dark:bg-gray-800/50 text-xs font-semibold text-gray-400 uppercase tracking-wider">
           <span>Member</span>
           <span className="text-center">Role</span>
+          <span className="text-center">Group</span>
           {PERMISSIONS.map(p => <span key={p.key} className="text-center">{p.label}</span>)}
         </div>
 
@@ -136,7 +137,7 @@ export default function Settings() {
           {users.map(u => {
             const isMe = u.id === currentUser?.id;
             return (
-              <div key={u.id} className="px-5 py-4 grid grid-cols-1 lg:grid-cols-[1fr_100px_repeat(3,90px)] gap-3 lg:gap-4 items-center">
+              <div key={u.id} className="px-5 py-4 grid grid-cols-1 lg:grid-cols-[1fr_80px_80px_repeat(3,80px)] gap-3 lg:gap-4 items-center">
                 {/* Identity */}
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
