@@ -75,7 +75,7 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Nav */}
           <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-            {NAV.map(({ label, page, icon: Icon }) => (
+            {NAV.filter(({ adminOnly }) => !adminOnly || user?.role === "admin").map(({ label, page, icon: Icon }) => (
               <Link
                 key={page}
                 to={createPageUrl(page)}
