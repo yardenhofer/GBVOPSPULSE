@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LayoutDashboard, ClipboardCheck, TrendingUp, Bell, Sun, Moon, Menu, Zap } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, TrendingUp, Bell, Sun, Moon, Menu, Zap, Settings } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const NAV = [
