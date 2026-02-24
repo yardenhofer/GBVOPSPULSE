@@ -15,7 +15,9 @@ export default function Settings() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteMsg, setInviteMsg] = useState(null);
-  const [pendingInvites, setPendingInvites] = useState([]);
+  const [pendingInvites, setPendingInvites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("opsctrl_pending_invites") || "[]"); } catch { return []; }
+  });
   const [updating, setUpdating] = useState({});
 
   useEffect(() => {
