@@ -17,6 +17,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     target_leads_per_week: client.target_leads_per_week ?? "",
     revenue: client.revenue ?? "",
     start_date: client.start_date || "",
+    contract_end_date: client.contract_end_date || "",
     last_am_touchpoint: client.last_am_touchpoint || "",
     last_client_reply_date: client.last_client_reply_date || "",
     waiting_on_leads: client.waiting_on_leads || false,
