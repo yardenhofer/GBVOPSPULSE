@@ -7,9 +7,13 @@ import { computeRedFlags, computeAutoStatus, STATUS_CONFIG } from "../components
 import ClientHeader from "../components/clientdetail/ClientHeader";
 import LeadFlowSection from "../components/clientdetail/LeadFlowSection";
 import ActivityLogSection from "../components/clientdetail/ActivityLogSection";
+import ActivityTimeline from "../components/clientdetail/ActivityTimeline";
 import PerformanceSection from "../components/clientdetail/PerformanceSection";
 import ClientSettingsSection from "../components/clientdetail/ClientSettingsSection";
 import RecoveryPlanSection from "../components/clientdetail/RecoveryPlanSection";
+import OnboardingChecklist from "../components/clientdetail/OnboardingChecklist";
+import EmailTemplatesPanel from "../components/clientdetail/EmailTemplatesPanel";
+import LeadVelocityChart from "../components/clientdetail/LeadVelocityChart";
 
 export default function ClientDetail() {
   const [client, setClient] = useState(null);
