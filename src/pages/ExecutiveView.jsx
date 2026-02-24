@@ -64,15 +64,59 @@ export default function ExecutiveView() {
     return { ...am, score, checkInPct, healthScore };
   }).sort((a, b) => b.score - a.score);
 
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    const { data } = await base44.functions.invoke('weeklyReport');
+    const blob = new Blob([data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ops-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    a.remove();
+    setExportingPdf(false);
+  }
+
+  async function handleSendDigest() {
+    setSendingDigest(true);
+    await base44.functions.invoke('dailyDigest');
+    setSendingDigest(false);
+    setDigestSent(true);
+    setTimeout(() => setDigestSent(false), 3000);
+  }
+
   if (loading) {
     return <div className="space-y-4">{Array(5).fill(0).map((_, i) => <div key={i} className="h-28 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />)}</div>;
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Executive View</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Executive View</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSendDigest}
+            disabled={sendingDigest || digestSent}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors border
+              ${digestSent ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          >
+            <Mail className={`w-4 h-4 ${sendingDigest ? 'animate-pulse' : ''}`} />
+            {digestSent ? 'Digest Sent!' : sendingDigest ? 'Sending…' : 'Send Digest'}
+          </button>
+          <button
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            <Download className={`w-4 h-4 ${exportingPdf ? 'animate-spin' : ''}`} />
+            {exportingPdf ? 'Generating…' : 'Export PDF'}
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
