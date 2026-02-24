@@ -15,6 +15,7 @@ export default function Settings() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteMsg, setInviteMsg] = useState(null);
+  const [pendingInvites, setPendingInvites] = useState([]);
   const [updating, setUpdating] = useState({});
 
   useEffect(() => {
