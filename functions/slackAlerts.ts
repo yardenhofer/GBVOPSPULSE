@@ -3,73 +3,70 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const body = await req.json();
+    const user = await base44.auth.me();
 
-    const slackWebhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
-    if (!slackWebhookUrl) {
-      return Response.json({ error: 'SLACK_WEBHOOK_URL not configured' }, { status: 500 });
+    if (!user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Called from entity automation — payload has event + data
-    const { event, data } = body;
-
-    if (!data) {
-      return Response.json({ skipped: true, reason: 'no data' });
+    const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
+    if (!webhookUrl) {
+      return Response.json({ error: 'SLACK_WEBHOOK_URL not set' }, { status: 500 });
     }
 
-    // Only alert on Critical or Escalated clients
-    const isCritical = data.status === 'Critical' || data.is_escalated;
-    if (!isCritical) {
-      return Response.json({ skipped: true, reason: 'not critical' });
-    }
+    const { message, client_name, severity, alert_type } = await req.json();
 
-    const flags = [];
-    const now = new Date();
+    const colorMap = { Red: '#E53E3E', Yellow: '#D69E2E' };
+    const emojiMap = { Red: '🚨', Yellow: '⚠️' };
+    const color = colorMap[severity] || '#718096';
+    const emoji = emojiMap[severity] || 'ℹ️';
 
-    if (data.waiting_on_leads && data.waiting_since) {
-      const days = Math.floor((now - new Date(data.waiting_since)) / 86400000);
-      if (days >= 2) flags.push(`⛔ Waiting ${days}d for lead list`);
-    }
-    if (data.last_am_touchpoint) {
-      const days = Math.floor((now - new Date(data.last_am_touchpoint)) / 86400000);
-      if (days >= 3) flags.push(`🕒 No AM touchpoint for ${days} days`);
-    }
-    if (data.is_escalated) flags.push('⚠️ Client escalated');
-    if (data.client_sentiment === 'Unhappy') flags.push('😡 Client unhappy');
-
-    const slackPayload = {
-      blocks: [
+    const payload = {
+      attachments: [
         {
-          type: 'header',
-          text: { type: 'plain_text', text: `🚨 Critical Alert: ${data.name}`, emoji: true }
+          color,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `${emoji} *OpsControl Alert* — ${severity} Severity`,
+              },
+            },
+            {
+              type: 'section',
+              fields: [
+                { type: 'mrkdwn', text: `*Client:*\n${client_name}` },
+                { type: 'mrkdwn', text: `*Alert Type:*\n${alert_type}` },
+              ],
+            },
+            {
+              type: 'section',
+              text: { type: 'mrkdwn', text: `*Details:*\n${message}` },
+            },
+            {
+              type: 'context',
+              elements: [
+                { type: 'mrkdwn', text: `Sent by ${user.full_name} (${user.email}) via OpsControl` },
+              ],
+            },
+          ],
         },
-        {
-          type: 'section',
-          fields: [
-            { type: 'mrkdwn', text: `*Status:* ${data.status}` },
-            { type: 'mrkdwn', text: `*AM:* ${data.assigned_am || 'Unassigned'}` },
-            { type: 'mrkdwn', text: `*Package:* ${data.package_type || '—'}` },
-            { type: 'mrkdwn', text: `*Revenue:* ${data.revenue ? `$${data.revenue.toLocaleString()}/mo` : '—'}` },
-          ]
-        },
-        ...(flags.length > 0 ? [{
-          type: 'section',
-          text: { type: 'mrkdwn', text: `*Flags:*\n${flags.map(f => `• ${f}`).join('\n')}` }
-        }] : []),
-        {
-          type: 'context',
-          elements: [{ type: 'mrkdwn', text: `OpsControl · ${new Date().toISOString().slice(0, 10)}` }]
-        }
-      ]
+      ],
     };
 
-    const slackRes = await fetch(slackWebhookUrl, {
+    const slackRes = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(slackPayload),
+      body: JSON.stringify(payload),
     });
 
-    return Response.json({ success: slackRes.ok, status: slackRes.status });
+    if (!slackRes.ok) {
+      const text = await slackRes.text();
+      return Response.json({ error: `Slack error: ${text}` }, { status: 500 });
+    }
+
+    return Response.json({ ok: true });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
