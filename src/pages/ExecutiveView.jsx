@@ -8,6 +8,9 @@ export default function ExecutiveView() {
   const [clients, setClients] = useState([]);
   const [checkIns, setCheckIns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [sendingDigest, setSendingDigest] = useState(false);
+  const [digestSent, setDigestSent] = useState(false);
 
   useEffect(() => {
     async function load() {
