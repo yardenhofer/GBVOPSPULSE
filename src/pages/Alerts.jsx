@@ -111,7 +111,7 @@ export default function Alerts() {
                 <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide">Critical ({redAlerts.length})</h2>
               </div>
               <div className="space-y-2">
-                {redAlerts.map((a, i) => <AlertCard key={i} alert={a} />)}
+                {redAlerts.map((a, i) => <AlertCard key={i} alertKey={`red-${i}`} alert={a} />)}
               </div>
             </div>
           )}
@@ -122,7 +122,7 @@ export default function Alerts() {
                 <h2 className="text-sm font-semibold text-yellow-400 uppercase tracking-wide">Watch ({yellowAlerts.length})</h2>
               </div>
               <div className="space-y-2">
-                {yellowAlerts.map((a, i) => <AlertCard key={i} alert={a} />)}
+                {yellowAlerts.map((a, i) => <AlertCard key={i} alertKey={`yellow-${i}`} alert={a} />)}
               </div>
             </div>
           )}
