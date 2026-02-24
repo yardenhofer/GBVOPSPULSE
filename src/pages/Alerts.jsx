@@ -10,6 +10,8 @@ export default function Alerts() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showResolved, setShowResolved] = useState(false);
+  const [sending, setSending] = useState({});
+  const [sent, setSent] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => { load(); }, []);
