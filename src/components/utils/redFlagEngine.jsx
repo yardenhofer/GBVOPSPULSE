@@ -47,6 +47,16 @@ export function computeRedFlags(client) {
     flags.push({ type: 'escalated', severity: 'red', message: 'Client escalated', emoji: '⚠️' });
   }
 
+  // 6. Contract renewal
+  if (client.contract_end_date) {
+    const days = differenceInDays(new Date(client.contract_end_date), now);
+    if (days <= 14 && days >= 0) {
+      flags.push({ type: 'renewal', severity: 'red', message: `Renewal in ${days}d`, emoji: '📅', days });
+    } else if (days <= 30 && days >= 0) {
+      flags.push({ type: 'renewal', severity: 'yellow', message: `Renewal in ${days}d`, emoji: '📅', days });
+    }
+  }
+
   return flags;
 }
 
