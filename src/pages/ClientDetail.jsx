@@ -87,9 +87,30 @@ export default function ClientDetail() {
         <PerformanceSection client={client} onClientUpdate={handleClientUpdate} />
       </div>
 
-      <ActivityLogSection client={client} />
+      {/* Lead velocity */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <LeadVelocityChart client={client} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ActivityLogSection client={client} />
+        <OnboardingChecklist client={client} onClientUpdate={handleClientUpdate} />
+      </div>
 
       {isCritical && <RecoveryPlanSection client={client} />}
+
+      <EmailTemplatesPanel client={client} />
+
+      {/* Full timeline */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          </div>
+          <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Client Timeline</h3>
+        </div>
+        <ActivityTimeline client={client} />
+      </div>
 
       <ClientSettingsSection client={client} onClientUpdate={handleClientUpdate} />
     </div>
