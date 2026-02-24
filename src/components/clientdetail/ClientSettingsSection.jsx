@@ -108,6 +108,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
         <F label="Target Leads / Week"><input type="number" className={inputCls} value={form.target_leads_per_week} onChange={e => setForm(f => ({ ...f, target_leads_per_week: e.target.value }))} /></F>
         <F label="Revenue (monthly $)"><input type="number" className={inputCls} value={form.revenue} onChange={e => setForm(f => ({ ...f, revenue: e.target.value }))} /></F>
         <F label="Start Date"><input type="date" className={inputCls} value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} /></F>
+        <F label="Contract End Date"><input type="date" className={inputCls} value={form.contract_end_date} onChange={e => setForm(f => ({ ...f, contract_end_date: e.target.value }))} /></F>
         <F label="Last AM Touchpoint"><input type="date" className={inputCls} value={form.last_am_touchpoint} onChange={e => setForm(f => ({ ...f, last_am_touchpoint: e.target.value }))} /></F>
         <F label="Last Client Reply"><input type="date" className={inputCls} value={form.last_client_reply_date} onChange={e => setForm(f => ({ ...f, last_client_reply_date: e.target.value }))} /></F>
       </div>
