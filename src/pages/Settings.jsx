@@ -119,6 +119,18 @@ export default function Settings() {
         {inviteMsg && (
           <p className={`text-xs mt-2 ${inviteMsg.type === "success" ? "text-green-400" : "text-red-400"}`}>{inviteMsg.text}</p>
         )}
+        {pendingInvites.length > 0 && (
+          <div className="mt-4 space-y-1.5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pending Invites</p>
+            {pendingInvites.map(email => (
+              <div key={email} className="flex items-center gap-2 text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-1.5">
+                <Mail className="w-3 h-3 shrink-0" />
+                <span>{email}</span>
+                <span className="ml-auto text-yellow-500/60">Invite sent – awaiting signup</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Team members */}
