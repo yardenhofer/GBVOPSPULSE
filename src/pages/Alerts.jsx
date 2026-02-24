@@ -32,7 +32,22 @@ export default function Alerts() {
   const redAlerts = allAlerts.filter(a => a.severity === 'red');
   const yellowAlerts = allAlerts.filter(a => a.severity === 'yellow');
 
-  function AlertCard({ alert }) {
+  async function sendToSlack(alert, key) {
+    setSending(s => ({ ...s, [key]: true }));
+    await base44.functions.invoke('slackAlerts', {
+      client_name: alert.client.name,
+      severity: alert.severity === 'red' ? 'Red' : 'Yellow',
+      alert_type: alert.type,
+      message: alert.message,
+    });
+    setSending(s => ({ ...s, [key]: false }));
+    setSent(s => ({ ...s, [key]: true }));
+    setTimeout(() => setSent(s => ({ ...s, [key]: false })), 3000);
+  }
+
+  function AlertCard({ alert, alertKey }) {
+    const isSending = sending[alertKey];
+    const isSent = sent[alertKey];
     return (
       <div className={`flex items-center justify-between gap-3 bg-white dark:bg-gray-900 rounded-xl border p-4
         ${alert.severity === 'red' ? 'border-red-500/25' : 'border-yellow-500/25'}`}>
@@ -44,12 +59,23 @@ export default function Alerts() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">AM: {alert.client.assigned_am || "Unassigned"}</p>
           </div>
         </div>
-        <button
-          onClick={() => navigate(createPageUrl(`ClientDetail?id=${alert.client.id}`))}
-          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors shrink-0"
-        >
-          <ExternalLink className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => sendToSlack(alert, alertKey)}
+            disabled={isSending || isSent}
+            title="Send to Slack"
+            className={`p-1.5 rounded-lg transition-colors text-xs font-medium flex items-center gap-1
+              ${isSent ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-purple-400 hover:bg-purple-500/10'}`}
+          >
+            {isSent ? '✓' : <Send className={`w-3.5 h-3.5 ${isSending ? 'animate-pulse' : ''}`} />}
+          </button>
+          <button
+            onClick={() => navigate(createPageUrl(`ClientDetail?id=${alert.client.id}`))}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     );
   }
