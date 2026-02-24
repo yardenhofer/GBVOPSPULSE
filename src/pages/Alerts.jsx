@@ -4,7 +4,7 @@ import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import { format, differenceInDays } from "date-fns";
 import { computeRedFlags, computeAutoStatus } from "../components/utils/redFlagEngine";
-import { Bell, CheckCheck, RefreshCw, ExternalLink } from "lucide-react";
+import { Bell, CheckCheck, RefreshCw, ExternalLink, Send } from "lucide-react";
 
 export default function Alerts() {
   const [clients, setClients] = useState([]);
