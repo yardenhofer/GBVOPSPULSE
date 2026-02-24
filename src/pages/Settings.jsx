@@ -41,7 +41,11 @@ export default function Settings() {
     setInviteMsg(null);
     await base44.users.inviteUser(email, "user");
     setInviteMsg({ type: "success", text: `Invite sent to ${email}` });
-    setPendingInvites(prev => [...prev, email]);
+    setPendingInvites(prev => {
+      const updated = [...prev, email];
+      localStorage.setItem("opsctrl_pending_invites", JSON.stringify(updated));
+      return updated;
+    });
     setInviteEmail("");
     setInviting(false);
     // Refresh list
