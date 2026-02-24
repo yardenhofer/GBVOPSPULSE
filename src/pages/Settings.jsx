@@ -33,11 +33,13 @@ export default function Settings() {
 
   async function handleInvite(e) {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    const email = inviteEmail.trim();
+    if (!email) return;
     setInviting(true);
     setInviteMsg(null);
-    await base44.users.inviteUser(inviteEmail.trim(), "user");
-    setInviteMsg({ type: "success", text: `Invite sent to ${inviteEmail}` });
+    await base44.users.inviteUser(email, "user");
+    setInviteMsg({ type: "success", text: `Invite sent to ${email}` });
+    setPendingInvites(prev => [...prev, email]);
     setInviteEmail("");
     setInviting(false);
     // Refresh list
