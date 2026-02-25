@@ -32,8 +32,9 @@ export function computeRedFlags(client) {
     }
   }
 
-  // 4. Lead volume below target
-  if (client.target_leads_per_week > 0 && client.leads_this_week !== undefined && client.leads_this_week !== null) {
+  // 4. Lead volume below target (only flag if at least some lead data has been entered)
+  const hasLeadData = (client.leads_this_week > 0) || (client.leads_last_week > 0) || (client.leads_week_3 > 0) || (client.leads_week_4 > 0);
+  if (hasLeadData && client.target_leads_per_week > 0 && client.leads_this_week !== undefined && client.leads_this_week !== null) {
     const ratio = client.leads_this_week / client.target_leads_per_week;
     if (ratio < 0.5) {
       flags.push({ type: 'low_leads', severity: 'red', message: `Leads at ${Math.round(ratio * 100)}% of target`, emoji: '📉', ratio });
