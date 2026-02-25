@@ -117,6 +117,64 @@ Deno.serve(async (req) => {
       return Response.json({ ok: true, alerts_sent: alerts.length });
     }
 
+    // ── Trigger: daily recap of all critical/escalated clients ───────────────
+    if (trigger === 'daily_recap') {
+      const clients = await base44.asServiceRole.entities.Client.list();
+      const critical = clients.filter(c => c.is_escalated || c.status === 'Critical');
+
+      if (critical.length === 0) {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: `✅ *GBV Ops Daily Recap* — No critical or escalated clients today (${now.toLocaleDateString('en-US')}). All clear!`,
+          }),
+        });
+        return Response.json({ ok: true, critical_count: 0 });
+      }
+
+      const lines = critical.map(c => {
+        const tags = [];
+        if (c.is_escalated) tags.push('🚨 Escalated');
+        if (c.status === 'Critical') tags.push('🔴 Critical');
+        const am = c.assigned_am ? `AM: ${c.assigned_am}` : 'No AM';
+        return `• *${c.name}* — ${am} | ${tags.join(', ')}`;
+      }).join('\n');
+
+      const payload = {
+        attachments: [
+          {
+            color: '#E53E3E',
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `🚨 *GBV Ops Daily Recap — Critical Clients (${now.toLocaleDateString('en-US')})*\n*${critical.length} client${critical.length > 1 ? 's' : ''} need${critical.length === 1 ? 's' : ''} attention today:*`,
+                },
+              },
+              {
+                type: 'section',
+                text: { type: 'mrkdwn', text: lines },
+              },
+              {
+                type: 'context',
+                elements: [{ type: 'mrkdwn', text: `Auto-generated daily recap · ${now.toLocaleDateString('en-US')}` }],
+              },
+            ],
+          },
+        ],
+      };
+
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      return Response.json({ ok: true, critical_count: critical.length });
+    }
+
     return Response.json({ error: 'Unknown trigger' }, { status: 400 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
