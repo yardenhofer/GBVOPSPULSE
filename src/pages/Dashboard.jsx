@@ -91,8 +91,37 @@ export default function Dashboard() {
       {/* Summary */}
       <SummaryBar clients={clients} computeAutoStatus={computeAutoStatus} />
 
-      {/* Filters */}
-      <ClientFilters filters={filters} onFiltersChange={setFilters} groups={groups} />
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800">
+        <button
+          onClick={() => setActiveTab("all")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "all"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          All Clients
+        </button>
+        <button
+          onClick={() => setActiveTab("escalated")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "escalated"
+              ? "border-red-500 text-red-500"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          🚨 Escalated
+          {escalatedClients.length > 0 && (
+            <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {escalatedClients.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Filters (only in all tab) */}
+      {activeTab === "all" && <ClientFilters filters={filters} onFiltersChange={setFilters} groups={groups} />}
 
       {/* Table header */}
       <ClientTableHeader />
