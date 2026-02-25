@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("all"); // "all" | "escalated"
   const navigate = useNavigate();
 
   useEffect(() => {
