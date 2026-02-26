@@ -140,6 +140,13 @@ export default function Dashboard() {
       {/* Filters (only in all tab) */}
       {activeTab === "all" && <ClientFilters filters={filters} onFiltersChange={setFilters} groups={groups} />}
 
+      {/* Awaiting Leads info banner */}
+      {activeTab === "awaiting_leads" && (
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl px-4 py-3 text-sm text-orange-600 dark:text-orange-400">
+          ⏳ These clients have <strong>"Waiting on Leads"</strong> enabled on their profile. Review and follow up on lead list status.
+        </div>
+      )}
+
       {/* Table header */}
       <ClientTableHeader />
 
