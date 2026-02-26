@@ -9,8 +9,8 @@ const SORT_OPTIONS = [
 
 const PACKAGE_OPTIONS = [
   { value: "All", label: "All Packages" },
-  { value: "PPL", label: "PPL" },
-  { value: "Retainer", label: "Retainer" },
+  { value: "Email", label: "Email" },
+  { value: "LinkedIn", label: "LinkedIn" },
   { value: "Hybrid", label: "Hybrid" },
 ];
 

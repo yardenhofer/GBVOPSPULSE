@@ -83,7 +83,7 @@ export const SENTIMENT_CONFIG = {
 };
 
 export const PACKAGE_CONFIG = {
-  'PPL':     { color: 'text-blue-400',   bg: 'bg-blue-500/10' },
-  'Retainer':{ color: 'text-purple-400', bg: 'bg-purple-500/10' },
-  'Hybrid':  { color: 'text-cyan-400',   bg: 'bg-cyan-500/10' },
+  'Email':    { color: 'text-blue-400',   bg: 'bg-blue-500/10' },
+  'LinkedIn': { color: 'text-purple-400', bg: 'bg-purple-500/10' },
+  'Hybrid':   { color: 'text-cyan-400',   bg: 'bg-cyan-500/10' },
 };
