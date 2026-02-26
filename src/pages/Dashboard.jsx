@@ -38,10 +38,12 @@ export default function Dashboard() {
   const groups = [...new Set(clients.map(c => c.group).filter(g => g != null))].sort((a, b) => a - b);
 
   const escalatedClients = clients.filter(c => c.is_escalated);
+  const awaitingLeadsClients = clients.filter(c => c.waiting_on_leads);
 
   const filtered = clients
     .filter(c => {
       if (activeTab === "escalated") return c.is_escalated;
+      if (activeTab === "awaiting_leads") return c.waiting_on_leads;
       if (filters.search && !c.name.toLowerCase().includes(filters.search.toLowerCase()) &&
           !(c.assigned_am || "").toLowerCase().includes(filters.search.toLowerCase())) return false;
       if (filters.package !== "All" && c.package_type !== filters.package) return false;
