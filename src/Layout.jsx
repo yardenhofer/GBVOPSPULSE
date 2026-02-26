@@ -107,6 +107,13 @@ export default function Layout({ children, currentPageName }) {
                 <p className="text-xs text-gray-500 truncate">{user.email}</p>
               </div>
             )}
+            <button
+              onClick={() => base44.auth.logout()}
+              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Log Out
+            </button>
           </div>
         </aside>
 
