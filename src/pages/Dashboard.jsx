@@ -120,6 +120,21 @@ export default function Dashboard() {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab("awaiting_leads")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "awaiting_leads"
+              ? "border-orange-500 text-orange-500"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          ⏳ Awaiting Leads
+          {awaitingLeadsClients.length > 0 && (
+            <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {awaitingLeadsClients.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Filters (only in all tab) */}
