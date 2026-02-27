@@ -35,32 +35,25 @@ Deno.serve(async (req) => {
     // but since we use a global key, we match by client name tag or just pull all.
 
     // Fetch campaigns overview analytics
-    const campaignsRes = await fetchInstantly('/campaigns?limit=100');
-    const campaigns = campaignsRes.items || [];
+    // GET /api/v2/campaigns/analytics — returns array of per-campaign stats (no id = all campaigns)
+    const analyticsRes = await fetchInstantly('/campaigns/analytics');
+    console.log('Analytics raw:', JSON.stringify(analyticsRes));
 
-    // Fetch per-campaign analytics using the correct V2 endpoint
+    const items = Array.isArray(analyticsRes) ? analyticsRes : [];
+
     let totalSent = 0, totalOpens = 0, totalReplies = 0, totalLeads = 0, totalMeetings = 0;
-    let rawAnalytics = null;
-
-    if (campaigns.length > 0) {
-      const campaignIds = campaigns.map(c => c.id);
-      // Use the campaign analytics endpoint with campaign IDs
-      const analyticsRes = await fetchInstantly('/analytics/campaign/summary', {
-        method: 'POST',
-        body: JSON.stringify({ campaign_ids: campaignIds }),
-      });
-      rawAnalytics = analyticsRes;
-      console.log('Analytics raw response:', JSON.stringify(analyticsRes));
-
-      const items = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes.data || analyticsRes.items || []);
-      for (const item of items) {
-        totalSent += item.emails_sent_count || item.total_sent || item.sent || 0;
-        totalOpens += item.open_count || item.total_opened || item.opens || 0;
-        totalReplies += item.reply_count || item.total_replied || item.replies || 0;
-        totalLeads += item.lead_count || item.total_leads || item.leads || 0;
-        totalMeetings += item.meeting_count || item.total_meetings || item.meetings || 0;
-      }
+    for (const item of items) {
+      totalSent    += item.emails_sent_count   || 0;
+      totalOpens   += item.open_count          || 0;
+      totalReplies += item.reply_count         || 0;
+      totalLeads   += item.total_leads_count   || 0;
     }
+
+    const campaigns = items.map(c => ({
+      id: c.campaign_id,
+      name: c.campaign_name,
+      status: c.campaign_status,
+    }));
 
     const stats = {
       campaigns_count: campaigns.length,
