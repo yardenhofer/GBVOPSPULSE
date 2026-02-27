@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     if (!apiKey) return Response.json({ error: 'No Instantly API key configured for this client' }, { status: 400 });
 
     const analyticsRes = await fetchInstantly('/campaigns/analytics', apiKey);
-    const items = Array.isArray(analyticsRes) ? analyticsRes : [];
+    const items = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
     let totalSent = 0, totalOpens = 0, totalReplies = 0, totalOpportunities = 0, totalBounced = 0;
     for (const item of items) {
