@@ -65,14 +65,10 @@ Deno.serve(async (req) => {
       open_rate: totalSent > 0 ? Math.round((totalOpens / totalSent) * 100) : 0,
       reply_rate: totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0,
       last_synced: new Date().toISOString(),
-      campaigns: campaigns.slice(0, 20).map(c => ({
-        id: c.id,
-        name: c.name,
-        status: c.status,
-      })),
+      campaigns: campaigns.slice(0, 20),
     };
 
-    return Response.json({ stats, _debug: rawAnalytics });
+    return Response.json({ stats });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
