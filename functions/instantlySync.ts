@@ -30,29 +30,31 @@ Deno.serve(async (req) => {
     // but since we use a global key, we match by client name tag or just pull all.
 
     // Fetch campaigns overview analytics
-    const [campaignsRes, analyticsRes] = await Promise.all([
-      fetchInstantly('/campaigns?limit=100'),
-      fetchInstantly('/campaigns/analytics/overview'),
-    ]);
-
+    const campaignsRes = await fetchInstantly('/campaigns?limit=100');
     const campaigns = campaignsRes.items || [];
 
-    // Build a map of campaign id -> name
-    const campaignMap = {};
-    for (const c of campaigns) {
-      campaignMap[c.id] = c.name;
-    }
-
-    // Sum up stats
+    // Fetch per-campaign analytics using the correct V2 endpoint
     let totalSent = 0, totalOpens = 0, totalReplies = 0, totalLeads = 0, totalMeetings = 0;
+    let rawAnalytics = null;
 
-    const overviewItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes.items || []);
-    for (const item of overviewItems) {
-      totalSent += item.total_sent || 0;
-      totalOpens += item.total_opened || 0;
-      totalReplies += item.total_replied || 0;
-      totalLeads += item.total_leads || 0;
-      totalMeetings += item.total_meetings || 0;
+    if (campaigns.length > 0) {
+      const campaignIds = campaigns.map(c => c.id);
+      // Use the campaign analytics endpoint with campaign IDs
+      const analyticsRes = await fetchInstantly('/analytics/campaign/summary', {
+        method: 'POST',
+        body: JSON.stringify({ campaign_ids: campaignIds }),
+      });
+      rawAnalytics = analyticsRes;
+      console.log('Analytics raw response:', JSON.stringify(analyticsRes));
+
+      const items = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes.data || analyticsRes.items || []);
+      for (const item of items) {
+        totalSent += item.emails_sent_count || item.total_sent || item.sent || 0;
+        totalOpens += item.open_count || item.total_opened || item.opens || 0;
+        totalReplies += item.reply_count || item.total_replied || item.replies || 0;
+        totalLeads += item.lead_count || item.total_leads || item.leads || 0;
+        totalMeetings += item.meeting_count || item.total_meetings || item.meetings || 0;
+      }
     }
 
     const stats = {
