@@ -47,15 +47,25 @@ Deno.serve(async (req) => {
       totalBounced       += item.bounced_count       || 0;
     }
 
-    const campaigns = items.map(c => ({
-      id: c.campaign_id,
-      name: c.campaign_name,
-      status: c.campaign_status,
-      sent: c.emails_sent_count,
-      replies: c.reply_count_unique,
-      opportunities: c.total_opportunities,
-      opportunity_value: c.total_opportunity_value,
-    }));
+    let totalLeads = 0;
+    let totalContacted = 0;
+
+    const campaigns = items.map(c => {
+      const leadsCount = c.leads_count || 0;
+      const contacted = c.emails_sent_count || 0;
+      totalLeads += leadsCount;
+      totalContacted += contacted;
+      return {
+        id: c.campaign_id,
+        name: c.campaign_name,
+        status: c.campaign_status,
+        sent: contacted,
+        replies: c.reply_count_unique,
+        opportunities: c.total_opportunities,
+        opportunity_value: c.total_opportunity_value,
+        leads_count: leadsCount,
+      };
+    });
 
     const stats = {
       campaigns_count: campaigns.length,
@@ -64,6 +74,8 @@ Deno.serve(async (req) => {
       total_replies: totalReplies,
       total_opportunities: totalOpportunities,
       total_bounced: totalBounced,
+      total_leads: totalLeads,
+      total_contacted: totalContacted,
       open_rate: totalSent > 0 ? Math.round((totalOpens / totalSent) * 100) : 0,
       reply_rate: totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0,
       last_synced: new Date().toISOString(),
