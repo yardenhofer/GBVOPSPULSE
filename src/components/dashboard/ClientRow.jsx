@@ -44,6 +44,11 @@ export default function ClientRow({ client, flags, status, isOwn, onClick }) {
             {client.group != null && (
               <span className="shrink-0 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full">G{client.group}</span>
             )}
+            {client.instantly_api_key && (
+              <span className="shrink-0 text-[10px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                <Zap className="w-2.5 h-2.5" />Instantly
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.assigned_am || "—"}</p>
         </div>
