@@ -24,8 +24,8 @@ export default function InstantlyStatsPanel({ client }) {
     fetchStats();
   }, [client.id]);
 
-  const leadListPct = (client.target_leads_per_week > 0)
-    ? Math.min(100, Math.round(((client.leads_this_week || 0) / client.target_leads_per_week) * 100))
+  const leadListPct = (stats && stats.total_leads > 0)
+    ? Math.min(100, Math.round((stats.total_contacted / stats.total_leads) * 100))
     : null;
 
   const metrics = stats ? [
