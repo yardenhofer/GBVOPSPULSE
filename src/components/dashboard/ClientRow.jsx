@@ -1,4 +1,5 @@
 import { differenceInDays, format } from "date-fns";
+import { Zap } from "lucide-react";
 import { STATUS_CONFIG, SENTIMENT_CONFIG, PACKAGE_CONFIG } from "../utils/redFlagEngine";
 
 const STATUS_GLOW = {
