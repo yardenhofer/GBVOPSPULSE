@@ -3,9 +3,14 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 const INSTANTLY_API = 'https://api.instantly.ai/api/v2';
 const API_KEY = Deno.env.get('INSTANTLY_API_KEY');
 
-async function fetchInstantly(path) {
+async function fetchInstantly(path, options = {}) {
   const res = await fetch(`${INSTANTLY_API}${path}`, {
-    headers: { Authorization: `Bearer ${API_KEY}` },
+    ...options,
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
   });
   if (!res.ok) {
     const text = await res.text();
