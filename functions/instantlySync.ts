@@ -37,15 +37,41 @@ Deno.serve(async (req) => {
     // Fetch campaigns overview analytics
     // GET /api/v2/campaigns/analytics — returns array of per-campaign stats (no id = all campaigns)
     const analyticsRes = await fetchInstantly('/campaigns/analytics');
-
     const items = Array.isArray(analyticsRes) ? analyticsRes : [];
 
-    // Return raw first item keys so we can see actual field names
-    if (items.length > 0) {
-      return Response.json({ _debug_keys: Object.keys(items[0]), _debug_item: items[0] });
+    let totalSent = 0, totalOpens = 0, totalReplies = 0, totalOpportunities = 0, totalBounced = 0;
+    for (const item of items) {
+      totalSent          += item.emails_sent_count   || 0;
+      totalOpens         += item.open_count_unique   || 0;
+      totalReplies       += item.reply_count_unique  || 0;
+      totalOpportunities += item.total_opportunities || 0;
+      totalBounced       += item.bounced_count       || 0;
     }
 
-    return Response.json({ _debug: 'no items', raw: analyticsRes });
+    const campaigns = items.map(c => ({
+      id: c.campaign_id,
+      name: c.campaign_name,
+      status: c.campaign_status,
+      sent: c.emails_sent_count,
+      replies: c.reply_count_unique,
+      opportunities: c.total_opportunities,
+      opportunity_value: c.total_opportunity_value,
+    }));
+
+    const stats = {
+      campaigns_count: campaigns.length,
+      total_sent: totalSent,
+      total_opens: totalOpens,
+      total_replies: totalReplies,
+      total_opportunities: totalOpportunities,
+      total_bounced: totalBounced,
+      open_rate: totalSent > 0 ? Math.round((totalOpens / totalSent) * 100) : 0,
+      reply_rate: totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0,
+      last_synced: new Date().toISOString(),
+      campaigns: campaigns.slice(0, 20),
+    };
+
+    return Response.json({ stats });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
