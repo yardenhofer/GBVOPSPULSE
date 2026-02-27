@@ -12,6 +12,7 @@ export default function InstantlyStatsPanel({ client }) {
     setError(null);
     try {
       const res = await base44.functions.invoke('instantlySync', { client_id: client.id });
+      if (res.data.error) throw new Error(res.data.error);
       setStats(res.data.stats);
     } catch (e) {
       setError(e.message || 'Failed to fetch Instantly data');
