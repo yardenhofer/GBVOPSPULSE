@@ -27,8 +27,8 @@ export default function InstantlyStatsPanel({ client }) {
     { label: 'Sent', value: stats.total_sent.toLocaleString(), icon: Mail, color: 'text-blue-400', bg: 'bg-blue-500/10' },
     { label: 'Opens', value: `${stats.total_opens.toLocaleString()} (${stats.open_rate}%)`, icon: MousePointerClick, color: 'text-purple-400', bg: 'bg-purple-500/10' },
     { label: 'Replies', value: `${stats.total_replies.toLocaleString()} (${stats.reply_rate}%)`, icon: MessageSquare, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-    { label: 'Leads', value: stats.total_leads.toLocaleString(), icon: Users, color: 'text-green-400', bg: 'bg-green-500/10' },
-    { label: 'Meetings', value: stats.total_meetings.toLocaleString(), icon: Calendar, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+    { label: 'Opportunities', value: stats.total_opportunities.toLocaleString(), icon: Users, color: 'text-green-400', bg: 'bg-green-500/10' },
+    { label: 'Bounced', value: stats.total_bounced.toLocaleString(), icon: Calendar, color: 'text-red-400', bg: 'bg-red-500/10' },
   ] : [];
 
   return (
