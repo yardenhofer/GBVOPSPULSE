@@ -141,6 +141,12 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
       </div>
 
       <div className="mt-3">
+        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Instantly API Key</label>
+        <input type="password" className={inputCls} value={form.instantly_api_key} placeholder="Paste client's Instantly API key…"
+          onChange={e => setForm(f => ({ ...f, instantly_api_key: e.target.value }))} />
+      </div>
+
+      <div className="mt-3">
         <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Internal Notes</label>
         <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2}
           className="w-full text-sm px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
