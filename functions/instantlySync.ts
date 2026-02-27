@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     // Fetch campaigns overview analytics
     // GET /api/v2/campaigns/analytics — returns array of per-campaign stats (no id = all campaigns)
     const analyticsRes = await fetchInstantly('/campaigns/analytics');
-    console.log('Analytics raw:', JSON.stringify(analyticsRes));
+    console.log('Analytics raw FULL:', JSON.stringify(analyticsRes, null, 2));
 
     const items = Array.isArray(analyticsRes) ? analyticsRes : [];
 
