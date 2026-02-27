@@ -70,25 +70,29 @@ export default function InstantlyStatsPanel({ client }) {
         </div>
       )}
 
-      {leadListPct !== null && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Lead List Consumption</span>
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-gray-500 dark:text-gray-400">Lead List Consumption</span>
+          {leadListPct !== null ? (
             <span className={`text-xs font-semibold ${leadListPct >= 80 ? 'text-orange-400' : leadListPct >= 60 ? 'text-yellow-400' : 'text-green-400'}`}>
               {leadListPct}% used ({client.leads_this_week || 0} / {client.target_leads_per_week} leads)
             </span>
-          </div>
-          <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+          ) : (
+            <span className="text-xs text-gray-400">No target set</span>
+          )}
+        </div>
+        <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+          {leadListPct !== null && (
             <div
               className={`h-2 rounded-full transition-all ${leadListPct >= 80 ? 'bg-orange-400' : leadListPct >= 60 ? 'bg-yellow-400' : 'bg-green-400'}`}
               style={{ width: `${leadListPct}%` }}
             />
-          </div>
-          {leadListPct >= 80 && (
-            <p className="text-xs text-orange-400 mt-1">⚠️ Lead list nearly exhausted — ensure next list is ready</p>
           )}
         </div>
-      )}
+        {leadListPct >= 80 && (
+          <p className="text-xs text-orange-400 mt-1">⚠️ Lead list nearly exhausted — ensure next list is ready</p>
+        )}
+      </div>
 
       {stats && (
         <>
