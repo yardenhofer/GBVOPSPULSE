@@ -2,13 +2,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const INSTANTLY_API = 'https://api.instantly.ai/api/v2';
 
-async function fetchInstantly(path, apiKey, options = {}) {
+async function fetchInstantly(path, apiKey) {
   const res = await fetch(`${INSTANTLY_API}${path}`, {
-    ...options,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
     },
   });
   if (!res.ok) {
@@ -18,6 +16,27 @@ async function fetchInstantly(path, apiKey, options = {}) {
   return res.json();
 }
 
+function getDateRange(period) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const end = fmt(now);
+
+  if (period === 'today') {
+    return { start_date: end, end_date: end };
+  } else if (period === '7d') {
+    const start = new Date(now);
+    start.setDate(start.getDate() - 6);
+    return { start_date: fmt(start), end_date: end };
+  } else if (period === '30d') {
+    const start = new Date(now);
+    start.setDate(start.getDate() - 29);
+    return { start_date: fmt(start), end_date: end };
+  }
+  // 'all' — no date filter
+  return {};
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -25,9 +44,8 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { client_id } = body;
+    const { client_id, period = 'all' } = body;
 
-    // Fetch the client record to get their specific Instantly API key
     const clients = await base44.entities.Client.filter({ id: client_id });
     const client = clients[0];
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
@@ -35,35 +53,39 @@ Deno.serve(async (req) => {
     const apiKey = client.instantly_api_key;
     if (!apiKey) return Response.json({ error: 'No Instantly API key configured for this client' }, { status: 400 });
 
-    const analyticsRes = await fetchInstantly('/campaigns/analytics', apiKey);
+    // Build query string for date filtering on the analytics endpoint
+    const dateRange = getDateRange(period);
+    const qs = new URLSearchParams();
+    if (dateRange.start_date) qs.set('start_date', dateRange.start_date);
+    if (dateRange.end_date) qs.set('end_date', dateRange.end_date);
+    qs.set('limit', '100');
+
+    const analyticsPath = `/campaigns/analytics?${qs.toString()}`;
+    const analyticsRes = await fetchInstantly(analyticsPath, apiKey);
     const items = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
     let totalSent = 0, totalOpens = 0, totalReplies = 0, totalOpportunities = 0, totalBounced = 0;
-    for (const item of items) {
-      totalSent          += item.emails_sent_count   || 0;
-      totalOpens         += item.open_count_unique   || 0;
-      totalReplies       += item.reply_count_unique  || 0;
-      totalOpportunities += item.total_opportunities || 0;
-      totalBounced       += item.bounced_count       || 0;
-    }
-
-    let totalLeads = 0;
-    let totalContacted = 0;
+    let totalLeads = 0, totalContacted = 0;
 
     const campaigns = items.map(c => {
-      const leadsCount = c.leads_count || 0;
-      const contacted = c.emails_sent_count || 0;
-      totalLeads += leadsCount;
-      totalContacted += contacted;
+      totalSent          += c.emails_sent_count   || 0;
+      totalOpens         += c.open_count_unique   || 0;
+      totalReplies       += c.reply_count_unique  || 0;
+      totalOpportunities += c.total_opportunities || 0;
+      totalBounced       += c.bounced_count       || 0;
+      // leads_count is total prospects ever added — not time-scoped, intentional for consumption %
+      totalLeads         += c.leads_count         || 0;
+      // contacted = unique leads that have received at least 1 email (all-time, from campaign)
+      totalContacted     += c.contacted_count     || c.leads_count_contacted || 0;
       return {
         id: c.campaign_id,
         name: c.campaign_name,
         status: c.campaign_status,
-        sent: contacted,
-        replies: c.reply_count_unique,
-        opportunities: c.total_opportunities,
-        opportunity_value: c.total_opportunity_value,
-        leads_count: leadsCount,
+        sent: c.emails_sent_count || 0,
+        replies: c.reply_count_unique || 0,
+        opportunities: c.total_opportunities || 0,
+        leads_count: c.leads_count || 0,
+        contacted_count: c.contacted_count || c.leads_count_contacted || 0,
       };
     });
 
@@ -78,6 +100,7 @@ Deno.serve(async (req) => {
       total_contacted: totalContacted,
       open_rate: totalSent > 0 ? Math.round((totalOpens / totalSent) * 100) : 0,
       reply_rate: totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0,
+      period,
       last_synced: new Date().toISOString(),
       campaigns: campaigns.slice(0, 20),
     };
