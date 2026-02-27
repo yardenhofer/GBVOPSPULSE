@@ -25,6 +25,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     is_escalated: client.is_escalated || false,
     unhappy_since: client.unhappy_since || "",
     notes: client.notes || "",
+    instantly_api_key: client.instantly_api_key || "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
