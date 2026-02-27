@@ -24,6 +24,10 @@ export default function InstantlyStatsPanel({ client }) {
     fetchStats();
   }, [client.id]);
 
+  const leadListPct = (client.target_leads_per_week > 0)
+    ? Math.min(100, Math.round(((client.leads_this_week || 0) / client.target_leads_per_week) * 100))
+    : null;
+
   const metrics = stats ? [
     { label: 'Sent', value: stats.total_sent.toLocaleString(), icon: Mail, color: 'text-blue-400', bg: 'bg-blue-500/10' },
     { label: 'Opens', value: `${stats.total_opens.toLocaleString()} (${stats.open_rate}%)`, icon: MousePointerClick, color: 'text-purple-400', bg: 'bg-purple-500/10' },
