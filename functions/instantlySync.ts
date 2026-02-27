@@ -37,38 +37,15 @@ Deno.serve(async (req) => {
     // Fetch campaigns overview analytics
     // GET /api/v2/campaigns/analytics — returns array of per-campaign stats (no id = all campaigns)
     const analyticsRes = await fetchInstantly('/campaigns/analytics');
-    console.log('Analytics raw FULL:', JSON.stringify(analyticsRes, null, 2));
 
     const items = Array.isArray(analyticsRes) ? analyticsRes : [];
 
-    let totalSent = 0, totalOpens = 0, totalReplies = 0, totalLeads = 0, totalMeetings = 0;
-    for (const item of items) {
-      totalSent    += item.emails_sent_count   || 0;
-      totalOpens   += item.open_count          || 0;
-      totalReplies += item.reply_count         || 0;
-      totalLeads   += item.total_leads_count   || 0;
+    // Return raw first item keys so we can see actual field names
+    if (items.length > 0) {
+      return Response.json({ _debug_keys: Object.keys(items[0]), _debug_item: items[0] });
     }
 
-    const campaigns = items.map(c => ({
-      id: c.campaign_id,
-      name: c.campaign_name,
-      status: c.campaign_status,
-    }));
-
-    const stats = {
-      campaigns_count: campaigns.length,
-      total_sent: totalSent,
-      total_opens: totalOpens,
-      total_replies: totalReplies,
-      total_leads: totalLeads,
-      total_meetings: totalMeetings,
-      open_rate: totalSent > 0 ? Math.round((totalOpens / totalSent) * 100) : 0,
-      reply_rate: totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0,
-      last_synced: new Date().toISOString(),
-      campaigns: campaigns.slice(0, 20),
-    };
-
-    return Response.json({ stats });
+    return Response.json({ _debug: 'no items', raw: analyticsRes });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
