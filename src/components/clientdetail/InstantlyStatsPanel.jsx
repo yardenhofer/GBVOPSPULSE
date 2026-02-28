@@ -37,8 +37,10 @@ export default function InstantlyStatsPanel({ client }) {
     fetchStats(p);
   }
 
-  // Lead pool consumption — pre-calculated in backend using leads_count vs contacted_count
-  const leadListPct = stats?.consumed_pct ?? null;
+  // Lead list consumption is always all-time (% of leads pool contacted)
+  const leadListPct = (stats && stats.total_leads > 0)
+    ? Math.min(100, Math.round((stats.total_contacted / stats.total_leads) * 100))
+    : null;
 
   const metrics = stats ? [
     { label: 'Sent',          value: stats.total_sent.toLocaleString(),                                              icon: Mail,             color: 'text-blue-400',   bg: 'bg-blue-500/10' },
@@ -101,35 +103,29 @@ export default function InstantlyStatsPanel({ client }) {
         </div>
       )}
 
-      {/* Lead List Consumption — based on actual per-lead status (all-time) */}
+      {/* Lead List Consumption — always all-time */}
       {stats && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Lead Pool Consumption
-              <span className="text-gray-400 ml-1">(active campaigns, all-time)</span>
-            </span>
-            {stats.lead_data_available && leadListPct !== null ? (
+            <span className="text-xs text-gray-500 dark:text-gray-400">Lead List Consumption <span className="text-gray-400">(all-time)</span></span>
+            {leadListPct !== null ? (
               <span className={`text-xs font-semibold ${leadListPct >= 80 ? 'text-orange-400' : leadListPct >= 60 ? 'text-yellow-400' : 'text-green-400'}`}>
-                {leadListPct}% used · {stats.remaining_leads.toLocaleString()} remaining of {stats.total_leads.toLocaleString()}
+                {leadListPct}% contacted · {stats.total_contacted.toLocaleString()} / {stats.total_leads.toLocaleString()} leads
               </span>
             ) : (
               <span className="text-xs text-gray-400">No lead data</span>
             )}
           </div>
           <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-            {stats.lead_data_available && leadListPct !== null && (
+            {leadListPct !== null && (
               <div
                 className={`h-2 rounded-full transition-all ${leadListPct >= 80 ? 'bg-orange-400' : leadListPct >= 60 ? 'bg-yellow-400' : 'bg-green-400'}`}
                 style={{ width: `${leadListPct}%` }}
               />
             )}
           </div>
-          {stats.lead_data_available && leadListPct >= 80 && (
-            <p className="text-xs text-orange-400 mt-1">⚠️ Lead pool nearly exhausted — add more leads now</p>
-          )}
-          {stats.lead_data_available && leadListPct >= 60 && leadListPct < 80 && (
-            <p className="text-xs text-yellow-400 mt-1">Lead pool over 60% consumed — plan for new leads soon</p>
+          {leadListPct >= 80 && (
+            <p className="text-xs text-orange-400 mt-1">⚠️ Lead list nearly exhausted — ensure next list is ready</p>
           )}
         </div>
       )}
@@ -149,25 +145,15 @@ export default function InstantlyStatsPanel({ client }) {
             ))}
           </div>
 
-          {stats.campaign_breakdown?.length > 0 && (
+          {stats.campaigns?.length > 0 && (
             <div className="mt-4">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Campaign Progress ({stats.campaign_breakdown.length})</p>
-              <div className="space-y-2.5">
-                {stats.campaign_breakdown.map(c => (
-                  <div key={c.id}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-600 dark:text-gray-300 truncate max-w-[60%]">{c.name}</span>
-                      <span className="text-xs text-gray-400 shrink-0 ml-2">
-                        {c.progress_pct}% · {c.not_yet_contacted.toLocaleString()} remaining of {c.total_leads.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <div
-                        className={`h-1.5 rounded-full transition-all ${c.progress_pct >= 80 ? 'bg-orange-400' : c.progress_pct >= 60 ? 'bg-yellow-400' : 'bg-blue-400'}`}
-                        style={{ width: `${c.progress_pct}%` }}
-                      />
-                    </div>
-                  </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Campaigns ({stats.campaigns_count})</p>
+              <div className="flex flex-wrap gap-1.5">
+                {stats.campaigns.map(c => (
+                  <span key={c.id} className={`text-xs px-2 py-0.5 rounded-full font-medium
+                    ${c.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-gray-500/10 text-gray-400'}`}>
+                    {c.name}
+                  </span>
                 ))}
               </div>
             </div>
