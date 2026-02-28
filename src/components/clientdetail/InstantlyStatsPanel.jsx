@@ -129,7 +129,7 @@ export default function InstantlyStatsPanel({ client }) {
                </div>
                <div className="flex items-center justify-between mb-1">
                  <span className="text-xs text-gray-500 dark:text-gray-400">Sequence Completion</span>
-                 <span className={`text-xs font-semibold ${completedPct >= 80 ? 'text-green-400' : completedPct >= 50 ? 'text-yellow-400' : 'text-blue-400'}`}>
+                 <span className={`text-xs font-semibold ${completedPct >= 80 ? 'text-red-400' : completedPct >= 60 ? 'text-orange-400' : 'text-green-400'}`}>
                    {completedPct}% completed
                  </span>
                </div>
