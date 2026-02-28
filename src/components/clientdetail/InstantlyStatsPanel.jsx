@@ -76,50 +76,51 @@ export default function InstantlyStatsPanel({ client }) {
       {stats && (
         <div className="mb-4">
           {activeCampaigns.map(c => {
-            const notContacted = c.leads_count - c.new_leads_contacted;
-            const contactedPct = c.leads_count > 0 ? Math.min(100, Math.round((c.new_leads_contacted / c.leads_count) * 100)) : 0;
-            const completedPct = c.leads_count > 0 ? Math.round((c.completed_count / c.leads_count) * 100) : 0;
-            return (
-              <div key={c.id} className="mb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Lead Pool — {c.name}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {c.leads_count.toLocaleString()} total leads
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center mb-2">
-                  <div className="rounded-lg bg-blue-500/10 px-2 py-1.5">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Contacted</p>
-                    <p className="text-sm font-semibold text-blue-400">{c.new_leads_contacted.toLocaleString()}</p>
-                  </div>
-                  <div className="rounded-lg bg-gray-500/10 px-2 py-1.5">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Not Yet Contacted</p>
-                    <p className="text-sm font-semibold text-gray-300">{Math.max(0, notContacted).toLocaleString()}</p>
-                  </div>
-                  <div className="rounded-lg bg-green-500/10 px-2 py-1.5">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
-                    <p className="text-sm font-semibold text-green-400">{c.completed_count.toLocaleString()}</p>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Sequence Progress</span>
-                  <span className={`text-xs font-semibold ${contactedPct >= 80 ? 'text-orange-400' : contactedPct >= 60 ? 'text-yellow-400' : 'text-green-400'}`}>
-                    {contactedPct}% contacted
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                  <div
-                    className={`h-2 rounded-full transition-all ${contactedPct >= 80 ? 'bg-orange-400' : contactedPct >= 60 ? 'bg-yellow-400' : 'bg-green-400'}`}
-                    style={{ width: `${contactedPct}%` }}
-                  />
-                </div>
-                {contactedPct >= 80 && (
-                  <p className="text-xs text-orange-400 mt-1">⚠️ Lead list nearly exhausted — ensure next list is ready</p>
-                )}
-              </div>
-            );
+           // Sequence started = emails_sent (first step only would be ideal, but we use sent as proxy)
+           // completed_count matches Instantly's "Completed" exactly
+           // The remaining leads still in sequence = leads_count - completed_count
+           const remaining = c.leads_count - c.completed_count;
+           const completedPct = c.leads_count > 0 ? Math.round((c.completed_count / c.leads_count) * 100) : 0;
+           // For the progress bar, show how much of the lead pool has been sent to (contacted_count / leads_count, capped at 100%)
+           const sentRatio = c.leads_count > 0 ? Math.min(100, Math.round((c.sent / c.leads_count) * 100)) : 0;
+           return (
+             <div key={c.id} className="mb-3">
+               <div className="flex items-center justify-between mb-1">
+                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                   {c.name}
+                 </span>
+                 <span className="text-xs text-gray-400">
+                   {c.leads_count.toLocaleString()} total leads
+                 </span>
+               </div>
+               <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                 <div className="rounded-lg bg-blue-500/10 px-2 py-1.5">
+                   <p className="text-xs text-gray-500 dark:text-gray-400">Emails Sent</p>
+                   <p className="text-sm font-semibold text-blue-400">{c.sent.toLocaleString()}</p>
+                 </div>
+                 <div className="rounded-lg bg-yellow-500/10 px-2 py-1.5">
+                   <p className="text-xs text-gray-500 dark:text-gray-400">In Sequence</p>
+                   <p className="text-sm font-semibold text-yellow-400">{Math.max(0, remaining).toLocaleString()}</p>
+                 </div>
+                 <div className="rounded-lg bg-green-500/10 px-2 py-1.5">
+                   <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
+                   <p className="text-sm font-semibold text-green-400">{c.completed_count.toLocaleString()}</p>
+                 </div>
+               </div>
+               <div className="flex items-center justify-between mb-1">
+                 <span className="text-xs text-gray-500 dark:text-gray-400">Sequence Completion</span>
+                 <span className={`text-xs font-semibold ${completedPct >= 80 ? 'text-green-400' : completedPct >= 50 ? 'text-yellow-400' : 'text-blue-400'}`}>
+                   {completedPct}% completed
+                 </span>
+               </div>
+               <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                 <div
+                   className="h-2 rounded-full transition-all bg-blue-400"
+                   style={{ width: `${Math.min(100, completedPct)}%` }}
+                 />
+               </div>
+             </div>
+           );
           })}
           {activeCampaigns.length === 0 && (
             <p className="text-xs text-gray-400">No active campaigns found</p>
