@@ -149,15 +149,25 @@ export default function InstantlyStatsPanel({ client }) {
             ))}
           </div>
 
-          {stats.campaigns?.length > 0 && (
+          {stats.campaign_breakdown?.length > 0 && (
             <div className="mt-4">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Campaigns ({stats.campaigns_count})</p>
-              <div className="flex flex-wrap gap-1.5">
-                {stats.campaigns.map(c => (
-                  <span key={c.id} className={`text-xs px-2 py-0.5 rounded-full font-medium
-                    ${c.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-gray-500/10 text-gray-400'}`}>
-                    {c.name}
-                  </span>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Campaign Progress ({stats.campaign_breakdown.length})</p>
+              <div className="space-y-2.5">
+                {stats.campaign_breakdown.map(c => (
+                  <div key={c.id}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-600 dark:text-gray-300 truncate max-w-[60%]">{c.name}</span>
+                      <span className="text-xs text-gray-400 shrink-0 ml-2">
+                        {c.progress_pct}% · {c.not_yet_contacted.toLocaleString()} remaining of {c.total_leads.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                      <div
+                        className={`h-1.5 rounded-full transition-all ${c.progress_pct >= 80 ? 'bg-orange-400' : c.progress_pct >= 60 ? 'bg-yellow-400' : 'bg-blue-400'}`}
+                        style={{ width: `${c.progress_pct}%` }}
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
