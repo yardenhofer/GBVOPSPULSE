@@ -2,16 +2,23 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw, Mail, MousePointerClick, MessageSquare, Users, Calendar, Zap } from "lucide-react";
 
+const TIME_FILTERS = [
+  { label: 'Day', value: 'day' },
+  { label: 'Week', value: 'week' },
+  { label: 'Month', value: 'month' },
+];
+
 export default function InstantlyStatsPanel({ client }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [timeFilter, setTimeFilter] = useState('month');
 
-  async function fetchStats() {
+  async function fetchStats(period) {
     setLoading(true);
     setError(null);
     try {
-      const res = await base44.functions.invoke('instantlySync', { client_id: client.id });
+      const res = await base44.functions.invoke('instantlySync', { client_id: client.id, time_filter: period || timeFilter });
       if (res.data.error) throw new Error(res.data.error);
       setStats(res.data.stats);
     } catch (e) {
@@ -22,7 +29,7 @@ export default function InstantlyStatsPanel({ client }) {
 
   useEffect(() => {
     fetchStats();
-  }, [client.id]);
+  }, [client.id, timeFilter]);
 
   // For lead consumption: each active campaign shows its own breakdown
   // leads_count = total leads in campaign pool
@@ -51,14 +58,31 @@ export default function InstantlyStatsPanel({ client }) {
             </span>
           )}
         </div>
-        <button
-          onClick={fetchStats}
-          disabled={loading}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-400 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Syncing…' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+            {TIME_FILTERS.map(f => (
+              <button
+                key={f.value}
+                onClick={() => setTimeFilter(f.value)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                  timeFilter === f.value
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => fetchStats()}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-400 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Syncing…' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -93,11 +117,7 @@ export default function InstantlyStatsPanel({ client }) {
                    {c.leads_count.toLocaleString()} total leads
                  </span>
                </div>
-               <div className="grid grid-cols-3 gap-2 text-center mb-2">
-                 <div className="rounded-lg bg-blue-500/10 px-2 py-1.5">
-                   <p className="text-xs text-gray-500 dark:text-gray-400">Emails Sent</p>
-                   <p className="text-sm font-semibold text-blue-400">{c.sent.toLocaleString()}</p>
-                 </div>
+               <div className="grid grid-cols-2 gap-2 text-center mb-2">
                  <div className="rounded-lg bg-yellow-500/10 px-2 py-1.5">
                    <p className="text-xs text-gray-500 dark:text-gray-400">In Sequence</p>
                    <p className="text-sm font-semibold text-yellow-400">{Math.max(0, remaining).toLocaleString()}</p>
