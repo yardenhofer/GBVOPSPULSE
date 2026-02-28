@@ -73,7 +73,9 @@ export default function InstantlyStatsPanel({ client }) {
       {stats && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Lead List Consumption</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+            Lead List Consumption {stats.active_only ? '(active campaign)' : '(all campaigns)'}
+          </span>
             {leadListPct !== null ? (
               <span className={`text-xs font-semibold ${leadListPct >= 80 ? 'text-orange-400' : leadListPct >= 60 ? 'text-yellow-400' : 'text-green-400'}`}>
                 {leadListPct}% contacted ({stats.total_contacted.toLocaleString()} / {stats.total_leads.toLocaleString()} leads)
