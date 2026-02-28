@@ -27,7 +27,6 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { client_id } = body;
 
-    // Fetch the client record to get their specific Instantly API key
     const clients = await base44.entities.Client.filter({ id: client_id });
     const client = clients[0];
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
@@ -35,40 +34,43 @@ Deno.serve(async (req) => {
     const apiKey = client.instantly_api_key;
     if (!apiKey) return Response.json({ error: 'No Instantly API key configured for this client' }, { status: 400 });
 
+    // Fetch all campaign analytics
     const analyticsRes = await fetchInstantly('/campaigns/analytics', apiKey);
-    const items = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
+    const allItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
+    // Separate active vs all campaigns
+    const activeItems = allItems.filter(c => c.campaign_status === 'active');
+    // If no active campaigns, still show all for context (so the panel isn't empty)
+    const relevantItems = activeItems.length > 0 ? activeItems : allItems;
+
+    // Aggregate stats only from active campaigns (or all if none active)
     let totalSent = 0, totalOpens = 0, totalReplies = 0, totalOpportunities = 0, totalBounced = 0;
-    for (const item of items) {
+    let totalLeads = 0, totalContacted = 0;
+
+    for (const item of relevantItems) {
       totalSent          += item.emails_sent_count   || 0;
       totalOpens         += item.open_count_unique   || 0;
       totalReplies       += item.reply_count_unique  || 0;
       totalOpportunities += item.total_opportunities || 0;
       totalBounced       += item.bounced_count       || 0;
+      // leads_count = total leads in campaign, emails_sent_count = already contacted
+      totalLeads         += item.leads_count         || 0;
+      totalContacted     += item.emails_sent_count   || 0;
     }
 
-    let totalLeads = 0;
-    let totalContacted = 0;
-
-    const campaigns = items.map(c => {
-      const leadsCount = c.leads_count || 0;
-      const contacted = c.emails_sent_count || 0;
-      totalLeads += leadsCount;
-      totalContacted += contacted;
-      return {
-        id: c.campaign_id,
-        name: c.campaign_name,
-        status: c.campaign_status,
-        sent: contacted,
-        replies: c.reply_count_unique,
-        opportunities: c.total_opportunities,
-        opportunity_value: c.total_opportunity_value,
-        leads_count: leadsCount,
-      };
-    });
+    const campaigns = allItems.map(c => ({
+      id: c.campaign_id,
+      name: c.campaign_name,
+      status: c.campaign_status,
+      sent: c.emails_sent_count || 0,
+      replies: c.reply_count_unique || 0,
+      opportunities: c.total_opportunities || 0,
+      leads_count: c.leads_count || 0,
+    }));
 
     const stats = {
-      campaigns_count: campaigns.length,
+      campaigns_count: activeItems.length,
+      total_campaigns: allItems.length,
       total_sent: totalSent,
       total_opens: totalOpens,
       total_replies: totalReplies,
@@ -80,6 +82,7 @@ Deno.serve(async (req) => {
       reply_rate: totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0,
       last_synced: new Date().toISOString(),
       campaigns: campaigns.slice(0, 20),
+      active_only: activeItems.length > 0,
     };
 
     return Response.json({ stats });
