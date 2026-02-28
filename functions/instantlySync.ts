@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const apiKey = client.instantly_api_key;
     if (!apiKey) return Response.json({ error: 'No Instantly API key configured for this client' }, { status: 400 });
 
-    // ── 1. Fetch analytics with date range (for sent/opens/replies metrics) ──
+    // ── 1. Fetch period-scoped analytics (for sent/opens/replies metrics) ──
     const dateRange = getDateRange(period);
     const qs = new URLSearchParams({ limit: '100' });
     if (dateRange.start_date) qs.set('start_date', dateRange.start_date);
@@ -55,24 +55,34 @@ Deno.serve(async (req) => {
     const analyticsRes = await fetchInstantly(`/campaigns/analytics?${qs.toString()}`, apiKey);
     const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
-    // ── 2. Fetch ALL-TIME analytics (no date filter) for lead pool data ──
-    // leads_count and emails_sent_count are all-time fields on the campaign itself,
-    // not filtered by date — so we need unfiltered data for the lead pool calculation.
-    const allTimeRes = await fetchInstantly(`/campaigns/analytics?limit=100`, apiKey);
-    const allTimeItems = Array.isArray(allTimeRes) ? allTimeRes : (allTimeRes?.items || []);
+    // ── 2. Fetch campaign list for lead status breakdown ──
+    // The /campaigns endpoint returns per-campaign fields including:
+    //   leads_count, completed_count, not_contacted_count (not yet contacted)
+    // These are all-time totals, exactly what Instantly shows in their progress bar UI.
+    const campaignListRes = await fetchInstantly(`/campaigns?limit=100&status=active`, apiKey);
+    const campaignListItems = Array.isArray(campaignListRes) ? campaignListRes : (campaignListRes?.items || []);
 
-    // Build a map of campaign_id -> all-time lead data
-    const allTimeMap = {};
-    for (const c of allTimeItems) {
-      if (c.campaign_id) {
-        allTimeMap[c.campaign_id] = {
-          leads_count: c.leads_count || 0,         // total leads EVER added to the campaign
-          contacted: c.contacted_count || c.emails_sent_count || 0, // leads that received at least 1 email
+    // Build map of campaign_id -> lead breakdown
+    const campaignLeadMap = {};
+    for (const c of campaignListItems) {
+      const id = c.id || c.campaign_id;
+      if (id) {
+        campaignLeadMap[id] = {
+          name: c.name || c.campaign_name,
+          status: c.status || c.campaign_status,
+          // These field names match what Instantly shows in their UI tooltip
+          total_leads: c.leads_count || 0,
+          not_yet_contacted: c.not_contacted_count ?? c.not_yet_contacted_count ?? null,
+          completed: c.completed_count || 0,
+          in_progress: c.in_progress_count || 0,
+          bounced: c.bounced_count || 0,
+          unsubscribed: c.unsubscribed_count || 0,
+          progress_pct: c.progress ?? c.progress_pct ?? null,
         };
       }
     }
 
-    // ── 3. Aggregate period-scoped metrics ──
+    // ── 3. Aggregate period-scoped metrics from analytics ──
     let totalSent = 0, totalOpens = 0, totalReplies = 0, totalOpportunities = 0, totalBounced = 0;
     const campaigns = analyticsItems.map(c => {
       totalSent          += c.emails_sent_count   || 0;
@@ -89,23 +99,45 @@ Deno.serve(async (req) => {
       };
     });
 
-    // ── 4. Lead pool consumption — from all-time data ──
-    // leads_count  = total leads in the campaign (the "pool size")
-    // contacted    = leads that have been emailed at least once
-    // remaining    = leads_count - contacted  (leads NOT yet contacted = still in queue)
+    // ── 4. Lead pool consumption — from campaign list (all-time, per Instantly UI) ──
+    // Sum across all active campaigns:
+    //   total_leads = leads_count (the full pool)
+    //   not_yet_contacted = leads not yet emailed (still in queue)
+    //   contacted = total_leads - not_yet_contacted
     let totalLeadsPool = 0;
-    let totalContacted = 0;
+    let totalNotYetContacted = 0;
     let leadDataAvailable = false;
+    const campaignBreakdown = [];
 
-    for (const data of Object.values(allTimeMap)) {
-      if (data.leads_count > 0) {
-        totalLeadsPool += data.leads_count;
-        totalContacted += Math.min(data.contacted, data.leads_count); // cap at pool size
+    for (const [id, data] of Object.entries(campaignLeadMap)) {
+      if (data.total_leads > 0) {
         leadDataAvailable = true;
+        totalLeadsPool += data.total_leads;
+
+        // not_yet_contacted is the most reliable "remaining" metric
+        // Fall back to total - completed if the field isn't present
+        const notYet = data.not_yet_contacted !== null
+          ? data.not_yet_contacted
+          : Math.max(0, data.total_leads - data.completed);
+        totalNotYetContacted += notYet;
+
+        campaignBreakdown.push({
+          id,
+          name: data.name,
+          status: data.status,
+          total_leads: data.total_leads,
+          not_yet_contacted: notYet,
+          completed: data.completed,
+          progress_pct: data.progress_pct !== null ? data.progress_pct : (
+            data.total_leads > 0
+              ? Math.round(((data.total_leads - notYet) / data.total_leads) * 100)
+              : 0
+          ),
+        });
       }
     }
 
-    const remainingLeads = totalLeadsPool - totalContacted;
+    const totalContacted = totalLeadsPool - totalNotYetContacted;
     const consumedPct = totalLeadsPool > 0
       ? Math.min(100, Math.round((totalContacted / totalLeadsPool) * 100))
       : null;
@@ -117,12 +149,13 @@ Deno.serve(async (req) => {
       total_replies: totalReplies,
       total_opportunities: totalOpportunities,
       total_bounced: totalBounced,
-      // Lead pool (always all-time)
+      // Lead pool (always all-time, from campaign list endpoint)
       total_leads: leadDataAvailable ? totalLeadsPool : null,
       total_contacted: leadDataAvailable ? totalContacted : null,
-      remaining_leads: leadDataAvailable ? remainingLeads : null,
+      remaining_leads: leadDataAvailable ? totalNotYetContacted : null,
       consumed_pct: consumedPct,
       lead_data_available: leadDataAvailable,
+      campaign_breakdown: campaignBreakdown, // per-campaign progress data
       open_rate: totalSent > 0 ? Math.round((totalOpens / totalSent) * 100) : 0,
       reply_rate: totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0,
       period,
