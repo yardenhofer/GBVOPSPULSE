@@ -111,7 +111,7 @@ export default function InstantlyStatsPanel({ client }) {
             </span>
             {stats.lead_data_available && leadListPct !== null ? (
               <span className={`text-xs font-semibold ${leadListPct >= 80 ? 'text-orange-400' : leadListPct >= 60 ? 'text-yellow-400' : 'text-green-400'}`}>
-                {leadListPct}% used · {stats.total_contacted.toLocaleString()} / {stats.total_leads.toLocaleString()} leads
+                {leadListPct}% used · {stats.remaining_leads.toLocaleString()} remaining of {stats.total_leads.toLocaleString()}
               </span>
             ) : (
               <span className="text-xs text-gray-400">No lead data</span>
