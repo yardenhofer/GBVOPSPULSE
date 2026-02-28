@@ -55,10 +55,14 @@ Deno.serve(async (req) => {
     const analyticsRes = await fetchInstantly(`/campaigns/analytics?${qs.toString()}`, apiKey);
     const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
-    // ── 2. Fetch ALL campaigns (no status filter) for lead status breakdown ──
+    // ── 2. Fetch ALL campaigns for lead status breakdown ──
     const campaignListRes = await fetchInstantly(`/campaigns?limit=100`, apiKey);
+    console.log('Campaign list raw response keys:', JSON.stringify(Object.keys(campaignListRes || {})));
+    console.log('Campaign list isArray:', Array.isArray(campaignListRes));
+    console.log('Campaign list items count:', (campaignListRes?.items || campaignListRes)?.length);
     const campaignListItems = Array.isArray(campaignListRes) ? campaignListRes : (campaignListRes?.items || []);
-    console.log('Campaign list raw sample:', JSON.stringify(campaignListItems[0] || {}));
+    console.log('First campaign keys:', JSON.stringify(Object.keys(campaignListItems[0] || {})));
+    console.log('First campaign data:', JSON.stringify(campaignListItems[0] || {}));
 
     // Build map of campaign_id -> lead breakdown
     const campaignLeadMap = {};
