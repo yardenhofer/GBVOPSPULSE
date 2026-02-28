@@ -24,8 +24,12 @@ export default function InstantlyStatsPanel({ client }) {
     fetchStats();
   }, [client.id]);
 
-  // Show progress bars for ALL campaigns (not just active)
-  const allCampaigns = stats?.campaigns || [];
+  // For lead consumption: each active campaign shows its own breakdown
+  // leads_count = total leads in campaign pool
+  // completed_count = leads that finished the entire sequence  
+  // The API doesn't directly give "not yet contacted" but we can show per-campaign data
+  const activeCampaigns = stats?.campaigns?.filter(c => c.status === 'active') || [];
+  const activeCampaign = activeCampaigns.length === 1 ? activeCampaigns[0] : null;
 
   const metrics = stats ? [
     { label: 'Sent', value: stats.total_sent.toLocaleString(), icon: Mail, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -71,7 +75,7 @@ export default function InstantlyStatsPanel({ client }) {
 
       {stats && (
         <div className="mb-4">
-          {allCampaigns.map(c => {
+          {activeCampaigns.map(c => {
            // Sequence started = emails_sent (first step only would be ideal, but we use sent as proxy)
            // completed_count matches Instantly's "Completed" exactly
            // The remaining leads still in sequence = leads_count - completed_count
@@ -82,13 +86,9 @@ export default function InstantlyStatsPanel({ client }) {
            return (
              <div key={c.id} className="mb-3">
                <div className="flex items-center justify-between mb-1">
-                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                    {c.name}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium
-                      ${c.status === 'active' ? 'bg-green-500/10 text-green-400' : c.status === 'paused' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-gray-500/10 text-gray-400'}`}>
-                      {c.status}
-                    </span>
-                  </span>
+                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                   {c.name}
+                 </span>
                  <span className="text-xs text-gray-400">
                    {c.leads_count.toLocaleString()} total leads
                  </span>
@@ -122,8 +122,8 @@ export default function InstantlyStatsPanel({ client }) {
              </div>
            );
           })}
-          {allCampaigns.length === 0 && (
-            <p className="text-xs text-gray-400">No campaigns found</p>
+          {activeCampaigns.length === 0 && (
+            <p className="text-xs text-gray-400">No active campaigns found</p>
           )}
         </div>
       )}
