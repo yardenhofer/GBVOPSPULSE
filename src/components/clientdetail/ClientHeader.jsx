@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { differenceInDays, format } from "date-fns";
-import { ArrowLeft, DollarSign, Target, Calendar, MessageCircle } from "lucide-react";
+import { ArrowLeft, DollarSign, Target, Calendar, MessageCircle, Trash2 } from "lucide-react";
 import { STATUS_CONFIG, SENTIMENT_CONFIG } from "../utils/redFlagEngine";
 
-export default function ClientHeader({ client, status, onBack }) {
+export default function ClientHeader({ client, status, onBack, onDelete }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Healthy"];
   const sentCfg = SENTIMENT_CONFIG[client.client_sentiment] || SENTIMENT_CONFIG["Neutral"];
   const replyDays = client.last_client_reply_date
@@ -36,6 +39,15 @@ export default function ClientHeader({ client, status, onBack }) {
           <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${sentCfg.bg} ${sentCfg.color}`}>
             {sentCfg.emoji} {client.client_sentiment || "Unknown"}
           </span>
+          {onDelete && (
+            <button
+              onClick={() => setShowConfirm(true)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+              title="Delete client"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -50,6 +62,34 @@ export default function ClientHeader({ client, status, onBack }) {
           </div>
         ))}
       </div>
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowConfirm(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm mx-4 space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Delete Client</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Are you sure you want to delete <strong>{client.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setDeleting(true);
+                  await onDelete();
+                }}
+                disabled={deleting}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
