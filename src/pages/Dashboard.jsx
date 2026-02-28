@@ -194,6 +194,7 @@ export default function Dashboard() {
             status={computeAutoStatus(c)}
             isOwn={user?.email === c.assigned_am}
             onClick={() => navigate(createPageUrl(`ClientDetail?id=${c.id}`))}
+            seqPct={instantlyPcts[c.id]}
           />
         ))}
       </div>
