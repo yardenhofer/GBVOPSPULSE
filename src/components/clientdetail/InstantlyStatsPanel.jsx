@@ -118,8 +118,8 @@ export default function InstantlyStatsPanel({ client }) {
              </div>
            );
           })}
-          {activeCampaigns.length === 0 && (
-            <p className="text-xs text-gray-400">No active campaigns found</p>
+          {allCampaigns.length === 0 && (
+            <p className="text-xs text-gray-400">No campaigns found</p>
           )}
         </div>
       )}
