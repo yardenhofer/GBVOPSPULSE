@@ -24,9 +24,12 @@ export default function InstantlyStatsPanel({ client }) {
     fetchStats();
   }, [client.id]);
 
-  const leadListPct = (stats && stats.total_leads > 0)
-    ? Math.min(100, Math.round((stats.total_contacted / stats.total_leads) * 100))
-    : null;
+  // For lead consumption: each active campaign shows its own breakdown
+  // leads_count = total leads in campaign pool
+  // completed_count = leads that finished the entire sequence  
+  // The API doesn't directly give "not yet contacted" but we can show per-campaign data
+  const activeCampaigns = stats?.campaigns?.filter(c => c.status === 'active') || [];
+  const activeCampaign = activeCampaigns.length === 1 ? activeCampaigns[0] : null;
 
   const metrics = stats ? [
     { label: 'Sent', value: stats.total_sent.toLocaleString(), icon: Mail, color: 'text-blue-400', bg: 'bg-blue-500/10' },
