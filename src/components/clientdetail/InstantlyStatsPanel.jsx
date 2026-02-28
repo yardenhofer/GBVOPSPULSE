@@ -126,10 +126,10 @@ export default function InstantlyStatsPanel({ client }) {
             )}
           </div>
           {stats.lead_data_available && leadListPct >= 80 && (
-            <p className="text-xs text-orange-400 mt-1">⚠️ Lead pool nearly exhausted — ensure next list is ready</p>
+            <p className="text-xs text-orange-400 mt-1">⚠️ Lead pool nearly exhausted — add more leads now</p>
           )}
-          {stats.campaigns_count > 5 && (
-            <p className="text-xs text-gray-400 mt-1">Note: Lead counts sampled from first 5 campaigns</p>
+          {stats.lead_data_available && leadListPct >= 60 && leadListPct < 80 && (
+            <p className="text-xs text-yellow-400 mt-1">Lead pool over 60% consumed — plan for new leads soon</p>
           )}
         </div>
       )}
