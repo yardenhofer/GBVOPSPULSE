@@ -55,12 +55,13 @@ Deno.serve(async (req) => {
     const analyticsRes = await fetchInstantly(`/campaigns/analytics?${qs.toString()}`, apiKey);
     const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
-    // ── 2. Fetch ALL campaigns for lead status breakdown ──
-    const campaignListRes = await fetchInstantly(`/campaigns?limit=100`, apiKey);
-    const campaignListItems = Array.isArray(campaignListRes) ? campaignListRes : (campaignListRes?.items || []);
-    // DEBUG: return raw first campaign to inspect field names
-    if (campaignListItems.length > 0) {
-      return Response.json({ debug_campaign: campaignListItems[0] });
+    // ── 2. Fetch campaign analytics (all-time) for lead counts ──
+    // The /campaigns/analytics endpoint has leads_count and contacted/not-yet-contacted data
+    const allTimeAnalyticsRes = await fetchInstantly(`/campaigns/analytics?limit=100`, apiKey);
+    const allTimeItems = Array.isArray(allTimeAnalyticsRes) ? allTimeAnalyticsRes : (allTimeAnalyticsRes?.items || []);
+    // DEBUG: return raw first item to inspect field names
+    if (allTimeItems.length > 0) {
+      return Response.json({ debug_analytics: allTimeItems[0] });
     }
 
     // Build map of campaign_id -> lead breakdown
