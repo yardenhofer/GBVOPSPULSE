@@ -37,10 +37,8 @@ export default function InstantlyStatsPanel({ client }) {
     fetchStats(p);
   }
 
-  // Lead list consumption is always all-time (% of leads pool contacted)
-  const leadListPct = (stats && stats.total_leads > 0)
-    ? Math.min(100, Math.round((stats.total_contacted / stats.total_leads) * 100))
-    : null;
+  // Lead pool consumption — pre-calculated in backend using leads_count vs contacted_count
+  const leadListPct = stats?.consumed_pct ?? null;
 
   const metrics = stats ? [
     { label: 'Sent',          value: stats.total_sent.toLocaleString(),                                              icon: Mail,             color: 'text-blue-400',   bg: 'bg-blue-500/10' },
