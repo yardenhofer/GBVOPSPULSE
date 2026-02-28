@@ -23,7 +23,22 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { client_id } = body;
+    const { client_id, time_filter } = body;
+
+    // Calculate start_date based on time filter
+    let startDate = null;
+    const now = new Date();
+    if (time_filter === 'day') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString().split('T')[0];
+    } else if (time_filter === 'week') {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 7);
+      startDate = d.toISOString().split('T')[0];
+    } else if (time_filter === 'month') {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 30);
+      startDate = d.toISOString().split('T')[0];
+    }
 
     const clients = await base44.entities.Client.filter({ id: client_id });
     const client = clients[0];
@@ -37,8 +52,9 @@ Deno.serve(async (req) => {
     const campaignsList = Array.isArray(campaignsRes) ? campaignsRes : (campaignsRes?.items || []);
     const activeCampaignIds = new Set(campaignsList.filter(c => c.status === 1).map(c => c.id));
 
-    // Step 2: Get per-campaign analytics
-    const analyticsRes = await fetchInstantly('/campaigns/analytics', apiKey);
+    // Step 2: Get per-campaign analytics (with optional date filter)
+    const analyticsQuery = startDate ? `/campaigns/analytics?start_date=${startDate}` : '/campaigns/analytics';
+    const analyticsRes = await fetchInstantly(analyticsQuery, apiKey);
     const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
     const analyticsMap = {};
     for (const a of analyticsItems) analyticsMap[a.campaign_id] = a;
