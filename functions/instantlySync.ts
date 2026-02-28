@@ -2,13 +2,17 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const INSTANTLY_API = 'https://api.instantly.ai/api/v2';
 
-async function fetchInstantly(path, apiKey) {
-  const res = await fetch(`${INSTANTLY_API}${path}`, {
+async function fetchInstantly(path, apiKey, options = {}) {
+  const { method = 'GET', body } = options;
+  const fetchOptions = {
+    method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-  });
+  };
+  if (body) fetchOptions.body = JSON.stringify(body);
+  const res = await fetch(`${INSTANTLY_API}${path}`, fetchOptions);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Instantly API error ${res.status}: ${text}`);
@@ -36,42 +40,43 @@ Deno.serve(async (req) => {
     const analyticsRes = await fetchInstantly('/campaigns/analytics', apiKey);
     const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
-    // Also try the overview endpoint which may have not_yet_contacted
-    let overviewData = null;
-    try {
-      overviewData = await fetchInstantly('/campaigns/analytics/overview', apiKey);
-    } catch (_e) { /* ignore */ }
-
     // Filter active campaigns
     const activeAnalytics = analyticsItems.filter(a => a.campaign_status === 1);
     const hasActive = activeAnalytics.length > 0;
     const relevantAnalytics = hasActive ? activeAnalytics : analyticsItems;
 
-    // For each active campaign, try to get lead counts by listing leads with status filter
-    // The API has GET /leads with campaign_id and lead_status filters
-    // Let's try to count "not yet contacted" leads via the leads endpoint
-    const campaignLeadInfo = {};
+    // For each active campaign, use POST /leads/list with in_campaign_status filter to get "not yet contacted" count
+    const campaignNotContacted = {};
     for (const a of relevantAnalytics) {
       try {
-        // Try fetching leads with status = 0 (not yet contacted) - just need the count
-        const leadsRes = await fetchInstantly(`/leads?campaign_id=${a.campaign_id}&limit=1&in_campaign_status=notcontacted`, apiKey);
-        console.log(`Leads notcontacted for ${a.campaign_id}:`, JSON.stringify(leadsRes).substring(0, 1000));
-        campaignLeadInfo[a.campaign_id] = {
-          not_yet_contacted: leadsRes?.total_count ?? leadsRes?.items?.length ?? null,
-          raw: leadsRes,
-        };
+        // POST /leads/list with campaign_id and in_campaign_status filter
+        // in_campaign_status options based on Instantly UI: "Not Yet Contacted" likely maps to leads not yet started
+        const res = await fetchInstantly('/leads/list', apiKey, {
+          method: 'POST',
+          body: {
+            campaign_id: a.campaign_id,
+            in_campaign_status: 'not_yet_contacted',
+            limit: 0,
+          }
+        });
+        console.log(`Leads list response for ${a.campaign_id}:`, JSON.stringify(res).substring(0, 500));
+        campaignNotContacted[a.campaign_id] = res?.total_count ?? null;
       } catch (e) {
-        console.log(`Leads endpoint failed for ${a.campaign_id}:`, e.message);
-        // Try alternate approach
+        console.log(`POST /leads/list failed:`, e.message);
+        // Try alternative filter values
         try {
-          const leadsRes2 = await fetchInstantly(`/leads?campaign_id=${a.campaign_id}&limit=1&status=0`, apiKey);
-          console.log(`Leads status=0 for ${a.campaign_id}:`, JSON.stringify(leadsRes2).substring(0, 1000));
-          campaignLeadInfo[a.campaign_id] = {
-            not_yet_contacted: leadsRes2?.total_count ?? null,
-            raw: leadsRes2,
-          };
+          const res2 = await fetchInstantly('/leads/list', apiKey, {
+            method: 'POST',
+            body: {
+              campaign_id: a.campaign_id,
+              in_campaign_status: 0,
+              limit: 0,
+            }
+          });
+          console.log(`Leads list status=0 response:`, JSON.stringify(res2).substring(0, 500));
+          campaignNotContacted[a.campaign_id] = res2?.total_count ?? null;
         } catch (e2) {
-          console.log(`Leads status=0 also failed:`, e2.message);
+          console.log(`Second attempt also failed:`, e2.message);
         }
       }
     }
@@ -91,22 +96,19 @@ Deno.serve(async (req) => {
     }
 
     // Build campaigns list
-    const campaigns = analyticsItems.map(a => {
-      const leadInfo = campaignLeadInfo[a.campaign_id];
-      return {
-        id: a.campaign_id,
-        name: a.campaign_name,
-        status: a.campaign_status === 1 ? 'active' : a.campaign_status === 2 ? 'paused' : a.campaign_status === 3 ? 'completed' : 'other',
-        sent: a.emails_sent_count || 0,
-        replies: a.reply_count_unique || 0,
-        opportunities: a.total_opportunities || 0,
-        leads_count: a.leads_count || 0,
-        completed_count: a.completed_count || 0,
-        bounced_count: a.bounced_count || 0,
-        unsubscribed_count: a.unsubscribed_count || 0,
-        not_yet_contacted: leadInfo?.not_yet_contacted ?? null,
-      };
-    });
+    const campaigns = analyticsItems.map(a => ({
+      id: a.campaign_id,
+      name: a.campaign_name,
+      status: a.campaign_status === 1 ? 'active' : a.campaign_status === 2 ? 'paused' : a.campaign_status === 3 ? 'completed' : 'other',
+      sent: a.emails_sent_count || 0,
+      replies: a.reply_count_unique || 0,
+      opportunities: a.total_opportunities || 0,
+      leads_count: a.leads_count || 0,
+      completed_count: a.completed_count || 0,
+      bounced_count: a.bounced_count || 0,
+      unsubscribed_count: a.unsubscribed_count || 0,
+      not_yet_contacted: campaignNotContacted[a.campaign_id] ?? null,
+    }));
 
     const stats = {
       campaigns_count: activeAnalytics.length,
@@ -123,8 +125,6 @@ Deno.serve(async (req) => {
       last_synced: new Date().toISOString(),
       campaigns: campaigns.slice(0, 20),
       active_only: hasActive,
-      _overview: overviewData,
-      _lead_info: campaignLeadInfo,
     };
 
     return Response.json({ stats });
