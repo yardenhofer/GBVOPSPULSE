@@ -71,7 +71,7 @@ export default function InstantlyStatsPanel({ client }) {
 
       {stats && (
         <div className="mb-4">
-          {activeCampaigns.map(c => {
+          {allCampaigns.map(c => {
            // Sequence started = emails_sent (first step only would be ideal, but we use sent as proxy)
            // completed_count matches Instantly's "Completed" exactly
            // The remaining leads still in sequence = leads_count - completed_count
