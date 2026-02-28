@@ -55,13 +55,10 @@ Deno.serve(async (req) => {
     const analyticsRes = await fetchInstantly(`/campaigns/analytics?${qs.toString()}`, apiKey);
     const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
-    // ── 2. Fetch campaign list for lead status breakdown ──
-    // The /campaigns endpoint returns per-campaign fields including:
-    //   leads_count, completed_count, not_contacted_count (not yet contacted)
-    // These are all-time totals, exactly what Instantly shows in their progress bar UI.
-    // status=1 = active in Instantly API (numeric enum)
-    const campaignListRes = await fetchInstantly(`/campaigns?limit=100&status=1`, apiKey);
+    // ── 2. Fetch ALL campaigns (no status filter) for lead status breakdown ──
+    const campaignListRes = await fetchInstantly(`/campaigns?limit=100`, apiKey);
     const campaignListItems = Array.isArray(campaignListRes) ? campaignListRes : (campaignListRes?.items || []);
+    console.log('Campaign list raw sample:', JSON.stringify(campaignListItems[0] || {}));
 
     // Build map of campaign_id -> lead breakdown
     const campaignLeadMap = {};
