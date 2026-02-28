@@ -2,14 +2,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 const INSTANTLY_API = 'https://api.instantly.ai/api/v2';
 
-async function fetchInstantly(path, apiKey, method = 'GET', body = null) {
+async function fetchInstantly(path, apiKey) {
   const res = await fetch(`${INSTANTLY_API}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) {
     const text = await res.text();
@@ -35,60 +30,6 @@ function getDateRange(period) {
   return {};
 }
 
-// Count leads in a campaign by status using the leads/list endpoint
-// Lead statuses: 1=Active, 2=Paused, 3=Completed, -1=Bounced, -2=Unsubscribed, -3=Skipped
-async function getLeadCountsForCampaign(campaignId, apiKey) {
-  try {
-    // We use a limit of 1 just to get total count from the response — 
-    // but Instantly doesn't return a total count in leads/list.
-    // Instead we count by status using separate calls (Active vs non-Active).
-    // Active = status 1 (not yet contacted / still queued)
-    // "Contacted/used" = statuses 2, 3, -1, -2, -3
-
-    // Fetch all leads for this campaign in batches (max 100 per page)
-    let allLeads = [];
-    let startingAfter = null;
-    let hasMore = true;
-
-    while (hasMore) {
-      const payload = {
-        campaign_id: campaignId,
-        limit: 100,
-      };
-      if (startingAfter) payload.starting_after = startingAfter;
-
-      const res = await fetchInstantly('/leads/list', apiKey, 'POST', payload);
-      const leads = Array.isArray(res) ? res : (res?.items || res?.leads || []);
-      allLeads = allLeads.concat(leads);
-
-      // If we got less than 100, we're done
-      if (leads.length < 100) {
-        hasMore = false;
-      } else {
-        // Use last lead's id as cursor
-        startingAfter = leads[leads.length - 1]?.id;
-        if (!startingAfter) hasMore = false;
-      }
-
-      // Safety cap at 5000 leads to avoid long execution
-      if (allLeads.length >= 5000) break;
-    }
-
-    const totalLeads = allLeads.length;
-    // "Contacted" = anyone who has been reached: Completed(3), Bounced(-1), Unsubscribed(-2), Skipped(-3)
-    // Also count Paused(2) as "in progress / contacted at least once"
-    const contactedLeads = allLeads.filter(l => l.status !== 1).length;
-    const activeLeads = allLeads.filter(l => l.status === 1).length;
-    const completedLeads = allLeads.filter(l => l.status === 3).length;
-    const bouncedLeads = allLeads.filter(l => l.status === -1).length;
-
-    return { totalLeads, contactedLeads, activeLeads, completedLeads, bouncedLeads };
-  } catch {
-    // If lead fetching fails for this campaign, return nulls
-    return { totalLeads: null, contactedLeads: null, activeLeads: null };
-  }
-}
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -105,54 +46,69 @@ Deno.serve(async (req) => {
     const apiKey = client.instantly_api_key;
     if (!apiKey) return Response.json({ error: 'No Instantly API key configured for this client' }, { status: 400 });
 
-    // Fetch analytics (for sent/opens/replies metrics, scoped to period)
+    // ── 1. Fetch analytics with date range (for sent/opens/replies metrics) ──
     const dateRange = getDateRange(period);
     const qs = new URLSearchParams({ limit: '100' });
     if (dateRange.start_date) qs.set('start_date', dateRange.start_date);
     if (dateRange.end_date) qs.set('end_date', dateRange.end_date);
 
     const analyticsRes = await fetchInstantly(`/campaigns/analytics?${qs.toString()}`, apiKey);
-    const items = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
+    const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
+    // ── 2. Fetch ALL-TIME analytics (no date filter) for lead pool data ──
+    // leads_count and emails_sent_count are all-time fields on the campaign itself,
+    // not filtered by date — so we need unfiltered data for the lead pool calculation.
+    const allTimeRes = await fetchInstantly(`/campaigns/analytics?limit=100`, apiKey);
+    const allTimeItems = Array.isArray(allTimeRes) ? allTimeRes : (allTimeRes?.items || []);
+
+    // Build a map of campaign_id -> all-time lead data
+    const allTimeMap = {};
+    for (const c of allTimeItems) {
+      if (c.campaign_id) {
+        allTimeMap[c.campaign_id] = {
+          leads_count: c.leads_count || 0,         // total leads EVER added to the campaign
+          contacted: c.contacted_count || c.emails_sent_count || 0, // leads that received at least 1 email
+        };
+      }
+    }
+
+    // ── 3. Aggregate period-scoped metrics ──
     let totalSent = 0, totalOpens = 0, totalReplies = 0, totalOpportunities = 0, totalBounced = 0;
-    const campaignIds = [];
-
-    const campaigns = items.map(c => {
+    const campaigns = analyticsItems.map(c => {
       totalSent          += c.emails_sent_count   || 0;
       totalOpens         += c.open_count_unique   || 0;
       totalReplies       += c.reply_count_unique  || 0;
       totalOpportunities += c.total_opportunities || 0;
       totalBounced       += c.bounced_count       || 0;
-      if (c.campaign_id) campaignIds.push(c.campaign_id);
       return {
         id: c.campaign_id,
         name: c.campaign_name,
         status: c.campaign_status,
         sent: c.emails_sent_count || 0,
         replies: c.reply_count_unique || 0,
-        opportunities: c.total_opportunities || 0,
       };
     });
 
-    // Fetch accurate lead counts per campaign (parallel, max 5 campaigns to keep response fast)
-    let totalLeads = 0;
+    // ── 4. Lead pool consumption — from all-time data ──
+    // leads_count  = total leads in the campaign (the "pool size")
+    // contacted    = leads that have been emailed at least once
+    // remaining    = leads_count - contacted  (leads NOT yet contacted = still in queue)
+    let totalLeadsPool = 0;
     let totalContacted = 0;
     let leadDataAvailable = false;
 
-    const campaignsToFetch = campaignIds.slice(0, 5);
-    if (campaignsToFetch.length > 0) {
-      const leadResults = await Promise.all(
-        campaignsToFetch.map(id => getLeadCountsForCampaign(id, apiKey))
-      );
-
-      for (const lr of leadResults) {
-        if (lr.totalLeads !== null) {
-          totalLeads += lr.totalLeads;
-          totalContacted += lr.contactedLeads;
-          leadDataAvailable = true;
-        }
+    for (const data of Object.values(allTimeMap)) {
+      if (data.leads_count > 0) {
+        totalLeadsPool += data.leads_count;
+        totalContacted += Math.min(data.contacted, data.leads_count); // cap at pool size
+        leadDataAvailable = true;
       }
     }
+
+    const remainingLeads = totalLeadsPool - totalContacted;
+    const consumedPct = totalLeadsPool > 0
+      ? Math.min(100, Math.round((totalContacted / totalLeadsPool) * 100))
+      : null;
 
     const stats = {
       campaigns_count: campaigns.length,
@@ -161,9 +117,11 @@ Deno.serve(async (req) => {
       total_replies: totalReplies,
       total_opportunities: totalOpportunities,
       total_bounced: totalBounced,
-      // Lead consumption: accurate per-lead status counts
-      total_leads: leadDataAvailable ? totalLeads : null,
+      // Lead pool (always all-time)
+      total_leads: leadDataAvailable ? totalLeadsPool : null,
       total_contacted: leadDataAvailable ? totalContacted : null,
+      remaining_leads: leadDataAvailable ? remainingLeads : null,
+      consumed_pct: consumedPct,
       lead_data_available: leadDataAvailable,
       open_rate: totalSent > 0 ? Math.round((totalOpens / totalSent) * 100) : 0,
       reply_rate: totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0,
