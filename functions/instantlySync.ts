@@ -38,8 +38,11 @@ Deno.serve(async (req) => {
     const analyticsRes = await fetchInstantly('/campaigns/analytics', apiKey);
     const allItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
 
-    // Separate active vs all campaigns
-    const activeItems = allItems.filter(c => c.campaign_status === 'active');
+    // Instantly API returns status as numbers: 1 = active, 0 = paused, 2 = completed, etc.
+    // Also handle string values just in case
+    const activeItems = allItems.filter(c => 
+      c.campaign_status === 1 || c.campaign_status === 'active'
+    );
     // If no active campaigns, still show all for context (so the panel isn't empty)
     const relevantItems = activeItems.length > 0 ? activeItems : allItems;
 
