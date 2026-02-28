@@ -11,6 +11,23 @@ import ClientRow from "../components/dashboard/ClientRow";
 import ClientTableHeader from "../components/dashboard/ClientTableHeader";
 import { computeRedFlags, computeAutoStatus } from "../components/utils/redFlagEngine";
 
+async function fetchInstantlyStats(clientId) {
+  try {
+    const res = await base44.functions.invoke('instantlySync', { client_id: clientId, time_filter: 'month' });
+    if (res.data?.stats) {
+      const activeCampaigns = res.data.stats.campaigns?.filter(c => c.status === 'active') || [];
+      if (activeCampaigns.length > 0) {
+        const totalLeads = activeCampaigns.reduce((s, c) => s + (c.leads_count || 0), 0);
+        const totalCompleted = activeCampaigns.reduce((s, c) => s + (c.completed_count || 0), 0);
+        return totalLeads > 0 ? Math.round((totalCompleted / totalLeads) * 100) : 0;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULT_FILTERS = { search: "", sort: "risk", package: "All", status: "All", group: "All" };
 
 const STATUS_ORDER = { Critical: 0, "At Risk": 1, Monitor: 2, Healthy: 3 };
