@@ -36,7 +36,7 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, seqPc
         </div>
       )}
 
-      <div className="p-4 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[200px_90px_120px_100px_90px_90px_90px_auto] lg:gap-4 items-center">
+      <div className="p-4 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[200px_90px_120px_80px_100px_90px_90px_90px_auto] lg:gap-4 items-center">
         {/* Name + AM */}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
