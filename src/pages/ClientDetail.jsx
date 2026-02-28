@@ -20,6 +20,9 @@ export default function ClientDetail() {
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isNew, setIsNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPackage, setNewPackage] = useState("Email");
+  const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -33,18 +36,19 @@ export default function ClientDetail() {
           setLoading(false);
         });
     } else {
-      // New client
       setIsNew(true);
-      createNewClient();
+      setLoading(false);
     }
   }, [clientId]);
 
-  async function createNewClient() {
+  async function confirmNewClient() {
+    if (!newName.trim()) return;
+    setCreating(true);
     const created = await base44.entities.Client.create({
-      name: "New Client",
+      name: newName.trim(),
       status: "Healthy",
       client_sentiment: "Happy",
-      package_type: "PPL",
+      package_type: newPackage,
     });
     navigate(createPageUrl(`ClientDetail?id=${created.id}`), { replace: true });
   }
@@ -53,13 +57,70 @@ export default function ClientDetail() {
     setClient(prev => ({ ...prev, ...updates }));
   }
 
-  if (loading || !client) {
+  if (loading) {
     return (
       <div className="space-y-4">
         {Array(4).fill(0).map((_, i) => (
           <div key={i} className="h-32 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
         ))}
       </div>
+    );
+  }
+
+  if (isNew && !client) {
+    return (
+      <div className="max-w-lg mx-auto mt-12">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 space-y-5">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add New Client</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Fill in the basics to create a new client profile.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Name *</label>
+            <input
+              type="text"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="e.g. Acme Corp"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Package Type</label>
+            <select
+              value={newPackage}
+              onChange={e => setNewPackage(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            >
+              <option value="Email">Email</option>
+              <option value="LinkedIn">LinkedIn</option>
+              <option value="Hybrid">Hybrid</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={confirmNewClient}
+              disabled={!newName.trim() || creating}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {creating ? "Creating…" : "Create Client"}
+            </button>
+            <button
+              onClick={() => navigate(createPageUrl("Dashboard"))}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!client) {
+    return (
+      <div className="text-center py-12 text-gray-500">Client not found.</div>
     );
   }
 
