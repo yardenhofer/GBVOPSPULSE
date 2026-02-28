@@ -52,32 +52,29 @@ Deno.serve(async (req) => {
     const campaignsList = Array.isArray(campaignsRes) ? campaignsRes : (campaignsRes?.items || []);
     const activeCampaignIds = new Set(campaignsList.filter(c => c.status === 1).map(c => c.id));
 
-    // Step 2: Get per-campaign analytics (with optional date filter)
-    const analyticsQuery = startDate ? `/campaigns/analytics?start_date=${startDate}` : '/campaigns/analytics';
-    const analyticsRes = await fetchInstantly(analyticsQuery, apiKey);
+    // Step 2: Get analytics overview (supports start_date, end_date, campaign_status)
+    // Use /campaigns/analytics/overview for date-filtered stats
+    const hasActive = activeCampaignIds.size > 0;
+    let overviewParams = [];
+    if (startDate) overviewParams.push(`start_date=${startDate}`);
+    if (hasActive) overviewParams.push('campaign_status=1'); // Active only
+    const overviewQuery = '/campaigns/analytics/overview' + (overviewParams.length ? '?' + overviewParams.join('&') : '');
+    const overviewRes = await fetchInstantly(overviewQuery, apiKey);
+
+    // Also get per-campaign analytics (no date filter) for lead pool / sequence progress
+    const analyticsRes = await fetchInstantly('/campaigns/analytics', apiKey);
     const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
     const analyticsMap = {};
     for (const a of analyticsItems) analyticsMap[a.campaign_id] = a;
 
-    // Step 3: Filter to active campaigns only (fallback to all if none active)
-    const hasActive = activeCampaignIds.size > 0;
-    const relevantAnalytics = hasActive
-      ? analyticsItems.filter(a => activeCampaignIds.has(a.campaign_id))
-      : analyticsItems;
-
-    // Step 4: Aggregate stats from active campaigns
-    let totalSent = 0, totalOpens = 0, totalReplies = 0, totalOpportunities = 0, totalBounced = 0;
-    let totalLeads = 0, totalCompleted = 0;
-
-    for (const item of relevantAnalytics) {
-      totalSent          += item.emails_sent_count    || 0;
-      totalOpens         += item.open_count_unique    || 0;
-      totalReplies       += item.reply_count_unique   || 0;
-      totalOpportunities += item.total_opportunities  || 0;
-      totalBounced       += item.bounced_count        || 0;
-      totalLeads         += item.leads_count          || 0;
-      totalCompleted     += item.completed_count      || 0;
-    }
+    // Step 3: Use overview response for aggregated totals (already filtered by date + active status)
+    const totalSent = overviewRes.emails_sent_count || 0;
+    const totalOpens = overviewRes.open_count_unique || 0;
+    const totalReplies = overviewRes.reply_count_unique || 0;
+    const totalOpportunities = overviewRes.total_opportunities || 0;
+    const totalBounced = overviewRes.bounced_count || 0;
+    const totalLeads = overviewRes.leads_count || 0;
+    const totalCompleted = overviewRes.completed_count || 0;
 
     // Step 5: Build campaigns list for display
     const campaigns = campaignsList.map(c => {
