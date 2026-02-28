@@ -59,7 +59,8 @@ Deno.serve(async (req) => {
     // The /campaigns endpoint returns per-campaign fields including:
     //   leads_count, completed_count, not_contacted_count (not yet contacted)
     // These are all-time totals, exactly what Instantly shows in their progress bar UI.
-    const campaignListRes = await fetchInstantly(`/campaigns?limit=100&status=active`, apiKey);
+    // status=1 = active in Instantly API (numeric enum)
+    const campaignListRes = await fetchInstantly(`/campaigns?limit=100&status=1`, apiKey);
     const campaignListItems = Array.isArray(campaignListRes) ? campaignListRes : (campaignListRes?.items || []);
 
     // Build map of campaign_id -> lead breakdown
