@@ -157,8 +157,15 @@ Deno.serve(async (req) => {
 
     // Log all analytics fields for the active campaign so we can see what's available
     for (const item of relevantAnalytics) {
-      console.log(`Full analytics fields for campaign ${item.campaign_id}:`, JSON.stringify(Object.keys(item)));
-      console.log(`Full analytics data:`, JSON.stringify(item));
+      console.log(`Full analytics keys for campaign ${item.campaign_id}:`, JSON.stringify(Object.keys(item)));
+      // Log specific lead-related fields
+      const leadFields = {};
+      for (const [k, v] of Object.entries(item)) {
+        if (k.includes('lead') || k.includes('contact') || k.includes('progress') || k.includes('complet') || k.includes('sequence') || k.includes('not_yet')) {
+          leadFields[k] = v;
+        }
+      }
+      console.log(`Lead-related fields:`, JSON.stringify(leadFields));
     }
 
     // Figure out contacted: use new_leads_contacted_count if available, otherwise leads_count - approximate
