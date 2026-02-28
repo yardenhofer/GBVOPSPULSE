@@ -103,29 +103,35 @@ export default function InstantlyStatsPanel({ client }) {
         </div>
       )}
 
-      {/* Lead List Consumption — always all-time */}
+      {/* Lead List Consumption — based on actual per-lead status (all-time) */}
       {stats && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Lead List Consumption <span className="text-gray-400">(all-time)</span></span>
-            {leadListPct !== null ? (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Lead Pool Consumption
+              <span className="text-gray-400 ml-1">(active campaigns, all-time)</span>
+            </span>
+            {stats.lead_data_available && leadListPct !== null ? (
               <span className={`text-xs font-semibold ${leadListPct >= 80 ? 'text-orange-400' : leadListPct >= 60 ? 'text-yellow-400' : 'text-green-400'}`}>
-                {leadListPct}% contacted · {stats.total_contacted.toLocaleString()} / {stats.total_leads.toLocaleString()} leads
+                {leadListPct}% used · {stats.total_contacted.toLocaleString()} / {stats.total_leads.toLocaleString()} leads
               </span>
             ) : (
               <span className="text-xs text-gray-400">No lead data</span>
             )}
           </div>
           <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-            {leadListPct !== null && (
+            {stats.lead_data_available && leadListPct !== null && (
               <div
                 className={`h-2 rounded-full transition-all ${leadListPct >= 80 ? 'bg-orange-400' : leadListPct >= 60 ? 'bg-yellow-400' : 'bg-green-400'}`}
                 style={{ width: `${leadListPct}%` }}
               />
             )}
           </div>
-          {leadListPct >= 80 && (
-            <p className="text-xs text-orange-400 mt-1">⚠️ Lead list nearly exhausted — ensure next list is ready</p>
+          {stats.lead_data_available && leadListPct >= 80 && (
+            <p className="text-xs text-orange-400 mt-1">⚠️ Lead pool nearly exhausted — ensure next list is ready</p>
+          )}
+          {stats.campaigns_count > 5 && (
+            <p className="text-xs text-gray-400 mt-1">Note: Lead counts sampled from first 5 campaigns</p>
           )}
         </div>
       )}
