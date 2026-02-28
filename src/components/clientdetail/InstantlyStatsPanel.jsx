@@ -1,25 +1,17 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { RefreshCw, Mail, MousePointerClick, MessageSquare, Users, AlertCircle, Zap } from "lucide-react";
-
-const PERIODS = [
-  { value: 'today', label: 'Today' },
-  { value: '7d',    label: '7 Days' },
-  { value: '30d',   label: '30 Days' },
-  { value: 'all',   label: 'All Time' },
-];
+import { RefreshCw, Mail, MousePointerClick, MessageSquare, Users, Calendar, Zap } from "lucide-react";
 
 export default function InstantlyStatsPanel({ client }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [period, setPeriod] = useState('7d');
 
-  async function fetchStats(p = period) {
+  async function fetchStats() {
     setLoading(true);
     setError(null);
     try {
-      const res = await base44.functions.invoke('instantlySync', { client_id: client.id, period: p });
+      const res = await base44.functions.invoke('instantlySync', { client_id: client.id });
       if (res.data.error) throw new Error(res.data.error);
       setStats(res.data.stats);
     } catch (e) {
@@ -29,30 +21,23 @@ export default function InstantlyStatsPanel({ client }) {
   }
 
   useEffect(() => {
-    fetchStats(period);
+    fetchStats();
   }, [client.id]);
 
-  function handlePeriodChange(p) {
-    setPeriod(p);
-    fetchStats(p);
-  }
-
-  // Lead list consumption is always all-time (% of leads pool contacted)
   const leadListPct = (stats && stats.total_leads > 0)
     ? Math.min(100, Math.round((stats.total_contacted / stats.total_leads) * 100))
     : null;
 
   const metrics = stats ? [
-    { label: 'Sent',          value: stats.total_sent.toLocaleString(),                                              icon: Mail,             color: 'text-blue-400',   bg: 'bg-blue-500/10' },
-    { label: 'Opens',         value: `${stats.total_opens.toLocaleString()} (${stats.open_rate}%)`,                  icon: MousePointerClick, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-    { label: 'Replies',       value: `${stats.total_replies.toLocaleString()} (${stats.reply_rate}%)`,               icon: MessageSquare,    color: 'text-cyan-400',   bg: 'bg-cyan-500/10' },
-    { label: 'Opportunities', value: stats.total_opportunities.toLocaleString(),                                     icon: Users,            color: 'text-green-400',  bg: 'bg-green-500/10' },
-    { label: 'Bounced',       value: stats.total_bounced.toLocaleString(),                                           icon: AlertCircle,      color: 'text-red-400',    bg: 'bg-red-500/10' },
+    { label: 'Sent', value: stats.total_sent.toLocaleString(), icon: Mail, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+    { label: 'Opens', value: `${stats.total_opens.toLocaleString()} (${stats.open_rate}%)`, icon: MousePointerClick, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    { label: 'Replies', value: `${stats.total_replies.toLocaleString()} (${stats.reply_rate}%)`, icon: MessageSquare, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+    { label: 'Opportunities', value: stats.total_opportunities.toLocaleString(), icon: Users, color: 'text-green-400', bg: 'bg-green-500/10' },
+    { label: 'Bounced', value: stats.total_bounced.toLocaleString(), icon: Calendar, color: 'text-red-400', bg: 'bg-red-500/10' },
   ] : [];
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-orange-400" />
@@ -64,7 +49,7 @@ export default function InstantlyStatsPanel({ client }) {
           )}
         </div>
         <button
-          onClick={() => fetchStats(period)}
+          onClick={fetchStats}
           disabled={loading}
           className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-400 transition-colors disabled:opacity-50"
         >
@@ -73,26 +58,8 @@ export default function InstantlyStatsPanel({ client }) {
         </button>
       </div>
 
-      {/* Period filter */}
-      <div className="flex gap-1 mb-4">
-        {PERIODS.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => handlePeriodChange(value)}
-            disabled={loading}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors disabled:opacity-50
-              ${period === value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-              }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {error && (
-        <div className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2 mb-3">{error}</div>
+        <div className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{error}</div>
       )}
 
       {loading && !stats && (
@@ -103,17 +70,16 @@ export default function InstantlyStatsPanel({ client }) {
         </div>
       )}
 
-      {/* Lead List Consumption — always all-time */}
       {stats && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Lead List Consumption <span className="text-gray-400">(all-time)</span></span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">Lead List Consumption</span>
             {leadListPct !== null ? (
               <span className={`text-xs font-semibold ${leadListPct >= 80 ? 'text-orange-400' : leadListPct >= 60 ? 'text-yellow-400' : 'text-green-400'}`}>
-                {leadListPct}% contacted · {stats.total_contacted.toLocaleString()} / {stats.total_leads.toLocaleString()} leads
+                {leadListPct}% contacted ({stats.total_contacted.toLocaleString()} / {stats.total_leads.toLocaleString()} leads)
               </span>
             ) : (
-              <span className="text-xs text-gray-400">No lead data</span>
+              <span className="text-xs text-gray-400">No lead count data</span>
             )}
           </div>
           <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
@@ -130,7 +96,6 @@ export default function InstantlyStatsPanel({ client }) {
         </div>
       )}
 
-      {/* Metrics grid */}
       {stats && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -147,7 +112,7 @@ export default function InstantlyStatsPanel({ client }) {
 
           {stats.campaigns?.length > 0 && (
             <div className="mt-4">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Campaigns ({stats.campaigns_count})</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Active Campaigns ({stats.campaigns_count})</p>
               <div className="flex flex-wrap gap-1.5">
                 {stats.campaigns.map(c => (
                   <span key={c.id} className={`text-xs px-2 py-0.5 rounded-full font-medium
