@@ -114,7 +114,9 @@ export default function InstantlyStatsPanel({ client }) {
 
           {stats.campaigns?.length > 0 && (
             <div className="mt-4">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Active Campaigns ({stats.campaigns_count})</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {stats.active_only ? `Active Campaigns (${stats.campaigns_count})` : `All Campaigns (${stats.total_campaigns})`}
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {stats.campaigns.map(c => (
                   <span key={c.id} className={`text-xs px-2 py-0.5 rounded-full font-medium
