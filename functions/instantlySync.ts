@@ -70,9 +70,10 @@ Deno.serve(async (req) => {
     }
 
     // Fetch campaign list to get lead counts (leads_count is on the campaign object)
-    // We use the campaigns list endpoint which has leads_count
-    const campaignsRes = await fetchInstantly('/campaigns?limit=100&status=1', apiKey);
-    const activeCampaigns = Array.isArray(campaignsRes) ? campaignsRes : (campaignsRes?.items || campaignsRes?.data || []);
+    const campaignsRes = await fetchInstantly('/campaigns?limit=100', apiKey);
+    const allCampaigns = Array.isArray(campaignsRes) ? campaignsRes : (campaignsRes?.items || campaignsRes?.data || []);
+    // status 1 = Active
+    const activeCampaigns = allCampaigns.filter(c => c.status === 1);
 
     // Build a map of campaign_id -> leads_count from the campaigns list
     const leadsCountMap = {};
