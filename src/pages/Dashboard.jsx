@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("all"); // "all" | "escalated" | "awaiting_leads"
+  const [instantlyPcts, setInstantlyPcts] = useState({}); // { clientId: number|null }
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,6 +51,14 @@ export default function Dashboard() {
     const data = await base44.entities.Client.list("-updated_date", 200);
     setClients(data);
     setLoading(false);
+
+    // Fetch Instantly stats for clients that have an API key
+    const instantlyClients = data.filter(c => c.instantly_api_key);
+    const results = {};
+    await Promise.all(instantlyClients.map(async (c) => {
+      results[c.id] = await fetchInstantlyStats(c.id);
+    }));
+    setInstantlyPcts(results);
   }
 
   const groups = [...new Set(clients.map(c => c.group).filter(g => g != null))].sort((a, b) => a - b);
