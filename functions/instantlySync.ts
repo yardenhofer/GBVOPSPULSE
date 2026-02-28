@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     const totalLeads = overviewRes.leads_count || 0;
     const totalCompleted = overviewRes.completed_count || 0;
 
-    // Step 5: Build campaigns list for display
+    // Step 4: Build campaigns list for display (per-campaign uses non-filtered analytics for lead pool data)
     const campaigns = campaignsList.map(c => {
       const a = analyticsMap[c.id] || {};
       return {
