@@ -9,7 +9,7 @@ const STATUS_GLOW = {
   Critical: "status-glow-critical",
 };
 
-export default function ClientRow({ client, flags, status, isOwn, onClick }) {
+export default function ClientRow({ client, flags, status, isOwn, onClick, seqPct }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Healthy"];
   const sentCfg = SENTIMENT_CONFIG[client.client_sentiment] || SENTIMENT_CONFIG["Neutral"];
   const pkgCfg = PACKAGE_CONFIG[client.package_type] || {};
