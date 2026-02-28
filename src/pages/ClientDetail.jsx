@@ -142,7 +142,15 @@ export default function ClientDetail() {
         </div>
       )}
 
-      <ClientHeader client={client} status={status} onBack={() => navigate(createPageUrl("Dashboard"))} />
+      <ClientHeader
+        client={client}
+        status={status}
+        onBack={() => navigate(createPageUrl("Dashboard"))}
+        onDelete={async () => {
+          await base44.entities.Client.delete(client.id);
+          navigate(createPageUrl("Dashboard"));
+        }}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LeadFlowSection client={client} />
