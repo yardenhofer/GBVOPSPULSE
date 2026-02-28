@@ -64,6 +64,33 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, seqPc
           {status}
         </span>
 
+        {/* Sequence % */}
+        <div className="hidden lg:block text-center">
+          {client.instantly_api_key ? (
+            seqPct != null ? (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className={`text-sm font-bold ${
+                  seqPct >= 80 ? 'text-green-500' : seqPct >= 50 ? 'text-yellow-500' : seqPct >= 20 ? 'text-orange-500' : 'text-red-500'
+                }`}>
+                  {seqPct}%
+                </span>
+                <div className="w-12 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      seqPct >= 80 ? 'bg-green-500' : seqPct >= 50 ? 'bg-yellow-500' : seqPct >= 20 ? 'bg-orange-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${Math.min(100, seqPct)}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-400">…</span>
+            )
+          ) : (
+            <span className="text-xs text-gray-400">—</span>
+          )}
+        </div>
+
         {/* Leads this week */}
         <div className="hidden lg:block text-right">
           <p className="text-sm font-bold text-gray-900 dark:text-white">{client.leads_this_week ?? "—"}</p>
