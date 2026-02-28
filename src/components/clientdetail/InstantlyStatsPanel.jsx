@@ -82,9 +82,13 @@ export default function InstantlyStatsPanel({ client }) {
            return (
              <div key={c.id} className="mb-3">
                <div className="flex items-center justify-between mb-1">
-                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                   {c.name}
-                 </span>
+                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                    {c.name}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium
+                      ${c.status === 'active' ? 'bg-green-500/10 text-green-400' : c.status === 'paused' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-gray-500/10 text-gray-400'}`}>
+                      {c.status}
+                    </span>
+                  </span>
                  <span className="text-xs text-gray-400">
                    {c.leads_count.toLocaleString()} total leads
                  </span>
