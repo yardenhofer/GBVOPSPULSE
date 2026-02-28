@@ -45,40 +45,68 @@ Deno.serve(async (req) => {
     const hasActive = activeAnalytics.length > 0;
     const relevantAnalytics = hasActive ? activeAnalytics : analyticsItems;
 
-    // For each active campaign, use POST /leads/list with in_campaign_status filter to get "not yet contacted" count
+    // For each active campaign, try POST /leads/list to find "not yet contacted" leads
     const campaignNotContacted = {};
     for (const a of relevantAnalytics) {
+      // Try various filter approaches and log full response structure
       try {
-        // POST /leads/list with campaign_id and in_campaign_status filter
-        // in_campaign_status options based on Instantly UI: "Not Yet Contacted" likely maps to leads not yet started
-        const res = await fetchInstantly('/leads/list', apiKey, {
+        const res1 = await fetchInstantly('/leads/list', apiKey, {
           method: 'POST',
           body: {
             campaign_id: a.campaign_id,
             in_campaign_status: 'not_yet_contacted',
-            limit: 0,
+            limit: 1,
           }
         });
-        console.log(`Leads list response for ${a.campaign_id}:`, JSON.stringify(res).substring(0, 500));
-        campaignNotContacted[a.campaign_id] = res?.total_count ?? null;
-      } catch (e) {
-        console.log(`POST /leads/list failed:`, e.message);
-        // Try alternative filter values
-        try {
-          const res2 = await fetchInstantly('/leads/list', apiKey, {
-            method: 'POST',
-            body: {
-              campaign_id: a.campaign_id,
-              in_campaign_status: 0,
-              limit: 0,
-            }
-          });
-          console.log(`Leads list status=0 response:`, JSON.stringify(res2).substring(0, 500));
-          campaignNotContacted[a.campaign_id] = res2?.total_count ?? null;
-        } catch (e2) {
-          console.log(`Second attempt also failed:`, e2.message);
+        console.log(`not_yet_contacted response keys: ${JSON.stringify(Object.keys(res1))}`);
+        console.log(`not_yet_contacted full: ${JSON.stringify(res1).substring(0, 800)}`);
+        if (res1.total_count != null) {
+          campaignNotContacted[a.campaign_id] = res1.total_count;
+        } else if (res1.items) {
+          // If it filtered correctly but no total_count, we need another approach
+          // Try with limit=0 or check if there's a count field
+          console.log(`items length: ${res1.items?.length}, has next_starting_after: ${!!res1.next_starting_after}`);
         }
+      } catch (e) {
+        console.log(`not_yet_contacted error: ${e.message}`);
       }
+
+      // Also try without filter to see what fields come back
+      try {
+        const res2 = await fetchInstantly('/leads/list', apiKey, {
+          method: 'POST',
+          body: {
+            campaign_id: a.campaign_id,
+            limit: 1,
+          }
+        });
+        console.log(`All leads response keys: ${JSON.stringify(Object.keys(res2))}`);
+        console.log(`All leads: total_count=${res2.total_count}, items_len=${res2.items?.length}`);
+        // Check the lead status field - what does the first lead look like?
+        if (res2.items?.[0]) {
+          console.log(`Sample lead keys: ${JSON.stringify(Object.keys(res2.items[0]))}`);
+          console.log(`Sample lead status: ${res2.items[0].status}, in_campaign_status: ${res2.items[0].in_campaign_status}`);
+        }
+      } catch (e) {
+        console.log(`All leads error: ${e.message}`);
+      }
+
+      // From the screenshot: Total=20169, Not yet contacted=13164
+      // The analytics API gives: leads_count=20169, contacted_count=233682 (inflated), new_leads_contacted_count=103511
+      // None of these give 13164. Let's try: 20169 - (20106 in_progress) = 63... no
+      // Or: leads_count - new_leads_contacted_count gives negative
+      // The screenshot shows: In Progress=20106, Not yet contacted=13164, Total=20169
+      // So In Progress + Not yet contacted > Total. This means "In Progress" counts leads currently in sequence
+      // and "Not yet contacted" is separate pool. Total Leads = 20169 is just leads in the campaign
+      // 
+      // Looking at the analytics endpoint: contacted_count = "Number of leads for whom the sequence has started"
+      // So not_yet_contacted should = leads_count - (contacted leads, deduplicated)
+      // But contacted_count=233682 which is way more than leads_count=20169
+      // This means contacted_count is NOT unique leads, despite the API docs saying so
+      //
+      // Let's compute: leads_count - new_leads_contacted_count... 20169 - 103511 = negative
+      // 
+      // The only reliable way is to use the leads list endpoint with the right filter
     }
 
     // Aggregate stats
