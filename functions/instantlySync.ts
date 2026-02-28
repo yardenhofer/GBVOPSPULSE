@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     const campaigns = allItems.map(c => ({
       id: c.campaign_id,
       name: c.campaign_name,
-      status: c.campaign_status,
+      status: (c.campaign_status === 1 || c.campaign_status === 'active') ? 'active' : 'inactive',
       sent: c.emails_sent_count || 0,
       replies: c.reply_count_unique || 0,
       opportunities: c.total_opportunities || 0,
