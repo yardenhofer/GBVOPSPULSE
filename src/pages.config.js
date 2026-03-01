@@ -54,6 +54,7 @@ import Dashboard from './pages/Dashboard';
 import ExecutiveView from './pages/ExecutiveView';
 import Settings from './pages/Settings';
 import DailyEntries from './pages/DailyEntries';
+import ActivityLog from './pages/ActivityLog';
 import __Layout from './Layout.jsx';
 
 
@@ -65,6 +66,7 @@ export const PAGES = {
     "ExecutiveView": ExecutiveView,
     "Settings": Settings,
     "DailyEntries": DailyEntries,
+    "ActivityLog": ActivityLog,
 }
 
 export const pagesConfig = {

@@ -119,6 +119,13 @@ export default function DailyCheckIn() {
       setCheckInId(created.id);
       setCheckIns(prev => [...prev, { ...payload, id: created.id }]);
     }
+    base44.entities.UserActivity.create({
+      user_email: user.email,
+      user_name: user.full_name || user.email,
+      action: "daily_checkin",
+      detail: `Submitted daily check-in${allDone ? " (completed)" : " (partial)"}`,
+      client_name: selectedClient?.name || "",
+    });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
