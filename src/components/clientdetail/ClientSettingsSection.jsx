@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 
 const SENTIMENTS = ["Happy", "Neutral", "Slightly Concerned", "Unhappy"];
 const STATUSES = ["Healthy", "Monitor", "At Risk", "Critical"];
-const PACKAGES = ["Email", "LinkedIn", "Hybrid", "Retainer", "PPL"];
+const PACKAGES = ["Email", "LinkedIn", "Hybrid"];
 
 export default function ClientSettingsSection({ client, onClientUpdate }) {
   const [form, setForm] = useState({
