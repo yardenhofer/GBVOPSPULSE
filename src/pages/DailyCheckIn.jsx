@@ -26,6 +26,7 @@ export default function DailyCheckIn() {
   const [form, setForm] = useState({
     emails_sent: "",
     linkedin_messages_sent: "",
+    inmails_sent: "",
     positive_responses: "",
   });
   const [checks, setChecks] = useState({
@@ -65,6 +66,7 @@ export default function DailyCheckIn() {
       setForm({
         emails_sent: existing.emails_sent ?? "",
         linkedin_messages_sent: existing.linkedin_messages_sent ?? "",
+        inmails_sent: existing.inmails_sent ?? "",
         positive_responses: existing.positive_responses ?? "",
       });
       setChecks({
@@ -76,7 +78,7 @@ export default function DailyCheckIn() {
       });
       setCheckInId(existing.id);
     } else {
-      setForm({ emails_sent: "", linkedin_messages_sent: "", positive_responses: "" });
+      setForm({ emails_sent: "", linkedin_messages_sent: "", inmails_sent: "", positive_responses: "" });
       setChecks({
         reviewed_lead_performance: false,
         checked_lead_list_status: false,
@@ -91,6 +93,8 @@ export default function DailyCheckIn() {
 
   const selectedClient = myClients.find(c => c.id === selectedClientId);
   const isHybrid = selectedClient?.package_type === "Hybrid";
+  const isLinkedIn = selectedClient?.package_type === "LinkedIn";
+  const showLinkedIn = isHybrid || isLinkedIn;
 
   async function handleSave() {
     if (!selectedClientId || !user) return;
@@ -101,7 +105,8 @@ export default function DailyCheckIn() {
       am_email: user.email,
       date: today,
       emails_sent: form.emails_sent !== "" ? Number(form.emails_sent) : 0,
-      linkedin_messages_sent: isHybrid && form.linkedin_messages_sent !== "" ? Number(form.linkedin_messages_sent) : 0,
+      linkedin_messages_sent: showLinkedIn && form.linkedin_messages_sent !== "" ? Number(form.linkedin_messages_sent) : 0,
+      inmails_sent: showLinkedIn && form.inmails_sent !== "" ? Number(form.inmails_sent) : 0,
       positive_responses: form.positive_responses !== "" ? Number(form.positive_responses) : 0,
       ...checks,
       completed: allDone,
@@ -205,7 +210,7 @@ export default function DailyCheckIn() {
                 onChange={e => { setForm(f => ({ ...f, emails_sent: e.target.value })); setSaved(false); }}
               />
             </div>
-            {isHybrid && (
+            {showLinkedIn && (
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">LinkedIn Messages Sent</label>
                 <input
@@ -215,6 +220,19 @@ export default function DailyCheckIn() {
                   placeholder="0"
                   value={form.linkedin_messages_sent}
                   onChange={e => { setForm(f => ({ ...f, linkedin_messages_sent: e.target.value })); setSaved(false); }}
+                />
+              </div>
+            )}
+            {showLinkedIn && (
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">InMails Sent</label>
+                <input
+                  type="number"
+                  min="0"
+                  className={inputCls}
+                  placeholder="0"
+                  value={form.inmails_sent}
+                  onChange={e => { setForm(f => ({ ...f, inmails_sent: e.target.value })); setSaved(false); }}
                 />
               </div>
             )}

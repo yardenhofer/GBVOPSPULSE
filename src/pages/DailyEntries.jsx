@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { format, subDays } from "date-fns";
-import { ClipboardList, ChevronDown, Check, X, Mail, MessageSquare, ThumbsUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { ClipboardList, ChevronDown, Check, X, Mail, MessageSquare, Send, ThumbsUp, ChevronLeft, ChevronRight } from "lucide-react";
 
 const CHECKLIST_KEYS = [
   { key: "reviewed_lead_performance", short: "Leads" },
@@ -155,6 +155,7 @@ export default function DailyEntries() {
                   <th className="text-left px-4 py-3 font-medium">AM</th>
                   <th className="text-center px-3 py-3 font-medium"><Mail className="w-3.5 h-3.5 mx-auto" /></th>
                   <th className="text-center px-3 py-3 font-medium"><MessageSquare className="w-3.5 h-3.5 mx-auto" /></th>
+                  <th className="text-center px-3 py-3 font-medium"><Send className="w-3.5 h-3.5 mx-auto" /></th>
                   <th className="text-center px-3 py-3 font-medium"><ThumbsUp className="w-3.5 h-3.5 mx-auto" /></th>
                   {CHECKLIST_KEYS.map(({ key, short }) => (
                     <th key={key} className="text-center px-2 py-3 font-medium whitespace-nowrap">{short}</th>
@@ -190,7 +191,10 @@ export default function DailyEntries() {
                       {checkIn ? checkIn.emails_sent : "—"}
                     </td>
                     <td className="text-center px-3 py-2.5 text-gray-900 dark:text-gray-100">
-                      {client.package_type === "Hybrid" ? (checkIn ? checkIn.linkedin_messages_sent : "—") : <span className="text-gray-300 dark:text-gray-600">n/a</span>}
+                      {(client.package_type === "Hybrid" || client.package_type === "LinkedIn") ? (checkIn ? checkIn.linkedin_messages_sent : "—") : <span className="text-gray-300 dark:text-gray-600">n/a</span>}
+                    </td>
+                    <td className="text-center px-3 py-2.5 text-gray-900 dark:text-gray-100">
+                      {(client.package_type === "Hybrid" || client.package_type === "LinkedIn") ? (checkIn ? (checkIn.inmails_sent || 0) : "—") : <span className="text-gray-300 dark:text-gray-600">n/a</span>}
                     </td>
                     <td className="text-center px-3 py-2.5 text-gray-900 dark:text-gray-100">
                       {checkIn ? checkIn.positive_responses : "—"}
