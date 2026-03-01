@@ -86,4 +86,6 @@ export const PACKAGE_CONFIG = {
   'Email':    { color: 'text-blue-400',   bg: 'bg-blue-500/10' },
   'LinkedIn': { color: 'text-purple-400', bg: 'bg-purple-500/10' },
   'Hybrid':   { color: 'text-cyan-400',   bg: 'bg-cyan-500/10' },
+  'Retainer': { color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  'PPL':      { color: 'text-amber-400',   bg: 'bg-amber-500/10' },
 };
