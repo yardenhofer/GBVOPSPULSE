@@ -53,6 +53,7 @@ import DailyCheckIn from './pages/DailyCheckIn';
 import Dashboard from './pages/Dashboard';
 import ExecutiveView from './pages/ExecutiveView';
 import Settings from './pages/Settings';
+import DailyEntries from './pages/DailyEntries';
 import __Layout from './Layout.jsx';
 
 
@@ -63,6 +64,7 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "ExecutiveView": ExecutiveView,
     "Settings": Settings,
+    "DailyEntries": DailyEntries,
 }
 
 export const pagesConfig = {
