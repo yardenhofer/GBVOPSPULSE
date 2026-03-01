@@ -105,7 +105,9 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <F label="Client Name"><input type="text" className={inputCls} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></F>
-        <F label="Assigned AM (email)"><input type="text" className={inputCls} value={form.assigned_am} onChange={e => setForm(f => ({ ...f, assigned_am: e.target.value }))} /></F>
+        <F label="Assigned AM (email)">
+          <Sel value={form.assigned_am} onChange={e => setForm(f => ({ ...f, assigned_am: e.target.value }))} options={amOptions} />
+        </F>
         <F label="Group #"><input type="number" min="1" className={inputCls} value={form.group} placeholder="—" onChange={e => setForm(f => ({ ...f, group: e.target.value }))} /></F>
         <F label="Package">
           <Sel value={form.package_type} onChange={e => setForm(f => ({ ...f, package_type: e.target.value }))} options={PACKAGES} />
