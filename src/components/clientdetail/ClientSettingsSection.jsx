@@ -7,6 +7,15 @@ const STATUSES = ["Healthy", "Monitor", "At Risk", "Critical"];
 const PACKAGES = ["Email", "LinkedIn", "Hybrid"];
 
 export default function ClientSettingsSection({ client, onClientUpdate }) {
+  const [amOptions, setAmOptions] = useState([]);
+
+  useEffect(() => {
+    base44.entities.User.list("-full_name", 200).then(users => {
+      const ams = [...new Set(users.map(u => u.email).filter(Boolean))];
+      setAmOptions(ams);
+    });
+  }, []);
+
   const [form, setForm] = useState({
     name: client.name || "",
     package_type: client.package_type || "Email",
