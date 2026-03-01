@@ -28,6 +28,13 @@ export default function Settings() {
       ]);
       setCurrentUser(me);
       setUsers(allUsers);
+      // Clean up pending invites that have been accepted
+      const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()));
+      setPendingInvites(prev => {
+        const stillPending = prev.filter(email => !existingEmails.has(email.toLowerCase()));
+        localStorage.setItem("opsctrl_pending_invites", JSON.stringify(stillPending));
+        return stillPending;
+      });
       setLoading(false);
     }
     load();
