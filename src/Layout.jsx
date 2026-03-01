@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Bell, Sun, Moon, Menu, Zap, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Bell, Sun, Moon, Menu, Zap, Settings, LogOut, Activity } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const NAV = [
@@ -10,6 +10,7 @@ const NAV = [
   { label: "Daily Entries",  page: "DailyEntries",   icon: ClipboardList, adminOnly: true },
   { label: "Alerts",         page: "Alerts",         icon: Bell },
   { label: "Executive View", page: "ExecutiveView",  icon: TrendingUp },
+  { label: "Activity Log",   page: "ActivityLog",    icon: Activity, adminOnly: true },
   { label: "Settings",       page: "Settings",       icon: Settings, adminOnly: true },
 ];
 
@@ -28,7 +29,21 @@ export default function Layout({ children, currentPageName }) {
   }, [dark]);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    base44.auth.me().then(u => {
+      setUser(u);
+      if (u) {
+        const key = `lastLogin_${u.email}_${new Date().toDateString()}`;
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "1");
+          base44.entities.UserActivity.create({
+            user_email: u.email,
+            user_name: u.full_name || u.email,
+            action: "login",
+            detail: "Logged into GBV Ops Center",
+          });
+        }
+      }
+    }).catch(() => {});
   }, []);
 
   return (
