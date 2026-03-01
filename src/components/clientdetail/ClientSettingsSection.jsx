@@ -57,6 +57,16 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     }
     await base44.entities.Client.update(client.id, payload);
     onClientUpdate(payload);
+    const u = await base44.auth.me().catch(() => null);
+    if (u) {
+      base44.entities.UserActivity.create({
+        user_email: u.email,
+        user_name: u.full_name || u.email,
+        action: "settings_change",
+        detail: `Updated settings for ${form.name}`,
+        client_name: form.name,
+      });
+    }
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

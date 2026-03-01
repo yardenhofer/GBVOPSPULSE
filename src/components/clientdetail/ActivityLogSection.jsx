@@ -37,6 +37,15 @@ export default function ActivityLogSection({ client }) {
     await base44.entities.ActivityLog.create({ ...form, client_id: client.id, am_email: user?.email });
     // Update last touchpoint on client
     await base44.entities.Client.update(client.id, { last_am_touchpoint: form.date });
+    if (user) {
+      base44.entities.UserActivity.create({
+        user_email: user.email,
+        user_name: user.full_name || user.email,
+        action: "activity_logged",
+        detail: `Logged ${form.type}: ${form.note.slice(0, 80)}`,
+        client_name: client.name,
+      });
+    }
     setForm({ type: "Call", note: "", follow_up_needed: false, date: new Date().toISOString().slice(0, 10) });
     setShowForm(false);
     setSaving(false);
