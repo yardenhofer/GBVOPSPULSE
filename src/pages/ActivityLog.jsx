@@ -21,14 +21,18 @@ export default function ActivityLog() {
   const [filterAction, setFilterAction] = useState("all");
 
   useEffect(() => {
-    Promise.all([
-      base44.entities.UserActivity.list("-created_date", 200),
-      base44.entities.User.list("-full_name", 200),
-    ]).then(([a, u]) => {
+    async function load() {
+      const a = await base44.entities.UserActivity.list("-created_date", 200);
       setActivities(a);
-      setUsers(u);
+      try {
+        const u = await base44.entities.User.list("-full_name", 200);
+        setUsers(u);
+      } catch {
+        // Non-admin users can't list users - that's OK
+      }
       setLoading(false);
-    });
+    }
+    load();
   }, []);
 
   const userMap = {};
