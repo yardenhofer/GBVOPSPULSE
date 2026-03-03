@@ -28,56 +28,62 @@ Deno.serve(async (req) => {
     const clients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
     const clientsWithKey = clients.filter(c => c.instantly_api_key);
 
+    const opsAlertsUrl = Deno.env.get('SLACK_WEBHOOK_URL_OPS_ALERTS');
+    const criticalUrl = webhookUrl; // original channel for critical duplicates
+    const slackTarget = opsAlertsUrl || webhookUrl;
+
     const alerts = [];
     const results = [];
 
     for (const client of clientsWithKey) {
       try {
-        const analyticsRes = await fetchInstantly('/campaigns/analytics', client.instantly_api_key);
-        const items = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
-
-        let totalSent = 0, totalOpens = 0, totalReplies = 0, totalOpportunities = 0, totalBounced = 0;
-        for (const item of items) {
-          totalSent          += item.emails_sent_count   || 0;
-          totalOpens         += item.open_count_unique   || 0;
-          totalReplies       += item.reply_count_unique  || 0;
-          totalOpportunities += item.total_opportunities || 0;
-          totalBounced       += item.bounced_count       || 0;
-        }
-
-        const openRate  = totalSent > 0 ? Math.round((totalOpens   / totalSent) * 100) : 0;
-        const replyRate = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
-        const bounceRate = totalSent > 0 ? Math.round((totalBounced / totalSent) * 100) : 0;
+        // Fetch campaigns to check lead consumption
+        const campaignsRes = await fetchInstantly('/campaigns?status=active&limit=100', client.instantly_api_key);
+        const campaigns = Array.isArray(campaignsRes) ? campaignsRes : (campaignsRes?.items || []);
 
         const issues = [];
+        let totalLeads = 0;
+        let totalCompleted = 0;
 
-        // Performance thresholds — flag when below industry benchmarks
-        if (totalSent > 100 && openRate < 20) {
-          issues.push(`📉 Low open rate: *${openRate}%* (benchmark: 20%+)`);
-        }
-        if (totalSent > 100 && replyRate < 2) {
-          issues.push(`📉 Low reply rate: *${replyRate}%* (benchmark: 2%+)`);
-        }
-        if (totalSent > 100 && bounceRate > 5) {
-          issues.push(`⚠️ High bounce rate: *${bounceRate}%* (threshold: 5%)`);
-        }
-        if (totalOpportunities === 0 && totalSent > 500) {
-          issues.push(`🚫 Zero opportunities from ${totalSent.toLocaleString()} emails sent`);
+        for (const campaign of campaigns) {
+          const leadsCount = campaign.leads_count || 0;
+          const completedCount = campaign.completed_count || 0;
+          totalLeads += leadsCount;
+          totalCompleted += completedCount;
+
+          // Flag campaigns where 80%+ of leads have completed the sequence
+          if (leadsCount > 0) {
+            const completionPct = Math.round((completedCount / leadsCount) * 100);
+            if (completionPct >= 80) {
+              issues.push(`🔴 Campaign "*${campaign.name}*" is ${completionPct}% through its lead list (${completedCount.toLocaleString()}/${leadsCount.toLocaleString()} completed)`);
+            }
+          }
         }
 
-        results.push({ client: client.name, openRate, replyRate, bounceRate, opportunities: totalOpportunities, issues: issues.length });
+        // Flag if no active campaigns at all
+        if (campaigns.length === 0) {
+          issues.push(`⚠️ No active campaigns found`);
+        }
+
+        // Flag if leads are running very low overall (< 50 remaining across all campaigns)
+        const remaining = totalLeads - totalCompleted;
+        if (totalLeads > 0 && remaining < 50 && remaining >= 0) {
+          issues.push(`🚨 Only *${remaining}* leads remaining across all active campaigns`);
+        }
+
+        results.push({ client: client.name, active_campaigns: campaigns.length, totalLeads, totalCompleted, remaining: totalLeads - totalCompleted, issues: issues.length });
 
         if (issues.length > 0) {
-          alerts.push({ client, issues, openRate, replyRate, totalSent });
+          alerts.push({ client, issues });
         }
       } catch (err) {
         results.push({ client: client.name, error: err.message });
       }
     }
 
-    // Send one Slack alert per underperforming client
+    // Send one Slack alert per flagged client
     for (const { client, issues } of alerts) {
-      await sendSlack(webhookUrl, {
+      const payload = {
         attachments: [{
           color: '#F97316',
           blocks: [
@@ -91,7 +97,12 @@ Deno.serve(async (req) => {
             { type: 'context', elements: [{ type: 'mrkdwn', text: `Auto-scanned · ${new Date().toLocaleDateString('en-US')} · Review in GBV Ops Center` }] },
           ],
         }],
-      });
+      };
+      await sendSlack(slackTarget, payload);
+      // Also send to critical channel if it's a lead shortage issue
+      if (criticalUrl && criticalUrl !== slackTarget) {
+        await sendSlack(criticalUrl, payload);
+      }
     }
 
     return Response.json({ ok: true, scanned: clientsWithKey.length, alerts_sent: alerts.length, results });
