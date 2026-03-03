@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-async function sendSlack(webhookUrl, { color, emoji, title, fields, footer }) {
+async function sendSlack(webhookUrl, { color, emoji, title, fields, footer }, extraWebhookUrl) {
   const payload = {
     attachments: [
       {
@@ -22,11 +22,13 @@ async function sendSlack(webhookUrl, { color, emoji, title, fields, footer }) {
       },
     ],
   };
-  await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const body = JSON.stringify(payload);
+  const headers = { 'Content-Type': 'application/json' };
+  await fetch(webhookUrl, { method: 'POST', headers, body });
+  // Also send to extra channel if provided (for critical alerts)
+  if (extraWebhookUrl) {
+    await fetch(extraWebhookUrl, { method: 'POST', headers, body });
+  }
 }
 
 Deno.serve(async (req) => {
@@ -40,9 +42,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
-    if (!webhookUrl) {
-      return Response.json({ error: 'SLACK_WEBHOOK_URL not set' }, { status: 500 });
+    const opsAlertsUrl = Deno.env.get('SLACK_WEBHOOK_URL_OPS_ALERTS');
+    const criticalUrl = Deno.env.get('SLACK_WEBHOOK_URL');
+    if (!opsAlertsUrl) {
+      return Response.json({ error: 'SLACK_WEBHOOK_URL_OPS_ALERTS not set' }, { status: 500 });
     }
 
     const body = await req.json().catch(() => ({}));

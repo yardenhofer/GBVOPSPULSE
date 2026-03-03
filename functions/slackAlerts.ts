@@ -9,9 +9,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
-    if (!webhookUrl) {
-      return Response.json({ error: 'SLACK_WEBHOOK_URL not set' }, { status: 500 });
+    const opsAlertsUrl = Deno.env.get('SLACK_WEBHOOK_URL_OPS_ALERTS');
+    const criticalUrl = Deno.env.get('SLACK_WEBHOOK_URL');
+    if (!opsAlertsUrl) {
+      return Response.json({ error: 'SLACK_WEBHOOK_URL_OPS_ALERTS not set' }, { status: 500 });
     }
 
     const { message, client_name, severity, alert_type } = await req.json();
@@ -55,15 +56,19 @@ Deno.serve(async (req) => {
       ],
     };
 
-    const slackRes = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const body = JSON.stringify(payload);
+    const headers = { 'Content-Type': 'application/json' };
 
+    // Always send to #GBV-Ops-alerts
+    const slackRes = await fetch(opsAlertsUrl, { method: 'POST', headers, body });
     if (!slackRes.ok) {
       const text = await slackRes.text();
       return Response.json({ error: `Slack error: ${text}` }, { status: 500 });
+    }
+
+    // Critical alerts also go to the original channel
+    if (severity === 'Red' && criticalUrl) {
+      await fetch(criticalUrl, { method: 'POST', headers, body });
     }
 
     return Response.json({ ok: true });
