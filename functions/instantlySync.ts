@@ -16,6 +16,20 @@ async function fetchInstantly(path, apiKey) {
   return res.json();
 }
 
+async function fetchAllAccounts(apiKey) {
+  let allAccounts = [];
+  let skip = 0;
+  const limit = 100;
+  while (true) {
+    const res = await fetchInstantly(`/accounts?limit=${limit}&skip=${skip}`, apiKey);
+    const items = Array.isArray(res) ? res : (res?.items || []);
+    allAccounts = allAccounts.concat(items);
+    if (items.length < limit) break;
+    skip += limit;
+  }
+  return allAccounts;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -47,27 +61,44 @@ Deno.serve(async (req) => {
     const apiKey = client.instantly_api_key;
     if (!apiKey) return Response.json({ error: 'No Instantly API key configured for this client' }, { status: 400 });
 
-    // Step 1: List campaigns to get statuses (status 1 = Active)
-    const campaignsRes = await fetchInstantly('/campaigns?limit=100', apiKey);
+    // Fetch campaigns and email accounts in parallel
+    const [campaignsRes, accounts] = await Promise.all([
+      fetchInstantly('/campaigns?limit=100', apiKey),
+      fetchAllAccounts(apiKey),
+    ]);
+
     const campaignsList = Array.isArray(campaignsRes) ? campaignsRes : (campaignsRes?.items || []);
     const activeCampaignIds = new Set(campaignsList.filter(c => c.status === 1).map(c => c.id));
 
-    // Step 2: Get analytics overview (supports start_date, end_date, campaign_status)
-    // Use /campaigns/analytics/overview for date-filtered stats
+    // Email account health
+    // Status: 1=Active, 2=Paused, 3=Maintenance, -1=Connection Error, -2=Soft Bounce, -3=Sending Error
+    const totalAccounts = accounts.length;
+    const activeAccounts = accounts.filter(a => a.status === 1).length;
+    const pausedAccounts = accounts.filter(a => a.status === 2).length;
+    const errorAccounts = accounts.filter(a => a.status < 0).length;
+    const errorPct = totalAccounts > 0 ? Math.round((errorAccounts / totalAccounts) * 100) : 0;
+
+    const accountsByStatus = accounts.map(a => ({
+      email: a.email,
+      status: a.status,
+      status_label: a.status === 1 ? 'Active' : a.status === 2 ? 'Paused' : a.status === 3 ? 'Maintenance' : a.status === -1 ? 'Connection Error' : a.status === -2 ? 'Soft Bounce Error' : a.status === -3 ? 'Sending Error' : 'Unknown',
+      warmup_status: a.warmup_status,
+      daily_limit: a.daily_limit,
+    }));
+
+    // Get analytics
     const hasActive = activeCampaignIds.size > 0;
     let overviewParams = [];
     if (startDate) overviewParams.push(`start_date=${startDate}`);
-    if (hasActive) overviewParams.push('campaign_status=1'); // Active only
+    if (hasActive) overviewParams.push('campaign_status=1');
     const overviewQuery = '/campaigns/analytics/overview' + (overviewParams.length ? '?' + overviewParams.join('&') : '');
     const overviewRes = await fetchInstantly(overviewQuery, apiKey);
 
-    // Also get per-campaign analytics (no date filter) for lead pool / sequence progress
     const analyticsRes = await fetchInstantly('/campaigns/analytics', apiKey);
     const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
     const analyticsMap = {};
     for (const a of analyticsItems) analyticsMap[a.campaign_id] = a;
 
-    // Step 3: Use overview response for aggregated totals (already filtered by date + active status)
     const totalSent = overviewRes.emails_sent_count || 0;
     const totalOpens = overviewRes.open_count_unique || 0;
     const totalReplies = overviewRes.reply_count_unique || 0;
@@ -76,7 +107,6 @@ Deno.serve(async (req) => {
     const totalLeads = overviewRes.leads_count || 0;
     const totalCompleted = overviewRes.completed_count || 0;
 
-    // Step 4: Build campaigns list for display (per-campaign uses non-filtered analytics for lead pool data)
     const campaigns = campaignsList.map(c => {
       const a = analyticsMap[c.id] || {};
       return {
@@ -93,16 +123,6 @@ Deno.serve(async (req) => {
       };
     });
 
-    // contacted_count from the API represents total email touches (not unique leads)
-    // new_leads_contacted_count also appears inflated for multi-step campaigns
-    // completed_count accurately matches Instantly's "Completed" metric
-    // 
-    // For lead consumption: leads_count is the total lead pool
-    // The Instantly UI shows "Not yet contacted" = leads not yet entered in sequence
-    // Best available proxy: contacted_count / leads_count gives a ratio but is inflated
-    // 
-    // We'll return all fields so the frontend can compute the best display
-
     const stats = {
       campaigns_count: activeCampaignIds.size,
       total_campaigns: campaignsList.length,
@@ -118,6 +138,15 @@ Deno.serve(async (req) => {
       last_synced: new Date().toISOString(),
       campaigns: campaigns.slice(0, 20),
       active_only: hasActive,
+      // Email account health
+      inbox_health: {
+        total: totalAccounts,
+        active: activeAccounts,
+        paused: pausedAccounts,
+        errors: errorAccounts,
+        error_pct: errorPct,
+        accounts: accountsByStatus,
+      },
     };
 
     return Response.json({ stats });
