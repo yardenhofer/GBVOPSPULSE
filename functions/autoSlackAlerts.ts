@@ -58,7 +58,8 @@ Deno.serve(async (req) => {
       const client = await base44.asServiceRole.entities.Client.get(client_id);
       if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
 
-      await sendSlack(webhookUrl, {
+      // Critical: send to both channels
+      await sendSlack(opsAlertsUrl, {
         color: '#E53E3E',
         emoji: '🚨',
         title: 'Client Escalated',
@@ -69,7 +70,7 @@ Deno.serve(async (req) => {
           `*Revenue:*\n$${client.revenue || 0}/mo`,
         ],
         footer: `Escalated on ${now.toLocaleDateString('en-US')} — requires leadership review`,
-      });
+      }, criticalUrl);
 
       return Response.json({ ok: true, sent: 'escalated' });
     }
@@ -103,7 +104,8 @@ Deno.serve(async (req) => {
       }
 
       for (const { client, flags } of alerts) {
-        await sendSlack(webhookUrl, {
+        // Critical: send to both channels
+        await sendSlack(opsAlertsUrl, {
           color: '#E53E3E',
           emoji: '🔴',
           title: 'Critical Client — Needs Attention',
@@ -114,7 +116,7 @@ Deno.serve(async (req) => {
             `*Revenue:*\n$${client.revenue || 0}/mo`,
           ],
           footer: `Auto-scan on ${now.toLocaleDateString('en-US')}`,
-        });
+        }, criticalUrl);
       }
 
       return Response.json({ ok: true, alerts_sent: alerts.length });
@@ -126,7 +128,7 @@ Deno.serve(async (req) => {
       const critical = clients.filter(c => c.is_escalated || c.status === 'Critical');
 
       if (critical.length === 0) {
-        await fetch(webhookUrl, {
+        await fetch(opsAlertsUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -169,11 +171,13 @@ Deno.serve(async (req) => {
         ],
       };
 
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const recapBody = JSON.stringify(payload);
+      const recapHeaders = { 'Content-Type': 'application/json' };
+      // Daily recap with critical clients goes to both channels
+      await fetch(opsAlertsUrl, { method: 'POST', headers: recapHeaders, body: recapBody });
+      if (criticalUrl) {
+        await fetch(criticalUrl, { method: 'POST', headers: recapHeaders, body: recapBody });
+      }
 
       return Response.json({ ok: true, critical_count: critical.length });
     }
