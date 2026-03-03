@@ -24,6 +24,7 @@ export default function ClientDetail() {
   const [newName, setNewName] = useState("");
   const [newPackage, setNewPackage] = useState("Email");
   const [creating, setCreating] = useState(false);
+  const [inboxHealth, setInboxHealth] = useState(null);
   const navigate = useNavigate();
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -158,7 +159,9 @@ export default function ClientDetail() {
         <PerformanceSection client={client} onClientUpdate={handleClientUpdate} />
       </div>
 
-      <InstantlyStatsPanel client={client} />
+      <InstantlyStatsPanel client={client} onInboxHealth={setInboxHealth} />
+
+      {inboxHealth && <InboxHealthSection inboxHealth={inboxHealth} />}
 
       {/* Lead velocity */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
