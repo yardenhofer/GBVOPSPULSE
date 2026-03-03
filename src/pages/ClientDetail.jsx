@@ -15,6 +15,7 @@ import OnboardingChecklist from "../components/clientdetail/OnboardingChecklist"
 import EmailTemplatesPanel from "../components/clientdetail/EmailTemplatesPanel";
 import LeadVelocityChart from "../components/clientdetail/LeadVelocityChart";
 import InstantlyStatsPanel from "../components/clientdetail/InstantlyStatsPanel";
+import InboxHealthSection from "../components/clientdetail/InboxHealthSection";
 
 export default function ClientDetail() {
   const [client, setClient] = useState(null);

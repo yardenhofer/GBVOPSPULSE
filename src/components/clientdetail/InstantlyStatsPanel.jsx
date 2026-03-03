@@ -8,7 +8,7 @@ const TIME_FILTERS = [
   { label: 'Month', value: 'month' },
 ];
 
-export default function InstantlyStatsPanel({ client }) {
+export default function InstantlyStatsPanel({ client, onInboxHealth }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -21,6 +21,9 @@ export default function InstantlyStatsPanel({ client }) {
       const res = await base44.functions.invoke('instantlySync', { client_id: client.id, time_filter: period || timeFilter });
       if (res.data.error) throw new Error(res.data.error);
       setStats(res.data.stats);
+      if (onInboxHealth && res.data.stats.inbox_health) {
+        onInboxHealth(res.data.stats.inbox_health);
+      }
     } catch (e) {
       setError(e.message || 'Failed to fetch Instantly data');
     }
