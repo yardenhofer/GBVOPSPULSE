@@ -4,7 +4,7 @@ import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import { format, differenceInDays } from "date-fns";
 import { computeRedFlags, computeAutoStatus } from "../components/utils/redFlagEngine";
-import { Bell, CheckCheck, RefreshCw, ExternalLink, Send } from "lucide-react";
+import { Bell, CheckCheck, RefreshCw, ExternalLink, Send, Inbox, AlertTriangle } from "lucide-react";
 
 export default function Alerts() {
   const [clients, setClients] = useState([]);
@@ -12,15 +12,22 @@ export default function Alerts() {
   const [showResolved, setShowResolved] = useState(false);
   const [sending, setSending] = useState({});
   const [sent, setSent] = useState({});
+  const [inboxAlerts, setInboxAlerts] = useState([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
+    setInboxLoading(true);
     const data = await base44.entities.Client.list("-updated_date", 200);
     setClients(data);
     setLoading(false);
+    // Fetch inbox health in background
+    base44.functions.invoke('instantlyInboxHealth', {}).then(res => {
+      setInboxAlerts(res.data?.results?.filter(r => r.alert) || []);
+    }).catch(() => {}).finally(() => setInboxLoading(false));
   }
 
   // Build alert list from all clients
@@ -112,6 +119,44 @@ export default function Alerts() {
               </div>
               <div className="space-y-2">
                 {redAlerts.map((a, i) => <AlertCard key={i} alertKey={`red-${i}`} alert={a} />)}
+              </div>
+            </div>
+          )}
+          {inboxAlerts.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Inbox className="w-4 h-4 text-red-400" />
+                <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide">Infrastructure Alerts ({inboxAlerts.length})</h2>
+              </div>
+              <div className="space-y-2">
+                {inboxAlerts.map(a => (
+                  <div key={a.client_id} className="flex items-center justify-between gap-3 bg-white dark:bg-gray-900 rounded-xl border border-red-500/25 p-4">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="w-6 h-6 text-red-400 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{a.client_name}</p>
+                        <p className="text-xs font-medium text-red-400">
+                          {a.errors}/{a.total} inboxes with errors ({a.error_pct}%)
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {a.error_accounts.slice(0, 3).map(ea => (
+                            <span key={ea.email} className="text-xs bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded">{ea.email} · {ea.status_label}</span>
+                          ))}
+                          {a.error_accounts.length > 3 && (
+                            <span className="text-xs text-gray-400">+{a.error_accounts.length - 3} more</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">AM: {a.assigned_am || "Unassigned"}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate(createPageUrl(`ClientDetail?id=${a.client_id}`))}
+                      className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors shrink-0"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
