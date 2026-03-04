@@ -14,17 +14,19 @@ import { computeRedFlags, computeAutoStatus } from "../components/utils/redFlagE
 async function fetchInstantlyStats(clientId) {
   try {
     const res = await base44.functions.invoke('instantlySync', { client_id: clientId, time_filter: 'month' });
+    if (res.data?.error) return { error: res.data.error };
     if (res.data?.stats) {
       const activeCampaigns = res.data.stats.campaigns?.filter(c => c.status === 'active') || [];
       if (activeCampaigns.length > 0) {
         const totalLeads = activeCampaigns.reduce((s, c) => s + (c.leads_count || 0), 0);
         const totalCompleted = activeCampaigns.reduce((s, c) => s + (c.completed_count || 0), 0);
-        return totalLeads > 0 ? Math.round((totalCompleted / totalLeads) * 100) : 0;
+        return { pct: totalLeads > 0 ? Math.round((totalCompleted / totalLeads) * 100) : 0 };
       }
+      return { pct: 0, noActive: true };
     }
-    return null;
-  } catch {
-    return null;
+    return { error: 'No data' };
+  } catch (e) {
+    return { error: e.message || 'Failed' };
   }
 }
 
@@ -194,7 +196,7 @@ export default function Dashboard() {
             status={computeAutoStatus(c)}
             isOwn={user?.email === c.assigned_am}
             onClick={() => navigate(createPageUrl(`ClientDetail?id=${c.id}`))}
-            seqPct={instantlyPcts[c.id]}
+            instantlyResult={instantlyPcts[c.id]}
           />
         ))}
       </div>
