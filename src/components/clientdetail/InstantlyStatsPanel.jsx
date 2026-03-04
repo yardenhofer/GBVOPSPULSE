@@ -26,7 +26,7 @@ export default function InstantlyStatsPanel({ client, onInboxHealth }) {
     setError(null);
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timeout = setTimeout(() => controller.abort(), 8000);
       const res = await base44.functions.invoke('instantlySync', { client_id: client.id, time_filter: period || timeFilter });
       clearTimeout(timeout);
       if (res.data.error) {
