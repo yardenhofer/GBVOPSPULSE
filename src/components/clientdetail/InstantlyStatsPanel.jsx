@@ -14,18 +14,34 @@ export default function InstantlyStatsPanel({ client, onInboxHealth }) {
   const [error, setError] = useState(null);
   const [timeFilter, setTimeFilter] = useState('month');
 
+  const emptyStats = {
+    total_sent: 0, total_opens: 0, total_replies: 0, total_opportunities: 0,
+    total_bounced: 0, total_leads: 0, total_completed: 0, open_rate: 0, reply_rate: 0,
+    campaigns_count: 0, total_campaigns: 0, campaigns: [], active_only: false,
+    last_synced: new Date().toISOString(), inbox_health: { total: 0, active: 0, paused: 0, errors: 0, error_pct: 0, accounts: [] },
+  };
+
   async function fetchStats(period) {
     setLoading(true);
     setError(null);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
       const res = await base44.functions.invoke('instantlySync', { client_id: client.id, time_filter: period || timeFilter });
-      if (res.data.error) throw new Error(res.data.error);
-      setStats(res.data.stats);
-      if (onInboxHealth && res.data.stats.inbox_health) {
-        onInboxHealth(res.data.stats.inbox_health);
+      clearTimeout(timeout);
+      if (res.data.error) {
+        setError(res.data.error);
+        setStats(emptyStats);
+      } else {
+        setStats(res.data.stats);
+        if (onInboxHealth && res.data.stats.inbox_health) {
+          onInboxHealth(res.data.stats.inbox_health);
+        }
       }
     } catch (e) {
-      setError(e.message || 'Failed to fetch Instantly data');
+      const msg = e.name === 'AbortError' ? 'Request timed out' : (e.message || 'Failed to fetch Instantly data');
+      setError(msg);
+      setStats(emptyStats);
     }
     setLoading(false);
   }
