@@ -4,7 +4,6 @@ import { CheckCircle2, Circle, ClipboardList } from "lucide-react";
 const STEPS = [
   { key: "onboarding_kickoff_done",       label: "Kickoff call completed" },
   { key: "onboarding_contract_signed",    label: "Contract signed" },
-  { key: "onboarding_crm_connected",      label: "CRM connected" },
   { key: "onboarding_lead_list_received", label: "Lead list received" },
   { key: "onboarding_campaign_live",      label: "Campaign live" },
 ];
