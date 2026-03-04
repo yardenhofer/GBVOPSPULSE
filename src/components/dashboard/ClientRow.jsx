@@ -1,5 +1,5 @@
 import { differenceInDays, format } from "date-fns";
-import { Zap } from "lucide-react";
+import { Zap, Pause, AlertTriangle } from "lucide-react";
 import { STATUS_CONFIG, SENTIMENT_CONFIG, PACKAGE_CONFIG } from "../utils/redFlagEngine";
 
 const STATUS_GLOW = {
@@ -9,7 +9,10 @@ const STATUS_GLOW = {
   Critical: "status-glow-critical",
 };
 
-export default function ClientRow({ client, flags, status, isOwn, onClick, seqPct }) {
+export default function ClientRow({ client, flags, status, isOwn, onClick, instantlyResult }) {
+  const seqPct = instantlyResult?.pct;
+  const instantlyError = instantlyResult?.error;
+  const noActive = instantlyResult?.noActive;
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Healthy"];
   const sentCfg = SENTIMENT_CONFIG[client.client_sentiment] || SENTIMENT_CONFIG["Neutral"];
   const pkgCfg = PACKAGE_CONFIG[client.package_type] || {};
@@ -67,7 +70,17 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, seqPc
         {/* Sequence % */}
         <div className="hidden lg:block text-center">
           {client.instantly_api_key ? (
-            seqPct != null ? (
+            instantlyError ? (
+              <div className="flex flex-col items-center gap-0.5 flag-chip" data-tip={instantlyError}>
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <span className="text-[10px] text-red-400">Error</span>
+              </div>
+            ) : noActive ? (
+              <div className="flex flex-col items-center gap-0.5 flag-chip" data-tip="No active campaigns">
+                <Pause className="w-4 h-4 text-yellow-400" />
+                <span className="text-[10px] text-yellow-400">Paused</span>
+              </div>
+            ) : seqPct != null ? (
               <div className="flex flex-col items-center gap-0.5">
                 <span className={`text-sm font-bold ${
                   seqPct >= 80 ? 'text-red-500' : seqPct >= 60 ? 'text-orange-500' : 'text-green-500'
