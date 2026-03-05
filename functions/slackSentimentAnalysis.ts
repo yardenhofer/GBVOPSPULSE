@@ -123,6 +123,12 @@ Deno.serve(async (req) => {
     const analysis = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: `You are an AI analyst for a B2B lead generation agency called GBV. Analyze the following Slack messages from a client channel for "${client.name}".
 
+CLIENT CONTEXT:
+- Client start date: ${client.start_date || 'Unknown'}
+- Package: ${client.package_type || 'Unknown'}
+- Current status: ${client.status || 'Unknown'}
+DO NOT make assumptions about when the client joined — use the start date above. These messages are only from the last 24 hours, not the full history.
+
 IMPORTANT: Messages are labeled with sender names. GBV agency staff/account managers are the people SENDING updates about campaigns, leads, LinkedIn outreach, etc. The CLIENT is the person RECEIVING these services and responding to them. Focus your sentiment analysis on the CLIENT's messages and reactions, NOT the agency team's updates. If only agency staff messages are present with no client responses, note that and assess based on available context (e.g. lack of client response could indicate disengagement).
 
 Determine:
