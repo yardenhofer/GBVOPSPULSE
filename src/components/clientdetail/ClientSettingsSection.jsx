@@ -35,6 +35,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     unhappy_since: client.unhappy_since || "",
     notes: client.notes || "",
     instantly_api_key: client.instantly_api_key || "",
+    slack_channel_name: client.slack_channel_name || "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
