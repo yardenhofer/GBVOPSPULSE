@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     cursor = data.response_metadata?.next_cursor || "";
   } while (cursor);
 
-  console.log(`Found ${allChannels.length} Slack channels`);
+  console.log(`Found ${allChannels.length} Slack channels: ${allChannels.map(ch => ch.name).join(', ')}`);
 
   // 2. Get all clients
   const clients = await base44.asServiceRole.entities.Client.list("-updated_date", 200);
@@ -42,11 +42,16 @@ Deno.serve(async (req) => {
     
     if (!channel) {
       // Auto-match: normalize client name and channel name for comparison
+      // Slack channels use hyphens for spaces, so normalize both to compare
       const normalizedName = client.name.toLowerCase().replace(/[^a-z0-9]/g, '');
       channel = allChannels.find(ch => {
-        const chName = ch.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return chName.includes(normalizedName) || normalizedName.includes(chName);
+        const chName = ch.name.toLowerCase().replace(/[^a-z0-9-]/g, '');
+        const chNameStripped = chName.replace(/-/g, '');
+        return chNameStripped.includes(normalizedName) || normalizedName.includes(chNameStripped);
       });
+      if (!channel) {
+        console.log(`No match for "${client.name}" (normalized: "${normalizedName}") against channels`);
+      }
       
       // Save matched channel_id for future use
       if (channel && !client.slack_channel_id) {
