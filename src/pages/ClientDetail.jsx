@@ -16,6 +16,7 @@ import EmailTemplatesPanel from "../components/clientdetail/EmailTemplatesPanel"
 import LeadVelocityChart from "../components/clientdetail/LeadVelocityChart";
 import InstantlyStatsPanel from "../components/clientdetail/InstantlyStatsPanel";
 import InboxHealthSection from "../components/clientdetail/InboxHealthSection";
+import AIInsightsPanel from "../components/clientdetail/AIInsightsPanel";
 
 export default function ClientDetail() {
   const [client, setClient] = useState(null);
@@ -159,7 +160,10 @@ export default function ClientDetail() {
         <PerformanceSection client={client} onClientUpdate={handleClientUpdate} />
       </div>
 
-      <InstantlyStatsPanel client={client} onInboxHealth={setInboxHealth} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <InstantlyStatsPanel client={client} onInboxHealth={setInboxHealth} />
+        <AIInsightsPanel client={client} />
+      </div>
 
       {inboxHealth && <InboxHealthSection inboxHealth={inboxHealth} />}
 
