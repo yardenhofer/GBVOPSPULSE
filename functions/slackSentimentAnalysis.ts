@@ -78,8 +78,8 @@ Deno.serve(async (req) => {
 
     console.log(`Matched "${client.name}" → #${channel.name}`);
 
-    // 4. Fetch recent messages (last 24 hours)
-    const since = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+    // 4. Fetch recent messages (last 7 days)
+    const since = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
     const histResp = await fetch(
       `https://slack.com/api/conversations.history?channel=${channel.id}&oldest=${since}&limit=100`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -127,7 +127,7 @@ CLIENT CONTEXT:
 - Client start date: ${client.start_date || 'Unknown'}
 - Package: ${client.package_type || 'Unknown'}
 - Current status: ${client.status || 'Unknown'}
-DO NOT make assumptions about when the client joined — use the start date above. These messages are only from the last 24 hours, not the full history.
+DO NOT make assumptions about when the client joined — use the start date above. These messages are from the last 7 days, not the full history. If there are no client messages, simply state "No client messages in the past 7 days" without speculating about disengagement or channel joins.
 
 IMPORTANT: Messages are labeled with sender names. GBV agency staff/account managers are the people SENDING updates about campaigns, leads, LinkedIn outreach, etc. The CLIENT is the person RECEIVING these services and responding to them. Focus your sentiment analysis on the CLIENT's messages and reactions, NOT the agency team's updates. If only agency staff messages are present with no client responses, note that and assess based on available context (e.g. lack of client response could indicate disengagement).
 
