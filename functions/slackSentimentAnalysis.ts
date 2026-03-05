@@ -40,9 +40,21 @@ Deno.serve(async (req) => {
       channel = allChannels.find(ch => ch.id === client.slack_channel_id);
     }
     
+    // Try manual slack_channel_name override before auto-match
+    if (!channel && client.slack_channel_name) {
+      const manualName = client.slack_channel_name.toLowerCase().replace(/^#/, '').trim();
+      channel = allChannels.find(ch => ch.name.toLowerCase() === manualName);
+      if (channel) {
+        console.log(`Matched "${client.name}" via manual channel name → #${channel.name}`);
+        // Save channel ID for future lookups
+        if (!client.slack_channel_id || client.slack_channel_id !== channel.id) {
+          await base44.asServiceRole.entities.Client.update(client.id, { slack_channel_id: channel.id });
+        }
+      }
+    }
+
     if (!channel) {
       // Auto-match: normalize client name and channel name for comparison
-      // Slack channels use hyphens for spaces, so normalize both to compare
       const normalizedName = client.name.toLowerCase().replace(/[^a-z0-9]/g, '');
       channel = allChannels.find(ch => {
         const chName = ch.name.toLowerCase().replace(/[^a-z0-9-]/g, '');

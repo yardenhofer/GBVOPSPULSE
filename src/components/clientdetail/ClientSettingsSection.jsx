@@ -162,10 +162,18 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
         </label>
       </div>
 
-      <div className="mt-3">
-        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Instantly API Key</label>
-        <input type="password" className={inputCls} value={form.instantly_api_key} placeholder="Paste client's Instantly API key…"
-          onChange={e => setForm(f => ({ ...f, instantly_api_key: e.target.value }))} />
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Instantly API Key</label>
+          <input type="password" className={inputCls} value={form.instantly_api_key} placeholder="Paste client's Instantly API key…"
+            onChange={e => setForm(f => ({ ...f, instantly_api_key: e.target.value }))} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Slack Channel Name (override)</label>
+          <input type="text" className={inputCls} value={form.slack_channel_name} placeholder="e.g. client-acme-corp"
+            onChange={e => setForm(f => ({ ...f, slack_channel_name: e.target.value }))} />
+          <p className="text-xs text-gray-400 mt-0.5">Set this if auto-match can't find the channel</p>
+        </div>
       </div>
 
       <div className="mt-3">
