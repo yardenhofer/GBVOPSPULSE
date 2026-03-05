@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    const messages = (histData.messages || []).filter(m => !m.bot_id && m.type === 'message' && m.text);
+    const messages = (histData.messages || []).filter(m => !m.bot_id && m.type === 'message' && !m.subtype && m.text);
     
     if (messages.length === 0) {
       console.log(`No recent messages in #${channel.name}`);
