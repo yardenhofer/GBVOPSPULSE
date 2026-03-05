@@ -25,10 +25,11 @@ export default function InstantlyStatsPanel({ client, onInboxHealth }) {
     setLoading(true);
     setError(null);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const res = await base44.functions.invoke('instantlySync', { client_id: client.id, time_filter: period || timeFilter });
-      clearTimeout(timeout);
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), 8000));
+      const res = await Promise.race([
+        base44.functions.invoke('instantlySync', { client_id: client.id, time_filter: period || timeFilter }),
+        timeoutPromise
+      ]);
       if (res.data.error) {
         setError(res.data.error);
         setStats(emptyStats);
@@ -39,8 +40,7 @@ export default function InstantlyStatsPanel({ client, onInboxHealth }) {
         }
       }
     } catch (e) {
-      const msg = e.name === 'AbortError' ? 'Request timed out' : (e.message || 'Failed to fetch Instantly data');
-      setError(msg);
+      setError(e.message || 'Failed to fetch Instantly data');
       setStats(emptyStats);
     }
     setLoading(false);
