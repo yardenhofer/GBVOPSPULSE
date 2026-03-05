@@ -86,18 +86,38 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    // 5. Build message text for AI analysis
-    const messageText = messages.slice(0, 50).map(m => m.text).join('\n---\n');
+    // 5. Resolve user names so the LLM can distinguish client vs agency staff
+    const uniqueUsers = [...new Set(messages.map(m => m.user).filter(Boolean))];
+    const userMap = {};
+    for (const uid of uniqueUsers) {
+      const uResp = await fetch(`https://slack.com/api/users.info?user=${uid}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const uData = await uResp.json();
+      if (uData.ok && uData.user) {
+        userMap[uid] = uData.user.real_name || uData.user.profile?.display_name || uData.user.name || uid;
+      } else {
+        userMap[uid] = uid;
+      }
+    }
+
+    // Build message text with sender names
+    const messageText = messages.slice(0, 50).map(m => {
+      const sender = userMap[m.user] || 'Unknown';
+      return `[${sender}]: ${m.text}`;
+    }).join('\n---\n');
 
     // 6. Analyze with LLM
     const analysis = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: `You are an AI analyst for a B2B lead generation agency called GBV. Analyze the following Slack messages from a client channel for "${client.name}".
 
+IMPORTANT: Messages are labeled with sender names. GBV agency staff/account managers are the people SENDING updates about campaigns, leads, LinkedIn outreach, etc. The CLIENT is the person RECEIVING these services and responding to them. Focus your sentiment analysis on the CLIENT's messages and reactions, NOT the agency team's updates. If only agency staff messages are present with no client responses, note that and assess based on available context (e.g. lack of client response could indicate disengagement).
+
 Determine:
-1. SENTIMENT: How does the client feel about our services? Consider tone, complaints, praise, responsiveness.
-2. UPSELL OPPORTUNITIES: Are they mentioning new markets, wanting more leads, interested in LinkedIn outreach, expanding to new regions, or showing signs they'd benefit from additional services?
-3. RISK SIGNALS: Any complaints, frustration, mentions of competitors, threats to cancel, long silences, or dissatisfaction?
-4. SUMMARY: Brief 2-3 sentence summary of the communication tone and key topics.
+1. SENTIMENT: How does the CLIENT feel about GBV's services? Consider their tone, complaints, praise, responsiveness, and engagement.
+2. UPSELL OPPORTUNITIES: Is the client mentioning new markets, wanting more leads, interested in LinkedIn outreach, expanding to new regions, or showing signs they'd benefit from additional services?
+3. RISK SIGNALS: Any client complaints, frustration, mentions of competitors, threats to cancel, long silences from the client, or dissatisfaction?
+4. SUMMARY: Brief 2-3 sentence summary of the client's communication tone and key topics. Clearly distinguish between what the agency said vs how the client responded.
 5. KEY TOPICS: Main subjects being discussed.
 
 Messages:
