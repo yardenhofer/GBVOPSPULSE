@@ -58,6 +58,10 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     }
     await base44.entities.Client.update(client.id, payload);
     onClientUpdate(payload);
+    // Trigger escalation alert if escalated was just turned on
+    if (payload.is_escalated && !client.is_escalated) {
+      base44.functions.invoke('autoSlackAlerts', { trigger: 'escalated', client_id: client.id });
+    }
     const u = await base44.auth.me().catch(() => null);
     if (u) {
       base44.entities.UserActivity.create({
