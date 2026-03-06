@@ -196,6 +196,8 @@ Determine:
 3. RISK SIGNALS: Any client complaints, frustration, mentions of competitors, threats to cancel, discussions about cancellation options, long silences from the client, or dissatisfaction? Be very sensitive to cancellation-related conversations even if they're framed diplomatically.
 4. SUMMARY: Brief 2-3 sentence summary of the client's communication tone and key topics. Clearly distinguish between what the agency said vs how the client responded. Highlight any cancellation or churn risk explicitly.
 5. KEY TOPICS: Main subjects being discussed.
+6. LAST GBV TOUCHPOINT: Find the date of the MOST RECENT message sent by a GBV/Grow Big Ventures team member (agency staff, NOT the client). Return the date as YYYY-MM-DD. If no GBV staff messages exist, return null.
+7. LAST CLIENT REPLY: Find the date of the MOST RECENT message sent by the CLIENT (NOT GBV staff). Return the date as YYYY-MM-DD. If no client messages exist, return null.
 
 Messages:
 ${messageText}`,
@@ -207,7 +209,9 @@ ${messageText}`,
           summary: { type: "string" },
           upsell_opportunities: { type: "string", description: "Describe any upsell opportunities, or 'None detected' if none" },
           risk_signals: { type: "string", description: "Describe any risk signals, or 'None detected' if none" },
-          key_topics: { type: "string", description: "Comma-separated list of key topics" }
+          key_topics: { type: "string", description: "Comma-separated list of key topics" },
+          last_gbv_touchpoint: { type: "string", description: "YYYY-MM-DD date of most recent GBV staff message, or null" },
+          last_client_reply: { type: "string", description: "YYYY-MM-DD date of most recent client message, or null" }
         }
       }
     });
@@ -228,21 +232,35 @@ ${messageText}`,
       analysis_date: new Date().toISOString()
     });
 
-    // 8. Update client sentiment if AI detected a change
+    // 8. Update client fields based on analysis
+    const updateData = {};
+
+    // Update sentiment if changed
     if (analysis.sentiment && analysis.sentiment !== client.client_sentiment) {
-      const updateData = { client_sentiment: analysis.sentiment };
-      // Track when sentiment goes negative
+      updateData.client_sentiment = analysis.sentiment;
       if ((analysis.sentiment === "Slightly Concerned" || analysis.sentiment === "Unhappy") && 
           client.client_sentiment !== "Slightly Concerned" && client.client_sentiment !== "Unhappy") {
         updateData.unhappy_since = new Date().toISOString().split('T')[0];
       }
-      // Clear unhappy_since if sentiment improved
       if ((analysis.sentiment === "Happy" || analysis.sentiment === "Neutral") && 
           (client.client_sentiment === "Slightly Concerned" || client.client_sentiment === "Unhappy")) {
         updateData.unhappy_since = null;
       }
+    }
+
+    // Update last AM touchpoint from Slack
+    if (analysis.last_gbv_touchpoint) {
+      updateData.last_am_touchpoint = analysis.last_gbv_touchpoint;
+    }
+
+    // Update last client reply date from Slack
+    if (analysis.last_client_reply) {
+      updateData.last_client_reply_date = analysis.last_client_reply;
+    }
+
+    if (Object.keys(updateData).length > 0) {
       await base44.asServiceRole.entities.Client.update(client.id, updateData);
-      console.log(`Updated ${client.name} sentiment: ${client.client_sentiment} → ${analysis.sentiment}`);
+      console.log(`Updated ${client.name}:`, JSON.stringify(updateData));
     }
 
     results.push({
