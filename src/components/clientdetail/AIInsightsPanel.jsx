@@ -30,7 +30,11 @@ export default function AIInsightsPanel({ client }) {
 
   async function runAnalysis() {
     setRunning(true);
-    await base44.functions.invoke("slackSentimentAnalysis", {});
+    try {
+      await base44.functions.invoke("slackSentimentAnalysis", { client_id: client.id });
+    } catch (e) {
+      console.error("Sentiment analysis error:", e);
+    }
     await loadInsights();
     setRunning(false);
   }
