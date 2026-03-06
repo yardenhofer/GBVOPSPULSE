@@ -7,6 +7,11 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
   }
 
+  // Support single-client mode to avoid timeouts
+  let body = {};
+  try { body = await req.json(); } catch(e) { /* no body */ }
+  const singleClientId = body.client_id || null;
+
   const { accessToken } = await base44.asServiceRole.connectors.getConnection("slackbot");
 
   // 1. Get all Slack channels
@@ -24,10 +29,15 @@ Deno.serve(async (req) => {
     cursor = data.response_metadata?.next_cursor || "";
   } while (cursor);
 
-  console.log(`Found ${allChannels.length} Slack channels: ${allChannels.map(ch => ch.name).join(', ')}`);
+  console.log(`Found ${allChannels.length} Slack channels`);
 
-  // 2. Get all clients
-  const clients = await base44.asServiceRole.entities.Client.list("-updated_date", 200);
+  // 2. Get clients — single or all
+  let clients;
+  if (singleClientId) {
+    clients = await base44.asServiceRole.entities.Client.filter({ id: singleClientId }, "-updated_date", 1);
+  } else {
+    clients = await base44.asServiceRole.entities.Client.list("-updated_date", 200);
+  }
 
   // 3. Auto-match channels to clients
   const results = [];
