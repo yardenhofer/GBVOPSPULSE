@@ -1,6 +1,39 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash } from "lucide-react";
+import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash, Brain, Play } from "lucide-react";
+
+function BatchRunButton() {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function handleRun() {
+    setRunning(true);
+    setResult(null);
+    try {
+      const res = await base44.functions.invoke("slackSentimentBatch", {});
+      setResult({ type: "success", text: `Done — ${res.data.processed} clients analyzed, ${res.data.failed} failed` });
+    } catch (e) {
+      setResult({ type: "error", text: e.message || "Batch run failed" });
+    }
+    setRunning(false);
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      <button
+        onClick={handleRun}
+        disabled={running}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+      >
+        {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+        {running ? "Running Batch…" : "Run AI Sentiment Batch"}
+      </button>
+      {result && (
+        <p className={`text-xs ${result.type === "success" ? "text-green-400" : "text-red-400"}`}>{result.text}</p>
+      )}
+    </div>
+  );
+}
 
 const PERMISSIONS = [
   { key: "can_view_all_clients", label: "View All Clients", desc: "See every client, not just assigned ones" },
@@ -246,6 +279,15 @@ export default function Settings() {
             );
           })}
         </div>
+      </div>
+
+      {/* Admin Actions */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Brain className="w-4 h-4 text-purple-400" />
+          <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Admin Actions</h2>
+        </div>
+        <BatchRunButton />
       </div>
 
       {/* Legend */}
