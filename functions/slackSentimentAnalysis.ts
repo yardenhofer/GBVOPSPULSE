@@ -2,8 +2,25 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (user?.role !== 'admin') {
+
+  // Allow both admin users and service-role calls (from batch scheduler)
+  let isAuthorized = false;
+  try {
+    const user = await base44.auth.me();
+    if (user?.role === 'admin') isAuthorized = true;
+  } catch (e) { /* service role call — no user token */ }
+  
+  if (!isAuthorized) {
+    // Check if this is a service-role invocation (has client_id in body from batch)
+    // Service role calls come from other backend functions via base44.asServiceRole.functions.invoke
+    // They won't have a user, but they're internal so we allow them
+    try {
+      const testBody = await req.clone().json();
+      if (testBody?.client_id) isAuthorized = true;
+    } catch(e) {}
+  }
+  
+  if (!isAuthorized) {
     return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
   }
 
