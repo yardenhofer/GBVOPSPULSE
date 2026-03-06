@@ -12,7 +12,7 @@ import PerformanceSection from "../components/clientdetail/PerformanceSection";
 import ClientSettingsSection from "../components/clientdetail/ClientSettingsSection";
 import RecoveryPlanSection from "../components/clientdetail/RecoveryPlanSection";
 import OnboardingChecklist from "../components/clientdetail/OnboardingChecklist";
-import EmailTemplatesPanel from "../components/clientdetail/EmailTemplatesPanel";
+
 import LeadVelocityChart from "../components/clientdetail/LeadVelocityChart";
 import InstantlyStatsPanel from "../components/clientdetail/InstantlyStatsPanel";
 import InboxHealthSection from "../components/clientdetail/InboxHealthSection";
@@ -187,7 +187,18 @@ export default function ClientDetail() {
 
       <EmailSequenceSection client={client} onClientUpdate={handleClientUpdate} />
 
-      <EmailTemplatesPanel client={client} />
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+            <span className="text-base">✉️</span>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Email Templates</h3>
+            <p className="text-xs text-gray-400">Send pre-built emails directly to clients</p>
+          </div>
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Coming Soon</span>
+      </div>
 
       {/* Full timeline */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
