@@ -44,13 +44,21 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
-    loadClients();
+    base44.auth.me().then(u => {
+      setUser(u);
+      loadClients(u);
+    }).catch(() => {});
   }, []);
 
-  async function loadClients() {
+  async function loadClients(currentUser) {
+    const u = currentUser || user;
     setLoading(true);
-    const data = await base44.entities.Client.list("-updated_date", 200);
+    let data;
+    if (u?.role === 'admin') {
+      data = await base44.entities.Client.list("-updated_date", 200);
+    } else {
+      data = await base44.entities.Client.filter({ assigned_am: u?.email }, "-updated_date", 200);
+    }
     setClients(data);
     setLoading(false);
 
