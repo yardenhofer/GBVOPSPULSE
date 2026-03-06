@@ -161,11 +161,13 @@ DO NOT make assumptions about when the client joined — use the start date abov
 
 IMPORTANT: Messages are labeled with sender names. GBV agency staff/account managers are the people SENDING updates about campaigns, leads, LinkedIn outreach, etc. The CLIENT is the person RECEIVING these services and responding to them. Focus your sentiment analysis on the CLIENT's messages and reactions, NOT the agency team's updates. If only agency staff messages are present with no client responses, note that and assess based on available context (e.g. lack of client response could indicate disengagement).
 
+CRITICAL RISK KEYWORDS TO WATCH FOR: cancellation, cancel, ending, not renewing, looking at other options, not working, disappointed, frustrated, not seeing results, waste of money, pulling the plug, pausing, downgrade, cutting budget, competitor, alternative, not worth it, rethinking, reconsidering. If ANY of these themes appear in client messages, sentiment MUST be "Unhappy" or at minimum "Slightly Concerned", and risk_signals MUST describe the specific concern.
+
 Determine:
-1. SENTIMENT: How does the CLIENT feel about GBV's services? Consider their tone, complaints, praise, responsiveness, and engagement.
+1. SENTIMENT: How does the CLIENT feel about GBV's services? Consider their tone, complaints, praise, responsiveness, and engagement. Pay special attention to ANY discussion about cancellation, dissatisfaction, or wanting to leave — these should heavily weight toward "Unhappy".
 2. UPSELL OPPORTUNITIES: Is the client mentioning new markets, wanting more leads, interested in LinkedIn outreach, expanding to new regions, or showing signs they'd benefit from additional services?
-3. RISK SIGNALS: Any client complaints, frustration, mentions of competitors, threats to cancel, long silences from the client, or dissatisfaction?
-4. SUMMARY: Brief 2-3 sentence summary of the client's communication tone and key topics. Clearly distinguish between what the agency said vs how the client responded.
+3. RISK SIGNALS: Any client complaints, frustration, mentions of competitors, threats to cancel, discussions about cancellation options, long silences from the client, or dissatisfaction? Be very sensitive to cancellation-related conversations even if they're framed diplomatically.
+4. SUMMARY: Brief 2-3 sentence summary of the client's communication tone and key topics. Clearly distinguish between what the agency said vs how the client responded. Highlight any cancellation or churn risk explicitly.
 5. KEY TOPICS: Main subjects being discussed.
 
 Messages:
