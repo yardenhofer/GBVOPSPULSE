@@ -78,20 +78,47 @@ Deno.serve(async (req) => {
 
     console.log(`Matched "${client.name}" → #${channel.name}`);
 
-    // 4. Fetch recent messages (last 30 days)
+    // 4. Fetch recent messages (last 30 days) — paginate to get all messages
     const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
-    const histResp = await fetch(
-      `https://slack.com/api/conversations.history?channel=${channel.id}&oldest=${since}&limit=100`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const histData = await histResp.json();
-    
-    if (!histData.ok) {
-      console.error(`Error fetching history for #${channel.name}:`, histData.error);
-      continue;
+    let allMessages = [];
+    let histCursor = "";
+    do {
+      const histUrl = `https://slack.com/api/conversations.history?channel=${channel.id}&oldest=${since}&limit=200${histCursor ? `&cursor=${histCursor}` : ""}`;
+      const histResp = await fetch(histUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const histData = await histResp.json();
+      
+      if (!histData.ok) {
+        console.error(`Error fetching history for #${channel.name}:`, histData.error);
+        break;
+      }
+      allMessages = allMessages.concat(histData.messages || []);
+      histCursor = histData.response_metadata?.next_cursor || "";
+    } while (histCursor);
+
+    // 4b. Fetch thread replies for any threaded messages
+    const threadParents = allMessages.filter(m => m.reply_count && m.reply_count > 0 && m.ts);
+    for (const parent of threadParents) {
+      const repliesResp = await fetch(
+        `https://slack.com/api/conversations.replies?channel=${channel.id}&ts=${parent.ts}&oldest=${since}&limit=200`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const repliesData = await repliesResp.json();
+      if (repliesData.ok && repliesData.messages) {
+        // replies includes the parent, skip it to avoid duplicates
+        const replies = repliesData.messages.filter(r => r.ts !== parent.ts);
+        allMessages = allMessages.concat(replies);
+      }
     }
 
-    const messages = (histData.messages || []).filter(m => !m.bot_id && m.type === 'message' && !m.subtype && m.text);
+    // Deduplicate by ts, filter out bots and system messages
+    const seenTs = new Set();
+    const messages = allMessages
+      .filter(m => {
+        if (seenTs.has(m.ts)) return false;
+        seenTs.add(m.ts);
+        return !m.bot_id && m.type === 'message' && !m.subtype && m.text;
+      })
+      .sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts)); // chronological order
     
     if (messages.length === 0) {
       console.log(`No recent messages in #${channel.name}`);
