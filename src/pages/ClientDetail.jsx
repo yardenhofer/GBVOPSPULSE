@@ -17,6 +17,8 @@ import LeadVelocityChart from "../components/clientdetail/LeadVelocityChart";
 import InstantlyStatsPanel from "../components/clientdetail/InstantlyStatsPanel";
 import InboxHealthSection from "../components/clientdetail/InboxHealthSection";
 import AIInsightsPanel from "../components/clientdetail/AIInsightsPanel";
+import DQLinkSection from "../components/clientdetail/DQLinkSection";
+import EmailSequenceSection from "../components/clientdetail/EmailSequenceSection";
 
 export default function ClientDetail() {
   const [client, setClient] = useState(null);
@@ -177,6 +179,13 @@ export default function ClientDetail() {
       </div>
 
       {isCritical && <RecoveryPlanSection client={client} />}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <DQLinkSection client={client} onClientUpdate={handleClientUpdate} />
+        <div />
+      </div>
+
+      <EmailSequenceSection client={client} onClientUpdate={handleClientUpdate} />
 
       <EmailTemplatesPanel client={client} />
 
