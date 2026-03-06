@@ -58,10 +58,6 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     }
     await base44.entities.Client.update(client.id, payload);
     onClientUpdate(payload);
-    // Trigger escalation alert if escalated was just turned on
-    if (payload.is_escalated && !client.is_escalated) {
-      base44.functions.invoke('autoSlackAlerts', { trigger: 'escalated', client_id: client.id });
-    }
     const u = await base44.auth.me().catch(() => null);
     if (u) {
       base44.entities.UserActivity.create({
@@ -153,8 +149,14 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
           )}
         </label>
         <label className="flex items-center gap-2 text-xs text-red-500 cursor-pointer select-none">
-          <input type="checkbox" className="rounded" checked={form.is_escalated} onChange={e => {
-            setForm(f => ({ ...f, is_escalated: e.target.checked }));
+          <input type="checkbox" className="rounded" checked={form.is_escalated} onChange={async e => {
+            const isEscalated = e.target.checked;
+            setForm(f => ({ ...f, is_escalated: isEscalated }));
+            await base44.entities.Client.update(client.id, { is_escalated: isEscalated });
+            onClientUpdate({ is_escalated: isEscalated });
+            if (isEscalated) {
+              base44.functions.invoke('autoSlackAlerts', { trigger: 'escalated', client_id: client.id });
+            }
           }} />
           Escalated
         </label>
