@@ -140,11 +140,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build message text with sender names
-    const messageText = messages.slice(0, 50).map(m => {
+    // Build message text with sender names — use up to 100 messages for better context
+    const messageText = messages.slice(-100).map(m => {
       const sender = userMap[m.user] || 'Unknown';
-      return `[${sender}]: ${m.text}`;
+      const date = new Date(parseFloat(m.ts) * 1000).toISOString().split('T')[0];
+      return `[${date}] [${sender}]: ${m.text}`;
     }).join('\n---\n');
+
+    console.log(`#${channel.name}: ${messages.length} total messages (${threadParents.length} threads expanded). Sending ${Math.min(messages.length, 100)} to LLM.`);
 
     // 6. Analyze with LLM
     const analysis = await base44.asServiceRole.integrations.Core.InvokeLLM({
