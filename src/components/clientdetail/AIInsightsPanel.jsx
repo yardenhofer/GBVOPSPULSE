@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, TrendingUp, AlertTriangle, MessageSquare, Sparkles, RefreshCw } from "lucide-react";
+import { Brain, TrendingUp, TrendingDown, Minus, AlertTriangle, MessageSquare, Sparkles, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 
 const SENTIMENT_STYLES = {
@@ -8,6 +8,12 @@ const SENTIMENT_STYLES = {
   Neutral: { bg: "bg-gray-500/10", color: "text-gray-400", emoji: "😐" },
   "Slightly Concerned": { bg: "bg-yellow-500/10", color: "text-yellow-400", emoji: "😟" },
   Unhappy: { bg: "bg-red-500/10", color: "text-red-400", emoji: "😠" },
+};
+
+const TREND_CONFIG = {
+  Improving: { icon: TrendingUp, color: "text-green-400", bg: "bg-green-500/10", label: "Improving" },
+  Stable: { icon: Minus, color: "text-gray-400", bg: "bg-gray-500/10", label: "Stable" },
+  Declining: { icon: TrendingDown, color: "text-red-400", bg: "bg-red-500/10", label: "Declining" },
 };
 
 export default function AIInsightsPanel({ client }) {
@@ -79,17 +85,29 @@ export default function AIInsightsPanel({ client }) {
           {/* Sentiment */}
           <div className={`rounded-lg ${sentStyle.bg} px-4 py-3`}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-500 dark:text-gray-400">AI Sentiment</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Current Sentiment</span>
               <span className="text-xs text-gray-400">
                 {format(new Date(latest.analysis_date), "MMM d, h:mm a")}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{sentStyle.emoji}</span>
-              <div>
-                <p className={`text-sm font-bold ${sentStyle.color}`}>{latest.sentiment}</p>
-                <p className="text-xs text-gray-400">Score: {latest.sentiment_score}/10 · {latest.messages_analyzed} messages analyzed</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{sentStyle.emoji}</span>
+                <div>
+                  <p className={`text-sm font-bold ${sentStyle.color}`}>{latest.sentiment}</p>
+                  <p className="text-xs text-gray-400">Score: {latest.sentiment_score}/10 · {latest.messages_analyzed} msgs</p>
+                </div>
               </div>
+              {latest.sentiment_trend && (() => {
+                const trend = TREND_CONFIG[latest.sentiment_trend] || TREND_CONFIG.Stable;
+                const TrendIcon = trend.icon;
+                return (
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${trend.bg}`}>
+                    <TrendIcon className={`w-3.5 h-3.5 ${trend.color}`} />
+                    <span className={`text-xs font-semibold ${trend.color}`}>{trend.label}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -145,12 +163,15 @@ export default function AIInsightsPanel({ client }) {
               <div className="space-y-1.5">
                 {insights.slice(1).map(ins => {
                   const s = SENTIMENT_STYLES[ins.sentiment] || SENTIMENT_STYLES.Neutral;
+                  const t = ins.sentiment_trend ? (TREND_CONFIG[ins.sentiment_trend] || TREND_CONFIG.Stable) : null;
+                  const TIcon = t?.icon;
                   return (
                     <div key={ins.id} className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1.5">
                         <span>{s.emoji}</span>
                         <span className={`font-medium ${s.color}`}>{ins.sentiment}</span>
                         <span className="text-gray-400">({ins.sentiment_score}/10)</span>
+                        {t && TIcon && <TIcon className={`w-3 h-3 ${t.color}`} />}
                       </div>
                       <span className="text-gray-400">{format(new Date(ins.analysis_date), "MMM d")}</span>
                     </div>
