@@ -190,22 +190,23 @@ DO NOT make assumptions about when the client joined — use the start date abov
 IMPORTANT: Messages are labeled with sender names and dates. GBV agency staff/account managers are the people SENDING updates about campaigns, leads, LinkedIn outreach, etc. The CLIENT is the person RECEIVING these services and responding to them. Focus your sentiment analysis on the CLIENT's messages and reactions, NOT the agency team's updates. If only agency staff messages are present with no client responses, note that and assess based on available context (e.g. lack of client response could indicate disengagement).
 
 CRITICAL — RECENCY-WEIGHTED SENTIMENT:
-Your sentiment rating MUST reflect the client's CURRENT state, not an average of the whole month. Use this approach:
-- Messages from the LAST 7 DAYS carry the MOST weight. If the client was upset 3 weeks ago but is now positive and engaged, the sentiment should be "Happy" or "Neutral".
-- Messages from 8-14 days ago carry moderate weight.
-- Messages from 15-30 days ago carry the least weight — only relevant if they show unresolved issues that persist.
-- If a negative issue from earlier was clearly addressed and the client's recent tone is positive, the current sentiment should reflect the RECOVERY, not the old problem.
+Your sentiment rating MUST reflect the client's CURRENT state, not an average of the whole month. Use the client's MOST RECENT messages as the primary anchor for sentiment — wherever they fall in the 30-day window. Then apply this layered approach:
+
+1. Find the client's LAST FEW MESSAGES (the most recent cluster of client activity). These are the primary basis for sentiment — even if they were 3 weeks ago.
+2. If there are messages across multiple time periods, later messages override earlier ones. A client who was upset 3 weeks ago but positive last week = currently positive.
+3. If there has been NO client activity for 14+ days, note the silence as a potential engagement concern in risk_signals, but base the sentiment on whatever the last client messages conveyed. Do NOT automatically downgrade sentiment just because of silence — some clients are simply low-touch communicators.
+4. If negative issues from earlier were clearly addressed/resolved (e.g. agency responded, client acknowledged fix), sentiment should reflect the resolution, not the original complaint.
 
 SENTIMENT TREND:
-In addition to current sentiment, determine the TREND over the full 30-day window:
-- "Improving" = client was more negative earlier but tone has gotten better recently
-- "Stable" = sentiment has been relatively consistent throughout
-- "Declining" = client was happier earlier but tone has gotten worse recently
+Determine the TREND by comparing sentiment across the full 30-day window:
+- "Improving" = client tone has gotten more positive over the period (earlier negative → later positive, or issues got resolved)
+- "Stable" = sentiment has been relatively consistent throughout (whether consistently happy OR consistently concerned)
+- "Declining" = client tone has gotten worse over the period (earlier positive → later negative, or new unresolved issues emerged)
 
-CRITICAL RISK KEYWORDS TO WATCH FOR: cancellation, cancel, ending, not renewing, looking at other options, not working, disappointed, frustrated, not seeing results, waste of money, pulling the plug, pausing, downgrade, cutting budget, competitor, alternative, not worth it, rethinking, reconsidering. If ANY of these themes appear in RECENT client messages (last 7 days), sentiment MUST be "Unhappy" or at minimum "Slightly Concerned", and risk_signals MUST describe the specific concern. If these keywords only appeared in OLDER messages and were since resolved, note them in risk_signals but don't let them override the current positive sentiment.
+CRITICAL RISK KEYWORDS TO WATCH FOR: cancellation, cancel, ending, not renewing, looking at other options, not working, disappointed, frustrated, not seeing results, waste of money, pulling the plug, pausing, downgrade, cutting budget, competitor, alternative, not worth it, rethinking, reconsidering. If ANY of these themes appear in the client's MOST RECENT messages (their last cluster of activity), sentiment MUST be "Unhappy" or at minimum "Slightly Concerned", and risk_signals MUST describe the specific concern. If these keywords only appeared in OLDER messages and were since resolved or followed by positive engagement, note them in risk_signals but don't let them override the current sentiment.
 
 Determine:
-1. SENTIMENT: The CLIENT's CURRENT feeling about GBV's services based on their most recent messages (last 7 days weighted highest). Consider their tone, complaints, praise, responsiveness, and engagement.
+1. SENTIMENT: The CLIENT's CURRENT feeling about GBV's services based on their MOST RECENT messages (wherever they fall in the 30-day window). Consider their tone, complaints, praise, responsiveness, and engagement.
 2. SENTIMENT TREND: "Improving", "Stable", or "Declining" over the full 30-day window.
 3. UPSELL OPPORTUNITIES: Is the client mentioning new markets, wanting more leads, interested in LinkedIn outreach, expanding to new regions, or showing signs they'd benefit from additional services?
 4. RISK SIGNALS: Any client complaints, frustration, mentions of competitors, threats to cancel, discussions about cancellation options, long silences from the client, or dissatisfaction? Note whether these are recent or resolved.
