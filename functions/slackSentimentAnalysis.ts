@@ -184,20 +184,35 @@ CLIENT CONTEXT:
 - Client start date: ${client.start_date || 'Unknown'}
 - Package: ${client.package_type || 'Unknown'}
 - Current status: ${client.status || 'Unknown'}
+- Today's date: ${new Date().toISOString().split('T')[0]}
 DO NOT make assumptions about when the client joined — use the start date above. These messages are from the last 30 days, not the full history. If there are no client messages, simply state "No client messages in the past 30 days" without speculating about disengagement or channel joins.
 
-IMPORTANT: Messages are labeled with sender names. GBV agency staff/account managers are the people SENDING updates about campaigns, leads, LinkedIn outreach, etc. The CLIENT is the person RECEIVING these services and responding to them. Focus your sentiment analysis on the CLIENT's messages and reactions, NOT the agency team's updates. If only agency staff messages are present with no client responses, note that and assess based on available context (e.g. lack of client response could indicate disengagement).
+IMPORTANT: Messages are labeled with sender names and dates. GBV agency staff/account managers are the people SENDING updates about campaigns, leads, LinkedIn outreach, etc. The CLIENT is the person RECEIVING these services and responding to them. Focus your sentiment analysis on the CLIENT's messages and reactions, NOT the agency team's updates. If only agency staff messages are present with no client responses, note that and assess based on available context (e.g. lack of client response could indicate disengagement).
 
-CRITICAL RISK KEYWORDS TO WATCH FOR: cancellation, cancel, ending, not renewing, looking at other options, not working, disappointed, frustrated, not seeing results, waste of money, pulling the plug, pausing, downgrade, cutting budget, competitor, alternative, not worth it, rethinking, reconsidering. If ANY of these themes appear in client messages, sentiment MUST be "Unhappy" or at minimum "Slightly Concerned", and risk_signals MUST describe the specific concern.
+CRITICAL — RECENCY-WEIGHTED SENTIMENT:
+Your sentiment rating MUST reflect the client's CURRENT state, not an average of the whole month. Use this approach:
+- Messages from the LAST 7 DAYS carry the MOST weight. If the client was upset 3 weeks ago but is now positive and engaged, the sentiment should be "Happy" or "Neutral".
+- Messages from 8-14 days ago carry moderate weight.
+- Messages from 15-30 days ago carry the least weight — only relevant if they show unresolved issues that persist.
+- If a negative issue from earlier was clearly addressed and the client's recent tone is positive, the current sentiment should reflect the RECOVERY, not the old problem.
+
+SENTIMENT TREND:
+In addition to current sentiment, determine the TREND over the full 30-day window:
+- "Improving" = client was more negative earlier but tone has gotten better recently
+- "Stable" = sentiment has been relatively consistent throughout
+- "Declining" = client was happier earlier but tone has gotten worse recently
+
+CRITICAL RISK KEYWORDS TO WATCH FOR: cancellation, cancel, ending, not renewing, looking at other options, not working, disappointed, frustrated, not seeing results, waste of money, pulling the plug, pausing, downgrade, cutting budget, competitor, alternative, not worth it, rethinking, reconsidering. If ANY of these themes appear in RECENT client messages (last 7 days), sentiment MUST be "Unhappy" or at minimum "Slightly Concerned", and risk_signals MUST describe the specific concern. If these keywords only appeared in OLDER messages and were since resolved, note them in risk_signals but don't let them override the current positive sentiment.
 
 Determine:
-1. SENTIMENT: How does the CLIENT feel about GBV's services? Consider their tone, complaints, praise, responsiveness, and engagement. Pay special attention to ANY discussion about cancellation, dissatisfaction, or wanting to leave — these should heavily weight toward "Unhappy".
-2. UPSELL OPPORTUNITIES: Is the client mentioning new markets, wanting more leads, interested in LinkedIn outreach, expanding to new regions, or showing signs they'd benefit from additional services?
-3. RISK SIGNALS: Any client complaints, frustration, mentions of competitors, threats to cancel, discussions about cancellation options, long silences from the client, or dissatisfaction? Be very sensitive to cancellation-related conversations even if they're framed diplomatically.
-4. SUMMARY: Brief 2-3 sentence summary of the client's communication tone and key topics. Clearly distinguish between what the agency said vs how the client responded. Highlight any cancellation or churn risk explicitly.
-5. KEY TOPICS: Main subjects being discussed.
-6. LAST GBV TOUCHPOINT: Find the date of the MOST RECENT message sent by a GBV/Grow Big Ventures team member (agency staff, NOT the client). Return the date as YYYY-MM-DD. If no GBV staff messages exist, return null.
-7. LAST CLIENT REPLY: Find the date of the MOST RECENT message sent by the CLIENT (NOT GBV staff). Return the date as YYYY-MM-DD. If no client messages exist, return null.
+1. SENTIMENT: The CLIENT's CURRENT feeling about GBV's services based on their most recent messages (last 7 days weighted highest). Consider their tone, complaints, praise, responsiveness, and engagement.
+2. SENTIMENT TREND: "Improving", "Stable", or "Declining" over the full 30-day window.
+3. UPSELL OPPORTUNITIES: Is the client mentioning new markets, wanting more leads, interested in LinkedIn outreach, expanding to new regions, or showing signs they'd benefit from additional services?
+4. RISK SIGNALS: Any client complaints, frustration, mentions of competitors, threats to cancel, discussions about cancellation options, long silences from the client, or dissatisfaction? Note whether these are recent or resolved.
+5. SUMMARY: Brief 2-3 sentence summary focusing on the client's CURRENT state and how it compares to earlier in the month. Clearly distinguish between what the agency said vs how the client responded.
+6. KEY TOPICS: Main subjects being discussed.
+7. LAST GBV TOUCHPOINT: Find the date of the MOST RECENT message sent by a GBV/Grow Big Ventures team member (agency staff, NOT the client). Return the date as YYYY-MM-DD. If no GBV staff messages exist, return null.
+8. LAST CLIENT REPLY: Find the date of the MOST RECENT message sent by the CLIENT (NOT GBV staff). Return the date as YYYY-MM-DD. If no client messages exist, return null.
 
 Messages:
 ${messageText}`,
@@ -205,10 +220,11 @@ ${messageText}`,
         type: "object",
         properties: {
           sentiment: { type: "string", enum: ["Happy", "Neutral", "Slightly Concerned", "Unhappy"] },
-          sentiment_score: { type: "number", description: "1-10 scale, 10 being very happy" },
+          sentiment_score: { type: "number", description: "1-10 scale, 10 being very happy, based on CURRENT (last 7 days) sentiment" },
+          sentiment_trend: { type: "string", enum: ["Improving", "Stable", "Declining"], description: "Direction of sentiment over the full 30-day window" },
           summary: { type: "string" },
           upsell_opportunities: { type: "string", description: "Describe any upsell opportunities, or 'None detected' if none" },
-          risk_signals: { type: "string", description: "Describe any risk signals, or 'None detected' if none" },
+          risk_signals: { type: "string", description: "Describe any risk signals (note if recent or resolved), or 'None detected' if none" },
           key_topics: { type: "string", description: "Comma-separated list of key topics" },
           last_gbv_touchpoint: { type: "string", description: "YYYY-MM-DD date of most recent GBV staff message, or null" },
           last_client_reply: { type: "string", description: "YYYY-MM-DD date of most recent client message, or null" }
@@ -224,6 +240,7 @@ ${messageText}`,
       client_name: client.name,
       sentiment: analysis.sentiment,
       sentiment_score: analysis.sentiment_score,
+      sentiment_trend: analysis.sentiment_trend || "Stable",
       summary: analysis.summary,
       upsell_opportunities: analysis.upsell_opportunities,
       risk_signals: analysis.risk_signals,
