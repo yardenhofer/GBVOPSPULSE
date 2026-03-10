@@ -46,10 +46,12 @@ Deno.serve(async (req) => {
     cursor = data.response_metadata?.next_cursor || "";
   } while (cursor);
 
-  console.log(`Found ${allChannels.length} Slack channels`);
-  const channelNames = allChannels.map(c => c.name);
-  console.log(`Channel names: ${JSON.stringify(channelNames)}`);
-  console.log(`Has insight-cpa: ${channelNames.includes('insight-cpa')}`);
+  console.error(`Found ${allChannels.length} Slack channels`);
+  const hasInsight = allChannels.some(c => c.name === 'insight-cpa');
+  console.error(`Has insight-cpa channel: ${hasInsight}`);
+  if (!hasInsight) {
+    console.error(`All channel names: ${allChannels.map(c => c.name).join(' | ')}`)
+  }
 
   // 2. Get clients — single or all
   let clients;
