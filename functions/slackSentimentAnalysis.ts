@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     cursor = data.response_metadata?.next_cursor || "";
   } while (cursor);
 
-  console.log(`Found ${allChannels.length} Slack channels`);
+  console.log(`Found ${allChannels.length} Slack channels: ${allChannels.map(c => c.name).join(', ')}`);
 
   // 2. Get clients — single or all
   let clients;
