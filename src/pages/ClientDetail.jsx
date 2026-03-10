@@ -30,7 +30,7 @@ export default function ClientDetail() {
   const [inboxHealth, setInboxHealth] = useState(null);
   const navigate = useNavigate();
 
-  const [clientId] = useState(() => new URLSearchParams(window.location.search).get("id"));
+  const clientId = new URLSearchParams(window.location.search).get("id");
 
   useEffect(() => {
     if (clientId) {
