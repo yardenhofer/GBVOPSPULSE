@@ -17,7 +17,7 @@ export function computeRedFlags(client) {
   // 2. No AM touchpoint
   if (client.last_am_touchpoint) {
     const days = differenceInDays(now, new Date(client.last_am_touchpoint));
-    if (days >= 5) {
+    if (days >= 10) {
       flags.push({ type: 'no_touchpoint', severity: 'red', message: `No AM touchpoint for ${days} days`, emoji: '🕒', days });
     } else if (days >= 3) {
       flags.push({ type: 'no_touchpoint', severity: 'yellow', message: `No AM touchpoint for ${days} days`, emoji: '🕒', days });
@@ -48,11 +48,12 @@ export function computeRedFlags(client) {
     flags.push({ type: 'escalated', severity: 'red', message: 'Client escalated', emoji: '⚠️' });
   }
 
-  // 6. Contract renewal
+  // 6. Contract renewal — only critical if sentiment is bad
   if (client.contract_end_date) {
     const days = differenceInDays(new Date(client.contract_end_date), now);
-    if (days <= 14 && days >= 0) {
-      flags.push({ type: 'renewal', severity: 'red', message: `Renewal in ${days}d`, emoji: '📅', days });
+    const badSentiment = client.client_sentiment === 'Unhappy' || client.client_sentiment === 'Slightly Concerned';
+    if (days <= 14 && days >= 0 && badSentiment) {
+      flags.push({ type: 'renewal', severity: 'red', message: `Renewal in ${days}d (${client.client_sentiment})`, emoji: '📅', days });
     } else if (days <= 30 && days >= 0) {
       flags.push({ type: 'renewal', severity: 'yellow', message: `Renewal in ${days}d`, emoji: '📅', days });
     }
