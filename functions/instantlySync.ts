@@ -29,7 +29,7 @@ async function fetchAccountHealth(apiKey) {
   const errorAccounts = []; // only track error accounts (small list)
   let skip = 0;
   const limit = 100;
-  const MAX_PAGES = 5; // cap at 500 accounts to prevent memory blowout
+  const MAX_PAGES = 15; // cap at 1500 accounts
   let page = 0;
   while (page < MAX_PAGES) {
     const res = await fetchInstantly(`/accounts?limit=${limit}&skip=${skip}`, apiKey);
@@ -94,13 +94,23 @@ Deno.serve(async (req) => {
     const campaignsList = Array.isArray(campaignsRes) ? campaignsRes : (campaignsRes?.items || []);
     const activeCampaigns = campaignsList.filter(c => c.status === 1);
 
-    // Get overview analytics
+    // Get overview analytics + per-campaign analytics (for active campaigns only)
     const hasActive = activeCampaigns.length > 0;
     const overviewParams = [];
     if (startDate) overviewParams.push(`start_date=${startDate}`);
     if (hasActive) overviewParams.push('campaign_status=1');
     const overviewQuery = '/campaigns/analytics/overview' + (overviewParams.length ? '?' + overviewParams.join('&') : '');
-    const overviewRes = await fetchInstantly(overviewQuery, apiKey);
+    
+    // Fetch overview and per-campaign analytics in parallel
+    const [overviewRes, analyticsRes] = await Promise.all([
+      fetchInstantly(overviewQuery, apiKey),
+      fetchInstantly('/campaigns/analytics', apiKey),
+    ]);
+
+    // Build analytics lookup map
+    const analyticsItems = Array.isArray(analyticsRes) ? analyticsRes : (analyticsRes?.items || []);
+    const analyticsMap = {};
+    for (const a of analyticsItems) analyticsMap[a.campaign_id] = a;
 
     const totalSent = overviewRes.emails_sent_count || 0;
     const totalOpens = overviewRes.open_count_unique || 0;
@@ -110,14 +120,20 @@ Deno.serve(async (req) => {
     const totalLeads = overviewRes.leads_count || 0;
     const totalCompleted = overviewRes.completed_count || 0;
 
-    // Build campaign list from overview data — skip per-campaign analytics call to save memory
-    const campaigns = campaignsList.slice(0, 20).map(c => ({
-      id: c.id,
-      name: c.name,
-      status: c.status === 1 ? 'active' : c.status === 2 ? 'paused' : c.status === 3 ? 'completed' : 'other',
-      leads_count: c.leads_count || 0,
-      completed_count: c.completed_count || 0,
-    }));
+    // Build campaign list with per-campaign analytics
+    const campaigns = campaignsList.slice(0, 20).map(c => {
+      const a = analyticsMap[c.id] || {};
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status === 1 ? 'active' : c.status === 2 ? 'paused' : c.status === 3 ? 'completed' : 'other',
+        leads_count: a.leads_count || 0,
+        completed_count: a.completed_count || 0,
+        sent: a.emails_sent_count || 0,
+        replies: a.reply_count_unique || 0,
+        opportunities: a.total_opportunities || 0,
+      };
+    });
 
     const stats = {
       campaigns_count: activeCampaigns.length,
