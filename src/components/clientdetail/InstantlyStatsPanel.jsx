@@ -25,7 +25,7 @@ export default function InstantlyStatsPanel({ client, onInboxHealth }) {
     setLoading(true);
     setError(null);
     try {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), 8000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), 20000));
       const res = await Promise.race([
         base44.functions.invoke('instantlySync', { client_id: client.id, time_filter: period || timeFilter }),
         timeoutPromise
