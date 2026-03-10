@@ -27,8 +27,8 @@ async function fetchInstantly(path, apiKey) {
 async function fetchAccountHealth(apiKey) {
   const counts = { total: 0, active: 0, paused: 0, errors: 0 };
   const errorAccounts = [];
-  const limit = 1000; // Instantly supports up to 1000 per page
-  const BATCH_SIZE = 5; // 5 parallel requests per batch
+  const limit = 100; // Instantly max is 100 per page
+  const BATCH_SIZE = 10; // 10 parallel requests per batch = 1000 accounts/batch
   const MAX_ACCOUNTS = 20000; // safety cap
 
   let skip = 0;
