@@ -23,47 +23,36 @@ async function fetchInstantly(path, apiKey) {
   }
 }
 
-// Lightweight account health — fetch in parallel batches with large page size
+// Lightweight account health — only count statuses, don't store full objects
 async function fetchAccountHealth(apiKey) {
   const counts = { total: 0, active: 0, paused: 0, errors: 0 };
-  const errorAccounts = [];
-  const limit = 100; // Instantly max is 100 per page
-  const BATCH_SIZE = 10; // 10 parallel requests per batch = 1000 accounts/batch
-  const MAX_ACCOUNTS = 20000; // safety cap
-
+  const errorAccounts = []; // only track error accounts (small list)
   let skip = 0;
-  let done = false;
-
-  while (!done && skip < MAX_ACCOUNTS) {
-    // Build a batch of parallel requests
-    const batch = [];
-    for (let i = 0; i < BATCH_SIZE && (skip + i * limit) < MAX_ACCOUNTS; i++) {
-      batch.push(fetchInstantly(`/accounts?limit=${limit}&skip=${skip + i * limit}`, apiKey));
-    }
-    const results = await Promise.all(batch);
-
-    for (let i = 0; i < results.length; i++) {
-      const items = Array.isArray(results[i]) ? results[i] : (results[i]?.items || []);
-      for (const a of items) {
-        counts.total++;
-        if (a.status === 1) counts.active++;
-        else if (a.status === 2) counts.paused++;
-        else if (a.status < 0) {
-          counts.errors++;
-          if (errorAccounts.length < 20) {
-            errorAccounts.push({
-              email: a.email,
-              status: a.status,
-              status_label: a.status === -1 ? 'Connection Error' : a.status === -2 ? 'Soft Bounce Error' : a.status === -3 ? 'Sending Error' : 'Unknown',
-            });
-          }
+  const limit = 100;
+  const MAX_PAGES = 15; // cap at 1500 accounts
+  let page = 0;
+  while (page < MAX_PAGES) {
+    const res = await fetchInstantly(`/accounts?limit=${limit}&skip=${skip}`, apiKey);
+    const items = Array.isArray(res) ? res : (res?.items || []);
+    for (const a of items) {
+      counts.total++;
+      if (a.status === 1) counts.active++;
+      else if (a.status === 2) counts.paused++;
+      else if (a.status < 0) {
+        counts.errors++;
+        if (errorAccounts.length < 20) {
+          errorAccounts.push({
+            email: a.email,
+            status: a.status,
+            status_label: a.status === -1 ? 'Connection Error' : a.status === -2 ? 'Soft Bounce Error' : a.status === -3 ? 'Sending Error' : 'Unknown',
+          });
         }
       }
-      if (items.length < limit) { done = true; break; }
     }
-    skip += BATCH_SIZE * limit;
+    if (items.length < limit) break;
+    skip += limit;
+    page++;
   }
-
   counts.error_pct = counts.total > 0 ? Math.round((counts.errors / counts.total) * 100) : 0;
   return { ...counts, accounts: errorAccounts };
 }
