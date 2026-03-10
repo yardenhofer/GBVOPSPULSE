@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { computeRedFlags, computeAutoStatus, STATUS_CONFIG } from "../components/utils/redFlagEngine";
 
 import ClientHeader from "../components/clientdetail/ClientHeader";
@@ -92,15 +93,16 @@ export default function ClientDetail() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Package Type</label>
-            <select
-              value={newPackage}
-              onChange={e => setNewPackage(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            >
-              <option value="Email">Email</option>
-              <option value="LinkedIn">LinkedIn</option>
-              <option value="Hybrid">Hybrid</option>
-            </select>
+            <Select value={newPackage} onValueChange={setNewPackage}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select package" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Email">Email</SelectItem>
+                <SelectItem value="LinkedIn">LinkedIn</SelectItem>
+                <SelectItem value="Hybrid">Hybrid</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-3 pt-2">
             <button
