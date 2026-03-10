@@ -119,13 +119,8 @@ export default function InstantlyStatsPanel({ client, onInboxHealth }) {
       {stats && (
         <div className="mb-4">
           {activeCampaigns.map(c => {
-           // Sequence started = emails_sent (first step only would be ideal, but we use sent as proxy)
-           // completed_count matches Instantly's "Completed" exactly
-           // The remaining leads still in sequence = leads_count - completed_count
-           const remaining = c.leads_count - c.completed_count;
+           const remaining = (c.leads_count || 0) - (c.completed_count || 0);
            const completedPct = c.leads_count > 0 ? Math.round((c.completed_count / c.leads_count) * 100) : 0;
-           // For the progress bar, show how much of the lead pool has been sent to (contacted_count / leads_count, capped at 100%)
-           const sentRatio = c.leads_count > 0 ? Math.min(100, Math.round((c.sent / c.leads_count) * 100)) : 0;
            return (
              <div key={c.id} className="mb-3">
                <div className="flex items-center justify-between mb-1">
