@@ -15,15 +15,20 @@ async function fetchInstantly(path, apiKey) {
 
 async function fetchAllAccounts(apiKey) {
   let allAccounts = [];
-  let skip = 0;
   const limit = 100;
-  while (true) {
-    const res = await fetchInstantly(`/accounts?limit=${limit}&skip=${skip}`, apiKey);
+  let cursor = null;
+  const MAX_PAGES = 20;
+  let page = 0;
+  while (page < MAX_PAGES) {
+    let url = `/accounts?limit=${limit}`;
+    if (cursor) url += `&starting_after=${encodeURIComponent(cursor)}`;
+    const res = await fetchInstantly(url, apiKey);
     if (!res) break;
-    const items = Array.isArray(res) ? res : (res?.items || []);
+    const items = res?.items || [];
     allAccounts = allAccounts.concat(items);
-    if (items.length < limit) break;
-    skip += limit;
+    cursor = res?.next_starting_after;
+    if (!cursor || items.length < limit) break;
+    page++;
   }
   return allAccounts;
 }

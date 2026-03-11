@@ -24,16 +24,19 @@ async function fetchInstantly(path, apiKey) {
 }
 
 // Lightweight account health — only count statuses, don't store full objects
+// Uses cursor-based pagination (starting_after) per Instantly API v2
 async function fetchAccountHealth(apiKey) {
   const counts = { total: 0, active: 0, paused: 0, errors: 0 };
-  const errorAccounts = []; // only track error accounts (small list)
-  let skip = 0;
+  const errorAccounts = [];
   const limit = 100;
-  const MAX_PAGES = 15; // cap at 1500 accounts
+  const MAX_PAGES = 20;
+  let cursor = null;
   let page = 0;
   while (page < MAX_PAGES) {
-    const res = await fetchInstantly(`/accounts?limit=${limit}&skip=${skip}`, apiKey);
-    const items = Array.isArray(res) ? res : (res?.items || []);
+    let url = `/accounts?limit=${limit}`;
+    if (cursor) url += `&starting_after=${encodeURIComponent(cursor)}`;
+    const res = await fetchInstantly(url, apiKey);
+    const items = res?.items || [];
     for (const a of items) {
       counts.total++;
       if (a.status === 1) counts.active++;
@@ -49,8 +52,8 @@ async function fetchAccountHealth(apiKey) {
         }
       }
     }
-    if (items.length < limit) break;
-    skip += limit;
+    cursor = res?.next_starting_after;
+    if (!cursor || items.length < limit) break;
     page++;
   }
   counts.error_pct = counts.total > 0 ? Math.round((counts.errors / counts.total) * 100) : 0;
