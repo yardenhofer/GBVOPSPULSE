@@ -32,11 +32,11 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
   const [amOptions, setAmOptions] = useState([]);
 
   useEffect(() => {
-    base44.entities.User.list("-full_name", 200).then(users => {
+    base44.functions.invoke("listUsers", {}).then(res => {
+      const users = res.data.users || [];
       const ams = [...new Set(users.map(u => u.email).filter(Boolean))];
       setAmOptions(ams);
     }).catch(() => {
-      // Non-admin users can't list all users; fall back to current AM
       if (client.assigned_am) setAmOptions([client.assigned_am]);
     });
   }, []);

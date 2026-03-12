@@ -61,7 +61,8 @@ export default function Settings() {
         setLoading(false);
         return;
       }
-      const allUsers = await base44.entities.User.list("-created_date", 100);
+      const res = await base44.functions.invoke("listUsers", {});
+      const allUsers = res.data.users || [];
       setUsers(allUsers);
       // Clean up pending invites that have been accepted
       const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()));
@@ -91,8 +92,8 @@ export default function Settings() {
     setInviteEmail("");
     setInviting(false);
     // Refresh list
-    const updated = await base44.entities.User.list("-created_date", 100);
-    setUsers(updated);
+    const res2 = await base44.functions.invoke("listUsers", {});
+    setUsers(res2.data.users || []);
   }
 
   async function togglePermission(user, key) {
