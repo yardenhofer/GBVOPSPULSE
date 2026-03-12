@@ -99,7 +99,7 @@ export default function Settings() {
   async function togglePermission(user, key) {
     const newVal = !(user[key] ?? true);
     setUpdating(u => ({ ...u, [`${user.id}-${key}`]: true }));
-    await base44.entities.User.update(user.id, { [key]: newVal });
+    await base44.functions.invoke("listUsers", { action: "update", user_id: user.id, data: { [key]: newVal } });
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, [key]: newVal } : u));
     setUpdating(u => ({ ...u, [`${user.id}-${key}`]: false }));
   }
@@ -107,7 +107,7 @@ export default function Settings() {
   async function toggleRole(user) {
     const newRole = user.role === "admin" ? "user" : "admin";
     setUpdating(u => ({ ...u, [`${user.id}-role`]: true }));
-    await base44.entities.User.update(user.id, { role: newRole });
+    await base44.functions.invoke("listUsers", { action: "update", user_id: user.id, data: { role: newRole } });
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, role: newRole } : u));
     setUpdating(u => ({ ...u, [`${user.id}-role`]: false }));
   }
@@ -117,7 +117,7 @@ export default function Settings() {
     if (rawVal !== "" && isNaN(val)) return;
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, group: val } : u));
     setUpdating(u => ({ ...u, [`${user.id}-group`]: true }));
-    await base44.entities.User.update(user.id, { group: val });
+    await base44.functions.invoke("listUsers", { action: "update", user_id: user.id, data: { group: val } });
     setUpdating(u => ({ ...u, [`${user.id}-group`]: false }));
   }
 
