@@ -55,11 +55,13 @@ export default function Settings() {
 
   useEffect(() => {
     async function load() {
-      const [me, allUsers] = await Promise.all([
-        base44.auth.me().catch(() => null),
-        base44.entities.User.list("-created_date", 100),
-      ]);
+      const me = await base44.auth.me().catch(() => null);
       setCurrentUser(me);
+      if (me?.role !== "admin") {
+        setLoading(false);
+        return;
+      }
+      const allUsers = await base44.entities.User.list("-created_date", 100);
       setUsers(allUsers);
       // Clean up pending invites that have been accepted
       const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()));
