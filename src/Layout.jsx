@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Bell, Sun, Moon, Menu, Zap, Settings, LogOut, Activity } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Bell, Sun, Moon, Menu, Zap, Settings, LogOut, Activity, FileCheck } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const NAV = [
@@ -10,6 +10,7 @@ const NAV = [
   { label: "Daily Entries",  page: "DailyEntries",   icon: ClipboardList, adminOnly: true },
   { label: "Alerts",         page: "Alerts",         icon: Bell },
   { label: "Executive View", page: "ExecutiveView",  icon: TrendingUp },
+  { label: "Lead Approvals", page: "LeadListApprovals", icon: FileCheck },
   { label: "Activity Log",   page: "ActivityLog",    icon: Activity, adminOnly: true },
   { label: "Settings",       page: "Settings",       icon: Settings, adminOnly: true },
 ];
