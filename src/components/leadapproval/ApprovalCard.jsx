@@ -2,6 +2,8 @@ import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { CheckCircle2, XCircle, Clock, FileText, ExternalLink, Loader2, MessageSquare, Eye } from "lucide-react";
 import CsvPreviewModal from "./CsvPreviewModal";
+import AiAnalysisPanel from "./AiAnalysisPanel";
+import AiScoreBadge from "./AiScoreBadge";
 function formatDate(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -15,7 +17,7 @@ const STATUS_STYLES = {
   Denied: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/20", label: "Denied" },
 };
 
-export default function ApprovalCard({ item, isAdmin, user, onUpdated }) {
+export default function ApprovalCard({ item, isAdmin, user, onUpdated, client }) {
   const [feedback, setFeedback] = useState("");
   const [acting, setActing] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -50,10 +52,13 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated }) {
             {" · "}{formatDate(item.created_date)}
           </p>
         </div>
-        <span className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
-          <StatusIcon className="w-3 h-3" />
-          {cfg.label}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <AiScoreBadge score={item.ai_score} recommendation={item.ai_recommendation} />
+          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
+            <StatusIcon className="w-3 h-3" />
+            {cfg.label}
+          </span>
+        </div>
       </div>
 
       {/* Details */}
@@ -101,6 +106,9 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated }) {
           )}
         </div>
       )}
+
+      {/* AI Analysis */}
+      <AiAnalysisPanel item={item} onAnalyzed={onUpdated} />
 
       {/* Admin actions (only for pending items) */}
       {isAdmin && item.status === "Pending" && (
