@@ -91,16 +91,21 @@ ${approval.list_type === "link" ? `Link: ${approval.link_url}` : ""}
 
 ANALYSIS INSTRUCTIONS:
 
+CRITICAL CONTEXT - READ CAREFULLY:
+The AM (Account Manager) who submitted this list knows the client's campaign goals. The LIST NAME and AM NOTES define what the target audience IS for this list. Do NOT second-guess the AM's targeting intent. If the AM says the target is "HVAC plumbing home services" and the leads are HVAC/plumbing/home services companies, that is a PERFECT match — even if the client is a CPA firm, law firm, marketing agency, etc. The client's business type does NOT define the target; the AM's stated goals do. Clients often target specific verticals/industries as their customers.
+
 SCORING PRIORITIES (in order of importance):
-1. **ICP & TARGET FIT (70% of score)**: This is by far the most important factor. Do the leads match the client's ideal customer profile? Are the companies in the right industry/vertical? Are the job titles and roles relevant to who the client wants to reach? What percentage of leads appear to be on-target vs off-target?
+1. **TARGET FIT vs AM's STATED INTENT (70% of score)**: Do the leads match what the AM described in the list name and notes? The AM's notes and list name ARE the target definition. If the leads align with what the AM said they're targeting, that's a high score. Only flag a mismatch if the actual lead data contradicts what the AM described.
 2. **Volume & Coverage (20% of score)**: Is the list size appropriate for the client's outreach needs and weekly target? Does it provide enough runway?
 3. **Data structure (10% of score)**: Does it have basic required columns (name, company, email)? This is a minor factor — some incomplete fields or duplicate company names are normal and expected. We often target larger companies and reach multiple people at the same company, so duplicate company names are NOT a concern. Missing titles or partial data should have almost negligible impact on the score.
 
 IMPORTANT GUIDELINES:
-- Focus your analysis on WHETHER THE LEADS FIT THE TARGET AUDIENCE, not on data hygiene.
+- The AM's list name and notes DEFINE the target. Trust them.
+- Do NOT assume what a client should be targeting based on the client's own business type.
 - Duplicate company names are NORMAL and EXPECTED — do not flag them as a concern.
 - Incomplete data fields (missing titles, phone numbers, etc.) should barely affect the score.
-- The key question is: "Will these leads generate positive responses for this client's outreach?"
+- Messy formatting or merged data sources is a very minor issue — what matters is whether the leads are on-target.
+- The key question is: "Do these leads match what the AM said they're targeting?"
 
 Provide your analysis as a JSON object with these fields:
    - score: number 1-100 (quality score)
