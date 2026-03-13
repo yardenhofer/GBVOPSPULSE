@@ -51,7 +51,7 @@ export default function CsvPreviewModal({ fileUrl, listName, onClose }) {
         const res = await fetch(fileUrl);
         if (!res.ok) throw new Error("Failed to fetch file");
         const text = await res.text();
-        const parsed = parseAllCsv(text);
+        const parsed = parseCsv(text);
         if (parsed.length > 0) {
           setHeaders(parsed[0]);
           setRows(parsed.slice(1).filter(r => r.some(c => c.trim())));
