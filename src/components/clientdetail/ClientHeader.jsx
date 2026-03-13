@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { differenceInDays, format } from "date-fns";
-import { ArrowLeft, DollarSign, Target, Calendar, MessageCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, DollarSign, Target, Calendar, MessageCircle, Archive } from "lucide-react";
 import { STATUS_CONFIG, SENTIMENT_CONFIG } from "../utils/redFlagEngine";
 
-export default function ClientHeader({ client, status, onBack, onDelete }) {
+export default function ClientHeader({ client, status, onBack, onDelete, onTerminate }) {
   const [showConfirm, setShowConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [terminating, setTerminating] = useState(false);
+  const isTerminated = client.status === 'Terminated';
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Healthy"];
   const sentCfg = SENTIMENT_CONFIG[client.client_sentiment] || SENTIMENT_CONFIG["Neutral"];
   const replyDays = client.last_client_reply_date
@@ -39,14 +40,19 @@ export default function ClientHeader({ client, status, onBack, onDelete }) {
           <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${sentCfg.bg} ${sentCfg.color}`}>
             {sentCfg.emoji} {client.client_sentiment || "Unknown"}
           </span>
-          {onDelete && (
+          {onTerminate && !isTerminated && (
             <button
               onClick={() => setShowConfirm(true)}
               className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-              title="Delete client"
+              title="Terminate client"
             >
-              <Trash2 className="w-4 h-4" />
+              <Archive className="w-4 h-4" />
             </button>
+          )}
+          {isTerminated && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-500/10 text-gray-400 border border-gray-500/20">
+              Terminated {client.terminated_date || ""}
+            </span>
           )}
         </div>
       </div>
@@ -65,9 +71,9 @@ export default function ClientHeader({ client, status, onBack, onDelete }) {
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowConfirm(false)}>
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm mx-4 space-y-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Delete Client</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Terminate Client</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Are you sure you want to delete <strong>{client.name}</strong>? This action cannot be undone.
+              Are you sure you want to terminate <strong>{client.name}</strong>? They will be moved to the Archived tab and hidden from the active dashboard.
             </p>
             <div className="flex items-center gap-3 justify-end">
               <button
@@ -78,13 +84,13 @@ export default function ClientHeader({ client, status, onBack, onDelete }) {
               </button>
               <button
                 onClick={async () => {
-                  setDeleting(true);
-                  await onDelete();
+                  setTerminating(true);
+                  await onTerminate();
                 }}
-                disabled={deleting}
+                disabled={terminating}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
               >
-                {deleting ? "Deleting…" : "Delete"}
+                {terminating ? "Terminating…" : "Terminate"}
               </button>
             </div>
           </div>

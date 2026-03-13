@@ -63,6 +63,7 @@ export function computeRedFlags(client) {
 }
 
 export function computeAutoStatus(client) {
+  if (client.status === 'Terminated') return 'Terminated';
   const flags = computeRedFlags(client);
   if (client.is_escalated || flags.some(f => f.severity === 'red')) return 'Critical';
   if (flags.some(f => f.severity === 'yellow')) return 'At Risk';
@@ -74,6 +75,7 @@ export const STATUS_CONFIG = {
   'Monitor':  { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', dot: 'bg-yellow-400' },
   'At Risk':  { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20', dot: 'bg-orange-400' },
   'Critical': { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', dot: 'bg-red-400' },
+  'Terminated': { color: 'text-gray-400', bg: 'bg-gray-500/10', border: 'border-gray-500/20', dot: 'bg-gray-400' },
 };
 
 export const SENTIMENT_CONFIG = {

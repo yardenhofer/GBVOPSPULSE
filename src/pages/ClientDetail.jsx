@@ -152,8 +152,9 @@ export default function ClientDetail() {
         client={client}
         status={status}
         onBack={() => navigate(createPageUrl("Dashboard"))}
-        onDelete={async () => {
-          await base44.entities.Client.delete(client.id);
+        onTerminate={async () => {
+          const today = new Date().toISOString().split("T")[0];
+          await base44.entities.Client.update(client.id, { status: "Terminated", terminated_date: today });
           navigate(createPageUrl("Dashboard"));
         }}
       />
