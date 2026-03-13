@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { CheckCircle2, XCircle, Clock, FileText, ExternalLink, Loader2, MessageSquare } from "lucide-react";
-import { format } from "date-fns";
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
+    " " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
 
 const STATUS_STYLES = {
   Pending: { icon: Clock, color: "text-yellow-500", bg: "bg-yellow-500/10", border: "border-yellow-500/20", label: "Pending Review" },
@@ -40,7 +45,7 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated }) {
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             <span className="font-medium">{item.client_name}</span>
             {" · "}Submitted by {item.submitted_by_name || item.submitted_by}
-            {" · "}{format(new Date(item.created_date), "MMM d, yyyy h:mm a")}
+            {" · "}{formatDate(item.created_date)}
           </p>
         </div>
         <span className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
@@ -84,7 +89,7 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated }) {
           </p>
           <p className="text-sm text-gray-700 dark:text-gray-300">{item.admin_feedback}</p>
           {item.reviewed_date && (
-            <p className="text-xs text-gray-400 mt-1">{format(new Date(item.reviewed_date), "MMM d, yyyy h:mm a")}</p>
+            <p className="text-xs text-gray-400 mt-1">{formatDate(item.reviewed_date)}</p>
           )}
         </div>
       )}
