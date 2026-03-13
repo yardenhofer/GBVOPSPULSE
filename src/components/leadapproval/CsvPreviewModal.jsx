@@ -4,7 +4,8 @@ import { X, Download, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 const PAGE_SIZE = 50;
 
 function parseCsv(text) {
-  const lines = [];
+  const rows = [];
+  let cells = [];
   let current = "";
   let inQuotes = false;
 
@@ -18,30 +19,21 @@ function parseCsv(text) {
         inQuotes = !inQuotes;
       }
     } else if (ch === "," && !inQuotes) {
-      lines.push(current);
+      cells.push(current);
       current = "";
     } else if ((ch === "\n" || ch === "\r") && !inQuotes) {
-      lines.push(current);
+      cells.push(current);
       current = "";
       if (ch === "\r" && text[i + 1] === "\n") i++;
-      // end of row
-      if (lines.length > 0) {
-        yield lines.splice(0);
-      }
+      if (cells.length > 0) rows.push(cells);
+      cells = [];
     } else {
       current += ch;
     }
   }
-  if (current || lines.length) {
-    lines.push(current);
-    yield lines.splice(0);
-  }
-}
-
-function parseAllCsv(text) {
-  const rows = [];
-  for (const row of parseCsv(text)) {
-    rows.push(row);
+  if (current || cells.length) {
+    cells.push(current);
+    rows.push(cells);
   }
   return rows;
 }
