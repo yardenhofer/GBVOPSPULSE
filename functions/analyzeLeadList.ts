@@ -19,6 +19,8 @@ Deno.serve(async (req) => {
 
     // Fetch CSV content if file type
     let csvSample = "";
+    let sampledCount = 0;
+    let totalLeadCount = 0;
     if (approval.list_type === "file" && approval.file_url) {
       try {
         const csvRes = await fetch(approval.file_url);
@@ -42,6 +44,8 @@ Deno.serve(async (req) => {
             }
           }
 
+          sampledCount = sampledLines.length;
+          totalLeadCount = totalLeads;
           csvSample = header + '\n' + sampledLines.join('\n');
           if (totalLeads > MAX_SAMPLE) {
             csvSample += `\n\n(Sampled ${MAX_SAMPLE} rows evenly from ${totalLeads} total leads)`;
@@ -107,9 +111,11 @@ IMPORTANT GUIDELINES:
 - Messy formatting, merged data sources, inconsistent columns, and many empty fields are COMPLETELY NORMAL for our lists. This is how all our data comes in. Do NOT flag this as a concern or let it negatively affect the score.
 - The key question is: "Do these leads match what the AM said they're targeting?"
 
+SAMPLING NOTE: You analyzed ${sampledCount} leads randomly sampled from ${totalLeadCount || 'unknown'} total leads in this list. Mention this in your summary (e.g. "Analyzed X leads randomly sampled from Y total.").
+
 Provide your analysis as a JSON object with these fields:
    - score: number 1-100 (quality score)
-   - summary: string (2-3 sentence overview focusing on target fit and relevance)
+   - summary: string (2-3 sentence overview — START with how many leads you analyzed out of the total, then focus on target fit and relevance)
    - strengths: array of strings (top 3 strengths, focus on ICP alignment)
    - concerns: array of strings (top 3 concerns if any — only flag serious target misalignment or fundamental issues, empty array if none)
    - recommendation: one of "Approve", "Review Carefully", "Deny"
