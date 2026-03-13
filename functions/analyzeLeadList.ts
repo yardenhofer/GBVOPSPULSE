@@ -24,11 +24,27 @@ Deno.serve(async (req) => {
         const csvRes = await fetch(approval.file_url);
         if (csvRes.ok) {
           const fullText = await csvRes.text();
-          // Take first 100 rows to stay within token limits
           const lines = fullText.split('\n');
-          csvSample = lines.slice(0, Math.min(101, lines.length)).join('\n');
-          if (lines.length > 101) {
-            csvSample += `\n... (${lines.length - 101} more rows, ${lines.length - 1} total leads)`;
+          const header = lines[0];
+          const dataLines = lines.slice(1).filter(l => l.trim());
+          const totalLeads = dataLines.length;
+
+          // Sample up to 500 rows spread evenly across the file for a representative view
+          const MAX_SAMPLE = 500;
+          let sampledLines;
+          if (dataLines.length <= MAX_SAMPLE) {
+            sampledLines = dataLines;
+          } else {
+            const step = dataLines.length / MAX_SAMPLE;
+            sampledLines = [];
+            for (let i = 0; i < MAX_SAMPLE; i++) {
+              sampledLines.push(dataLines[Math.floor(i * step)]);
+            }
+          }
+
+          csvSample = header + '\n' + sampledLines.join('\n');
+          if (totalLeads > MAX_SAMPLE) {
+            csvSample += `\n\n(Sampled ${MAX_SAMPLE} rows evenly from ${totalLeads} total leads)`;
           }
         }
       } catch (e) {
