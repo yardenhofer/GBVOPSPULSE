@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, Link as LinkIcon, FileText, Loader2, X } from "lucide-react";
+import { Upload, Link as LinkIcon, FileText, Loader2, X, ChevronsUpDown, Check, Search } from "lucide-react";
 
 export default function SubmitListForm({ clients, user, onSubmitted }) {
   const [clientId, setClientId] = useState("");
@@ -33,33 +33,37 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
     if (listType === "link" && !linkUrl.trim()) return;
 
     setSubmitting(true);
-    await base44.entities.LeadListApproval.create({
-      client_id: clientId,
-      client_name: selectedClient?.name || "",
-      submitted_by: user.email,
-      submitted_by_name: user.full_name || user.email,
-      list_name: listName,
-      list_type: listType,
-      file_url: listType === "file" ? fileUrl : null,
-      link_url: listType === "link" ? linkUrl.trim() : null,
-      notes: notes.trim() || null,
-      lead_count: leadCount ? Number(leadCount) : null,
-      status: "Pending",
-    });
-    
-    // Reset
-    setClientId("");
-    setListName("");
-    setFile(null);
-    setFileUrl("");
-    setLinkUrl("");
-    setNotes("");
-    setLeadCount("");
-    setSubmitting(false);
-    onSubmitted();
+    try {
+      await base44.entities.LeadListApproval.create({
+        client_id: clientId,
+        client_name: selectedClient?.name || "",
+        submitted_by: user.email,
+        submitted_by_name: user.full_name || user.email,
+        list_name: listName,
+        list_type: listType,
+        file_url: listType === "file" ? fileUrl : null,
+        link_url: listType === "link" ? linkUrl.trim() : null,
+        notes: notes.trim() || null,
+        lead_count: leadCount ? Number(leadCount) : null,
+        status: "Pending",
+      });
+      // Reset
+      setClientId("");
+      setListName("");
+      setFile(null);
+      setFileUrl("");
+      setLinkUrl("");
+      setNotes("");
+      setLeadCount("");
+      onSubmitted();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const inputCls = "w-full text-sm px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+  const isValid = clientId && listName && (listType === "file" ? !!fileUrl : !!linkUrl.trim());
 
   return (
     <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
@@ -69,16 +73,11 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
       </h3>
 
       {/* Client dropdown */}
-      <div>
-        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Client *</label>
-        <select value={clientId} onChange={e => setClientId(e.target.value)} required
-          className={inputCls + " cursor-pointer"}>
-          <option value="">Select a client…</option>
-          {clients.filter(c => c.status !== "Terminated").map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </div>
+      <ClientCombobox
+        clients={clients.filter(c => c.status !== "Terminated")}
+        value={clientId}
+        onChange={setClientId}
+      />
 
       {/* List name */}
       <div>
@@ -144,7 +143,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
           className={inputCls + " resize-none"} />
       </div>
 
-      <button type="submit" disabled={submitting || uploading || !clientId || !listName}
+      <button type="submit" disabled={submitting || uploading || !isValid}
         className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50">
         {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
         {submitting ? "Submitting…" : "Submit for Approval"}
