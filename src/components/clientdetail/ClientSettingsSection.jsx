@@ -3,7 +3,7 @@ import { Settings, ChevronDown } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const SENTIMENTS = ["Happy", "Neutral", "Slightly Concerned", "Unhappy"];
-const STATUSES = ["Healthy", "Monitor", "At Risk", "Critical"];
+const STATUSES = ["Healthy", "Monitor", "At Risk", "Critical", "Terminated"];
 const PACKAGES = ["Email", "LinkedIn", "Hybrid"];
 
 const Field = ({ label, children }) => (
