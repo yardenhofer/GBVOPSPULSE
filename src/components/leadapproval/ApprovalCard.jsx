@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { CheckCircle2, XCircle, Clock, FileText, ExternalLink, Loader2, MessageSquare } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, FileText, ExternalLink, Loader2, MessageSquare, Eye } from "lucide-react";
+import CsvPreviewModal from "./CsvPreviewModal";
 function formatDate(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -18,6 +19,7 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated }) {
   const [feedback, setFeedback] = useState("");
   const [acting, setActing] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const cfg = STATUS_STYLES[item.status] || STATUS_STYLES.Pending;
   const StatusIcon = cfg.icon;
@@ -57,10 +59,16 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated }) {
       {/* Details */}
       <div className="flex flex-wrap gap-3 text-xs">
         {item.list_type === "file" && item.file_url && (
-          <a href={item.file_url} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1 text-blue-500 hover:text-blue-600">
-            <FileText className="w-3 h-3" /> Download CSV
-          </a>
+          <>
+            <button onClick={() => setShowPreview(true)}
+              className="flex items-center gap-1 text-blue-500 hover:text-blue-600 font-medium">
+              <Eye className="w-3 h-3" /> Preview CSV
+            </button>
+            <a href={item.file_url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300">
+              <FileText className="w-3 h-3" /> Download
+            </a>
+          </>
         )}
         {item.list_type === "link" && item.link_url && (
           <a href={item.link_url} target="_blank" rel="noopener noreferrer"
@@ -133,6 +141,14 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated }) {
             </div>
           )}
         </div>
+      )}
+      {/* CSV Preview Modal */}
+      {showPreview && item.file_url && (
+        <CsvPreviewModal
+          fileUrl={item.file_url}
+          listName={item.list_name}
+          onClose={() => setShowPreview(false)}
+        />
       )}
     </div>
   );
