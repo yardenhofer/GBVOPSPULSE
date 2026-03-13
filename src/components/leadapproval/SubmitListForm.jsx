@@ -147,9 +147,12 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
         Submit Lead List for Approval
       </h3>
 
-      {/* Client dropdown */}
+      {/* Client dropdown — filter by AM's group for non-admins */}
       <ClientCombobox
-        clients={clients.filter(c => c.status !== "Terminated")}
+        clients={clients.filter(c =>
+          c.status !== "Terminated" &&
+          (user?.role === "admin" || !user?.group || c.group === user.group)
+        )}
         value={clientId}
         onChange={setClientId}
       />
