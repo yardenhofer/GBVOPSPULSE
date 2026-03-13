@@ -104,7 +104,7 @@ IMPORTANT GUIDELINES:
 - Do NOT assume what a client should be targeting based on the client's own business type.
 - Duplicate company names are NORMAL and EXPECTED — do not flag them as a concern.
 - Incomplete data fields (missing titles, phone numbers, etc.) should barely affect the score.
-- Messy formatting or merged data sources is a very minor issue — what matters is whether the leads are on-target.
+- Messy formatting, merged data sources, inconsistent columns, and many empty fields are COMPLETELY NORMAL for our lists. This is how all our data comes in. Do NOT flag this as a concern or let it negatively affect the score.
 - The key question is: "Do these leads match what the AM said they're targeting?"
 
 Provide your analysis as a JSON object with these fields:
