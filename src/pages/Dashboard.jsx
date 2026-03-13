@@ -73,11 +73,15 @@ export default function Dashboard() {
 
   const groups = [...new Set(clients.map(c => c.group).filter(g => g != null))].sort((a, b) => a - b);
 
-  const escalatedClients = clients.filter(c => c.is_escalated);
-  const awaitingLeadsClients = clients.filter(c => c.waiting_on_leads);
+  const activeClients = clients.filter(c => c.status !== "Terminated");
+  const terminatedClients = clients.filter(c => c.status === "Terminated");
+  const escalatedClients = activeClients.filter(c => c.is_escalated);
+  const awaitingLeadsClients = activeClients.filter(c => c.waiting_on_leads);
 
   const filtered = clients
     .filter(c => {
+      if (activeTab === "archived") return c.status === "Terminated";
+      if (c.status === "Terminated") return false;
       if (activeTab === "escalated") return c.is_escalated;
       if (activeTab === "awaiting_leads") return c.waiting_on_leads;
       if (filters.search && !c.name.toLowerCase().includes(filters.search.toLowerCase()) &&
