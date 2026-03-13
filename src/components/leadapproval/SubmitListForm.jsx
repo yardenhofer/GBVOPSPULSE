@@ -83,6 +83,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
   const [listType, setListType] = useState("file");
   const [file, setFile] = useState(null);
   const [linkUrl, setLinkUrl] = useState("");
+  const [clientCopy, setClientCopy] = useState("");
   const [notes, setNotes] = useState("");
   const [leadCount, setLeadCount] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -103,7 +104,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!clientId || !listName) return;
+    if (!clientId || !listName || !clientCopy.trim()) return;
     if (listType === "file" && !fileUrl) return;
     if (listType === "link" && !linkUrl.trim()) return;
 
@@ -118,6 +119,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
         list_type: listType,
         file_url: listType === "file" ? fileUrl : null,
         link_url: listType === "link" ? linkUrl.trim() : null,
+        client_copy: clientCopy.trim(),
         notes: notes.trim() || null,
         lead_count: leadCount ? Number(leadCount) : null,
         status: "Pending",
@@ -128,6 +130,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
       setFile(null);
       setFileUrl("");
       setLinkUrl("");
+      setClientCopy("");
       setNotes("");
       setLeadCount("");
       onSubmitted();
@@ -138,13 +141,13 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
 
   const inputCls = "w-full text-sm px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-  const isValid = clientId && listName && (listType === "file" ? !!fileUrl : !!linkUrl.trim());
+  const isValid = clientId && listName && clientCopy.trim() && (listType === "file" ? !!fileUrl : !!linkUrl.trim());
 
   return (
     <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
       <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
         <FileText className="w-4 h-4 text-blue-400" />
-        Submit Lead List for Approval
+        Submit Lead List &amp; Copy for Approval
       </h3>
 
       {/* Client dropdown — filter by AM's group for non-admins */}
@@ -212,6 +215,15 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
           <input type="number" value={leadCount} onChange={e => setLeadCount(e.target.value)}
             placeholder="e.g. 500" className={inputCls} />
         </div>
+      </div>
+
+      {/* Client Copy - Required */}
+      <div>
+        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Client Outreach Copy *</label>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">Paste the full email sequence / outreach copy for this campaign. Both the list and copy are required.</p>
+        <textarea value={clientCopy} onChange={e => setClientCopy(e.target.value)} rows={6}
+          placeholder="Paste the full email sequence here (Subject lines, body copy, follow-ups, etc.)…"
+          className={inputCls + " resize-y font-mono text-xs"} />
       </div>
 
       <div>
