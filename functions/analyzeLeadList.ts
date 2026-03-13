@@ -74,22 +74,26 @@ ${csvSample || '(No CSV data available - this is a link-based list)'}
 ${approval.list_type === "link" ? `Link: ${approval.link_url}` : ""}
 
 ANALYSIS INSTRUCTIONS:
-1. Evaluate the lead list quality based on:
-   - Column structure (does it have essential fields like name, company, title, email?)
-   - ICP alignment with the client's goals, package type, and email copy
-   - Data completeness and consistency
-   - Title/seniority relevance
-   - Industry/company relevance if discernible
-   - Volume appropriateness vs the client's weekly target
 
-2. Provide your analysis as a JSON object with these fields:
+SCORING PRIORITIES (in order of importance):
+1. **ICP & TARGET FIT (70% of score)**: This is by far the most important factor. Do the leads match the client's ideal customer profile? Are the companies in the right industry/vertical? Are the job titles and roles relevant to who the client wants to reach? What percentage of leads appear to be on-target vs off-target?
+2. **Volume & Coverage (20% of score)**: Is the list size appropriate for the client's outreach needs and weekly target? Does it provide enough runway?
+3. **Data structure (10% of score)**: Does it have basic required columns (name, company, email)? This is a minor factor — some incomplete fields or duplicate company names are normal and expected. We often target larger companies and reach multiple people at the same company, so duplicate company names are NOT a concern. Missing titles or partial data should have almost negligible impact on the score.
+
+IMPORTANT GUIDELINES:
+- Focus your analysis on WHETHER THE LEADS FIT THE TARGET AUDIENCE, not on data hygiene.
+- Duplicate company names are NORMAL and EXPECTED — do not flag them as a concern.
+- Incomplete data fields (missing titles, phone numbers, etc.) should barely affect the score.
+- The key question is: "Will these leads generate positive responses for this client's outreach?"
+
+Provide your analysis as a JSON object with these fields:
    - score: number 1-100 (quality score)
-   - summary: string (2-3 sentence overview of the list quality)
-   - strengths: array of strings (top 3 strengths)
-   - concerns: array of strings (top 3 concerns, empty array if none)
+   - summary: string (2-3 sentence overview focusing on target fit and relevance)
+   - strengths: array of strings (top 3 strengths, focus on ICP alignment)
+   - concerns: array of strings (top 3 concerns if any — only flag serious target misalignment or fundamental issues, empty array if none)
    - recommendation: one of "Approve", "Review Carefully", "Deny"
 
-Be practical and specific. Reference actual column names and data patterns you observe.`;
+Be practical and specific. Reference actual industries, titles, and patterns you see in the data.`;
 
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
