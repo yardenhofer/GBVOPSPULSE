@@ -131,7 +131,7 @@ export default function Dashboard() {
       </div>
 
       {/* Summary */}
-      <SummaryBar clients={clients} computeAutoStatus={computeAutoStatus} />
+      <SummaryBar clients={activeClients} computeAutoStatus={computeAutoStatus} />
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800">
@@ -172,6 +172,21 @@ export default function Dashboard() {
           {awaitingLeadsClients.length > 0 && (
             <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
               {awaitingLeadsClients.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("archived")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "archived"
+              ? "border-gray-500 text-gray-500"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          📦 Archived
+          {terminatedClients.length > 0 && (
+            <span className="bg-gray-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {terminatedClients.length}
             </span>
           )}
         </button>
