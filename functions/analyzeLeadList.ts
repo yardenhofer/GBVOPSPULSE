@@ -9,11 +9,9 @@ Deno.serve(async (req) => {
     const { approval_id } = await req.json();
     if (!approval_id) return Response.json({ error: 'Missing approval_id' }, { status: 400 });
 
-    // Fetch the approval record
     const approval = await base44.asServiceRole.entities.LeadListApproval.get(approval_id);
     if (!approval) return Response.json({ error: 'Approval not found' }, { status: 404 });
 
-    // Fetch the client
     const client = await base44.asServiceRole.entities.Client.get(approval.client_id);
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
 
@@ -31,7 +29,6 @@ Deno.serve(async (req) => {
           const dataLines = lines.slice(1).filter(l => l.trim());
           const totalLeads = dataLines.length;
 
-          // Sample up to 500 rows spread evenly across the file for a representative view
           const MAX_SAMPLE = 500;
           let sampledLines;
           if (dataLines.length <= MAX_SAMPLE) {
@@ -56,7 +53,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build context about the client
+    // Build client context
     const clientContext = [
       `Client Name: ${client.name}`,
       `Package Type: ${client.package_type || 'Not set'}`,
@@ -68,17 +65,13 @@ Deno.serve(async (req) => {
       client.notes ? `Client Notes: ${client.notes}` : null,
     ].filter(Boolean).join('\n');
 
-    // If DQ link exists, try to fetch its content for extra context
     let dqContent = "";
     if (client.dq_link) {
-      try {
-        dqContent = `\nNote: The client has a Discovery Questionnaire at: ${client.dq_link}. Consider that the lead list should align with the client's ICP and target criteria defined in their DQ.`;
-      } catch (e) {
-        // ignore
-      }
+      dqContent = `\nNote: The client has a Discovery Questionnaire at: ${client.dq_link}. Consider that the lead list should align with the client's ICP and target criteria defined in their DQ.`;
     }
 
-    const prompt = `You are an expert lead list quality analyst for a B2B outreach agency. Analyze the following lead list submission and score it based on quality, relevance to the client's goals, and likelihood of generating positive responses.
+    // ── LEAD LIST ANALYSIS ──
+    const leadPrompt = `You are an expert lead list quality analyst for a B2B outreach agency. Analyze the following lead list submission and score it based on quality, relevance to the client's goals, and likelihood of generating positive responses.
 
 CLIENT CONTEXT:
 ${clientContext}
@@ -89,6 +82,9 @@ List Name: ${approval.list_name}
 AM Notes: ${approval.notes || 'None provided'}
 Lead Count: ${approval.lead_count || 'Unknown'}
 
+SUBMITTED CLIENT COPY (for cross-reference — does the list match who this copy is targeting?):
+${approval.client_copy || '(No copy provided)'}
+
 CSV DATA (sample):
 ${csvSample || '(No CSV data available - this is a link-based list)'}
 ${approval.list_type === "link" ? `Link: ${approval.link_url}` : ""}
@@ -98,10 +94,12 @@ ANALYSIS INSTRUCTIONS:
 CRITICAL CONTEXT - READ CAREFULLY:
 The AM (Account Manager) who submitted this list knows the client's campaign goals. The LIST NAME and AM NOTES define what the target audience IS for this list. Do NOT second-guess the AM's targeting intent. If the AM says the target is "HVAC plumbing home services" and the leads are HVAC/plumbing/home services companies, that is a PERFECT match — even if the client is a CPA firm, law firm, marketing agency, etc. The client's business type does NOT define the target; the AM's stated goals do. Clients often target specific verticals/industries as their customers.
 
+Also cross-reference the leads against the submitted client copy. If the copy is written for a specific audience and the leads match that audience, that's a strong positive signal.
+
 SCORING PRIORITIES (in order of importance):
-1. **TARGET FIT vs AM's STATED INTENT (70% of score)**: Do the leads match what the AM described in the list name and notes? The AM's notes and list name ARE the target definition. If the leads align with what the AM said they're targeting, that's a high score. Only flag a mismatch if the actual lead data contradicts what the AM described.
+1. **TARGET FIT vs AM's STATED INTENT (70% of score)**: Do the leads match what the AM described in the list name and notes? The AM's notes and list name ARE the target definition. If the leads align with what the AM said they're targeting, that's a high score. Only flag a mismatch if the actual lead data contradicts what the AM described. Also consider whether the leads match the audience the submitted copy is written for.
 2. **Volume & Coverage (20% of score)**: Is the list size appropriate for the client's outreach needs and weekly target? Does it provide enough runway?
-3. **Data structure (10% of score)**: Does it have basic required columns (name, company, email)? This is a minor factor — some incomplete fields or duplicate company names are normal and expected. We often target larger companies and reach multiple people at the same company, so duplicate company names are NOT a concern. Missing titles or partial data should have almost negligible impact on the score.
+3. **Data structure (10% of score)**: Does it have basic required columns (name, company, email)? This is a minor factor — some incomplete fields or duplicate company names are normal and expected.
 
 IMPORTANT GUIDELINES:
 - The AM's list name and notes DEFINE the target. Trust them.
@@ -122,36 +120,115 @@ Provide your analysis as a JSON object with these fields:
 
 Be practical and specific. Reference actual industries, titles, and patterns you see in the data.`;
 
-    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          score: { type: "number" },
-          summary: { type: "string" },
-          strengths: { type: "array", items: { type: "string" } },
-          concerns: { type: "array", items: { type: "string" } },
-          recommendation: { type: "string" }
-        }
-      }
-    });
+    // ── COPY ANALYSIS ──
+    const copyPrompt = `You are an expert B2B outreach copy reviewer. Analyze the following client outreach copy for a cold email/LinkedIn campaign.
 
-    // Save results to the approval record
-    await base44.asServiceRole.entities.LeadListApproval.update(approval_id, {
-      ai_score: result.score,
-      ai_summary: result.summary,
-      ai_strengths: (result.strengths || []).join("|||"),
-      ai_concerns: (result.concerns || []).join("|||"),
-      ai_recommendation: result.recommendation,
+CLIENT CONTEXT:
+${clientContext}
+
+TARGET AUDIENCE (from AM):
+List Name: ${approval.list_name}
+AM Notes: ${approval.notes || 'None provided'}
+
+SUBMITTED COPY:
+${approval.client_copy || '(No copy provided)'}
+
+COPY REVIEW CRITERIA:
+
+Our outreach philosophy is partnership-based and collaboration-focused. We NEVER do hard sells. The goal is to generate FOMO (fear of missing out) or intrigue that makes the prospect want to learn more.
+
+Score the copy on these priorities:
+1. **Tone & Approach (50% of score)**: Is the copy partnership/collaboration-based? Does it avoid being salesy, pushy, or using hard-sell language? Does it create FOMO or intrigue? Good copy makes the prospect feel like they'd be missing an opportunity, not being sold to.
+2. **Audience Fit (30% of score)**: Is the copy written for the target audience described in the list name and AM notes? Does the messaging resonate with that specific industry/role?
+3. **Quality & Clarity (20% of score)**: Is it well-written, clear, concise? Does the subject line grab attention? Is there a clear but soft CTA?
+
+RED FLAGS (mark these down heavily):
+- Hard sell language ("Buy now", "Limited time offer", "Act fast")
+- Overly salesy tone or pressure tactics
+- Generic/template feeling with no personalization hooks
+- Too long or too many follow-ups that feel pushy
+- Claims that sound too good to be true
+
+GREEN FLAGS (score these up):
+- Partnership/collaboration framing ("working together", "mutual benefit")
+- FOMO/intrigue triggers ("seeing results with companies like yours", "thought you'd want to know")
+- Social proof done subtly (not braggy)
+- Short, punchy, conversational tone
+- Personalization hooks that reference their industry/role
+- Soft CTAs ("would it make sense to chat?", "open to exploring?")
+
+Provide your analysis as a JSON object:
+   - score: number 1-100
+   - summary: string (2-3 sentences — overall assessment of the copy's tone, fit, and effectiveness)
+   - strengths: array of strings (top 3 strengths)
+   - concerns: array of strings (top 3 concerns — focus on salesy language, tone issues, or audience mismatch. Empty array if none)
+   - recommendation: one of "Approve", "Review Carefully", "Deny"`;
+
+    // Run both analyses in parallel
+    const [leadResult, copyResult] = await Promise.all([
+      base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: leadPrompt,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            score: { type: "number" },
+            summary: { type: "string" },
+            strengths: { type: "array", items: { type: "string" } },
+            concerns: { type: "array", items: { type: "string" } },
+            recommendation: { type: "string" }
+          }
+        }
+      }),
+      approval.client_copy ? base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: copyPrompt,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            score: { type: "number" },
+            summary: { type: "string" },
+            strengths: { type: "array", items: { type: "string" } },
+            concerns: { type: "array", items: { type: "string" } },
+            recommendation: { type: "string" }
+          }
+        }
+      }) : null
+    ]);
+
+    // Save results
+    const updateData = {
+      ai_score: leadResult.score,
+      ai_summary: leadResult.summary,
+      ai_strengths: (leadResult.strengths || []).join("|||"),
+      ai_concerns: (leadResult.concerns || []).join("|||"),
+      ai_recommendation: leadResult.recommendation,
       ai_analyzed_date: new Date().toISOString(),
-    });
+    };
+
+    if (copyResult) {
+      updateData.copy_ai_score = copyResult.score;
+      updateData.copy_ai_summary = copyResult.summary;
+      updateData.copy_ai_strengths = (copyResult.strengths || []).join("|||");
+      updateData.copy_ai_concerns = (copyResult.concerns || []).join("|||");
+      updateData.copy_ai_recommendation = copyResult.recommendation;
+    }
+
+    await base44.asServiceRole.entities.LeadListApproval.update(approval_id, updateData);
 
     return Response.json({
-      score: result.score,
-      summary: result.summary,
-      strengths: result.strengths,
-      concerns: result.concerns,
-      recommendation: result.recommendation,
+      lead: {
+        score: leadResult.score,
+        summary: leadResult.summary,
+        strengths: leadResult.strengths,
+        concerns: leadResult.concerns,
+        recommendation: leadResult.recommendation,
+      },
+      copy: copyResult ? {
+        score: copyResult.score,
+        summary: copyResult.summary,
+        strengths: copyResult.strengths,
+        concerns: copyResult.concerns,
+        recommendation: copyResult.recommendation,
+      } : null,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

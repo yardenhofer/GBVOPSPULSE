@@ -86,6 +86,18 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated, client })
         )}
       </div>
 
+      {/* Client Copy */}
+      {item.client_copy && (
+        <details className="bg-orange-50/50 dark:bg-orange-500/5 border border-orange-200/30 dark:border-orange-500/10 rounded-lg">
+          <summary className="px-3 py-2 text-xs text-orange-600 dark:text-orange-400 font-medium cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded-lg transition-colors">
+            View Client Copy
+          </summary>
+          <div className="px-3 pb-2">
+            <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">{item.client_copy}</pre>
+          </div>
+        </details>
+      )}
+
       {/* AM notes */}
       {item.notes && (
         <div className="bg-gray-50 dark:bg-gray-800/60 rounded-lg px-3 py-2">
