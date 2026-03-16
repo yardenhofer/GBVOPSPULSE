@@ -22,6 +22,14 @@ const STATUS_OPTIONS = [
   { value: "Critical", label: "Critical" },
 ];
 
+const SEQUENCE_OPTIONS = [
+  { value: "All", label: "All Sequence %" },
+  { value: "red", label: "🔴 High (≥80%)" },
+  { value: "orange", label: "🟠 Medium (60-79%)" },
+  { value: "red_orange", label: "🔴🟠 Needs Lists (≥60%)" },
+  { value: "green", label: "🟢 Healthy (<60%)" },
+];
+
 function FilterPill({ value, options, onChange, icon: Icon }) {
   const selected = options.find(o => o.value === value) || options[0];
   const isDefault = value === options[0].value;
@@ -87,6 +95,13 @@ export default function ClientFilters({ filters, onFiltersChange, groups = [] })
         value={filters.status}
         options={STATUS_OPTIONS}
         onChange={v => onFiltersChange({ ...filters, status: v })}
+      />
+
+      {/* Sequence % */}
+      <FilterPill
+        value={filters.sequence || "All"}
+        options={SEQUENCE_OPTIONS}
+        onChange={v => onFiltersChange({ ...filters, sequence: v })}
       />
 
       {/* Group */}

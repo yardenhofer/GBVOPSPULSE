@@ -30,7 +30,7 @@ async function fetchInstantlyStats(clientId) {
   }
 }
 
-const DEFAULT_FILTERS = { search: "", sort: "risk", package: "All", status: "All", group: "All" };
+const DEFAULT_FILTERS = { search: "", sort: "risk", package: "All", status: "All", group: "All", sequence: "All" };
 
 const STATUS_ORDER = { Critical: 0, "At Risk": 1, Monitor: 2, Healthy: 3 };
 
