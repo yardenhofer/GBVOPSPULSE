@@ -12,7 +12,6 @@ export default function LeadListApprovals() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("All");
-  const [scoreFilter, setScoreFilter] = useState("All");
   const isAdmin = user?.role === "admin";
 
   useEffect(() => {
@@ -38,15 +37,7 @@ export default function LeadListApprovals() {
     setLoading(false);
   }
 
-  const filteredItems = items.filter(i => {
-    if (statusFilter !== "All" && i.status !== statusFilter) return false;
-    if (scoreFilter === "Medium" && (i.ai_score == null || i.ai_score < 40 || i.ai_score >= 70)) return false;
-    if (scoreFilter === "High Alert" && (i.ai_score == null || i.ai_score >= 40)) return false;
-    return true;
-  });
-
-  const mediumCount = items.filter(i => i.ai_score != null && i.ai_score >= 40 && i.ai_score < 70).length;
-  const highAlertCount = items.filter(i => i.ai_score != null && i.ai_score < 40).length;
+  const filteredItems = items.filter(i => statusFilter === "All" || i.status === statusFilter);
 
   const pendingCount = items.filter(i => i.status === "Pending").length;
 
@@ -95,7 +86,7 @@ export default function LeadListApprovals() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800 flex-wrap">
+      <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800">
         {["All", "Pending", "Approved", "Denied"].map(s => (
           <button key={s} onClick={() => setStatusFilter(s)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -110,26 +101,6 @@ export default function LeadListApprovals() {
             {s === "Pending" && pendingCount > 0 && (
               <span className="ml-1.5 bg-yellow-500 text-white text-xs font-bold rounded-full w-5 h-5 inline-flex items-center justify-center">
                 {pendingCount}
-              </span>
-            )}
-          </button>
-        ))}
-        <span className="mx-1 text-gray-300 dark:text-gray-600">|</span>
-        {[
-          { key: "All", label: "All Scores", color: "blue" },
-          { key: "Medium", label: "⚠️ Medium", color: "yellow", count: mediumCount },
-          { key: "High Alert", label: "🔴 High Alert", color: "red", count: highAlertCount },
-        ].map(({ key, label, color, count }) => (
-          <button key={key} onClick={() => setScoreFilter(key)}
-            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-              scoreFilter === key
-                ? `border-${color}-500 text-${color}-500`
-                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-            }`}>
-            {label}
-            {count > 0 && (
-              <span className={`ml-1.5 bg-${color}-500 text-white text-xs font-bold rounded-full w-5 h-5 inline-flex items-center justify-center`}>
-                {count}
               </span>
             )}
           </button>
