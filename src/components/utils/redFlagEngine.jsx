@@ -13,7 +13,7 @@ export function computeRedFlags(client) {
 
   // 1. Waiting on lead list
   if (client.waiting_on_leads && client.waiting_since) {
-    const days = differenceInDays(now, new Date(client.waiting_since));
+    const days = differenceInDays(now, parseDate(client.waiting_since));
     if (days >= 4) {
       flags.push({ type: 'waiting_leads', severity: 'red', message: `Waiting ${days}d for lead list`, emoji: '⛔', days });
     } else if (days >= 2) {
@@ -23,7 +23,7 @@ export function computeRedFlags(client) {
 
   // 2. No AM touchpoint
   if (client.last_am_touchpoint) {
-    const days = differenceInDays(now, new Date(client.last_am_touchpoint));
+    const days = differenceInDays(now, parseDate(client.last_am_touchpoint));
     if (days >= 10) {
       flags.push({ type: 'no_touchpoint', severity: 'red', message: `No AM touchpoint for ${days} days`, emoji: '🕒', days });
     } else if (days >= 3) {
@@ -33,7 +33,7 @@ export function computeRedFlags(client) {
 
   // 3. Unhappy > 10 days
   if (client.client_sentiment === 'Unhappy' && client.unhappy_since) {
-    const days = differenceInDays(now, new Date(client.unhappy_since));
+    const days = differenceInDays(now, parseDate(client.unhappy_since));
     if (days >= 10) {
       flags.push({ type: 'unhappy_long', severity: 'red', message: `Unhappy for ${days} days`, emoji: '😡', days });
     }
@@ -57,7 +57,7 @@ export function computeRedFlags(client) {
 
   // 6. Contract renewal — only critical if sentiment is bad
   if (client.contract_end_date) {
-    const days = differenceInDays(new Date(client.contract_end_date), now);
+    const days = differenceInDays(parseDate(client.contract_end_date), now);
     const badSentiment = client.client_sentiment === 'Unhappy' || client.client_sentiment === 'Slightly Concerned';
     if (days <= 14 && days >= 0 && badSentiment) {
       flags.push({ type: 'renewal', severity: 'red', message: `Renewal in ${days}d (${client.client_sentiment})`, emoji: '📅', days });
