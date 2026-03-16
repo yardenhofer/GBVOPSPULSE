@@ -309,14 +309,14 @@ ${messageText}`,
       }
     }
 
-    // Update last AM touchpoint from Slack
-    if (analysis.last_gbv_touchpoint) {
-      updateData.last_am_touchpoint = analysis.last_gbv_touchpoint;
+    // Update last AM touchpoint from computed Slack data (not LLM)
+    if (lastGbvDate) {
+      updateData.last_am_touchpoint = lastGbvDate;
     }
 
-    // Update last client reply date from Slack
-    if (analysis.last_client_reply) {
-      updateData.last_client_reply_date = analysis.last_client_reply;
+    // Update last client reply date from computed Slack data (not LLM)
+    if (lastClientDate) {
+      updateData.last_client_reply_date = lastClientDate;
     }
 
     if (Object.keys(updateData).length > 0) {
