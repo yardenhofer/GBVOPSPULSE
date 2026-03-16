@@ -260,8 +260,7 @@ ${messageText}`,
           summary: { type: "string" },
           upsell_opportunities: { type: "string", description: "Describe any upsell opportunities, or 'None detected' if none" },
           risk_signals: { type: "string", description: "Describe any risk signals (note if recent or resolved), or 'None detected' if none" },
-          key_topics: { type: "string", description: "Comma-separated list of key topics" },
-
+          key_topics: { type: "string", description: "Comma-separated list of key topics" }
         }
       }
     });
