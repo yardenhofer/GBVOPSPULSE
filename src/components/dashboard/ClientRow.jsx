@@ -17,9 +17,10 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
   const sentCfg = SENTIMENT_CONFIG[client.client_sentiment] || SENTIMENT_CONFIG["Neutral"];
   const pkgCfg = PACKAGE_CONFIG[client.package_type] || {};
 
-  const now = new Date();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const touchpointDays = client.last_am_touchpoint
-    ? differenceInDays(now, new Date(client.last_am_touchpoint))
+    ? differenceInDays(today, new Date(client.last_am_touchpoint + "T00:00:00"))
     : null;
 
   const leadsChange = client.target_leads_per_week > 0
