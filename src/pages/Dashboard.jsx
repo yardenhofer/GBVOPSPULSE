@@ -62,13 +62,16 @@ export default function Dashboard() {
     setClients(data);
     setLoading(false);
 
-    // Fetch Instantly stats for clients that have an API key
+    // Fetch Instantly stats in batches of 3 to avoid rate limits
     const instantlyClients = data.filter(c => c.instantly_api_key);
     const results = {};
-    await Promise.all(instantlyClients.map(async (c) => {
-      results[c.id] = await fetchInstantlyStats(c.id);
-    }));
-    setInstantlyPcts(results);
+    for (let i = 0; i < instantlyClients.length; i += 3) {
+      const batch = instantlyClients.slice(i, i + 3);
+      await Promise.all(batch.map(async (c) => {
+        results[c.id] = await fetchInstantlyStats(c.id);
+      }));
+      setInstantlyPcts({ ...results });
+    }
   }
 
   const groups = [...new Set(clients.map(c => c.group).filter(g => g != null))].sort((a, b) => a - b);
