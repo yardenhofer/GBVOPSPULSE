@@ -255,8 +255,6 @@ Determine:
 4. RISK SIGNALS: Any client complaints, frustration, mentions of competitors, threats to cancel, discussions about cancellation options, long silences from the client, or dissatisfaction? Note whether these are recent or resolved.
 5. SUMMARY: Brief 2-3 sentence summary focusing on the client's CURRENT state and how it compares to earlier in the month. Clearly distinguish between what the agency said vs how the client responded.
 6. KEY TOPICS: Main subjects being discussed.
-7. LAST GBV TOUCHPOINT: Find the date of the MOST RECENT message sent by a GBV/Grow Big Ventures team member (agency staff, NOT the client). Return the date as YYYY-MM-DD. If no GBV staff messages exist, return null.
-8. LAST CLIENT REPLY: Find the date of the MOST RECENT message sent by the CLIENT (NOT GBV staff). Return the date as YYYY-MM-DD. If no client messages exist, return null.
 
 Messages:
 ${messageText}`,
@@ -270,8 +268,7 @@ ${messageText}`,
           upsell_opportunities: { type: "string", description: "Describe any upsell opportunities, or 'None detected' if none" },
           risk_signals: { type: "string", description: "Describe any risk signals (note if recent or resolved), or 'None detected' if none" },
           key_topics: { type: "string", description: "Comma-separated list of key topics" },
-          last_gbv_touchpoint: { type: "string", description: "YYYY-MM-DD date of most recent GBV staff message, or null" },
-          last_client_reply: { type: "string", description: "YYYY-MM-DD date of most recent client message, or null" }
+
         }
       }
     });
