@@ -9,8 +9,10 @@ export default function ClientHeader({ client, status, onBack, onDelete, onTermi
   const isTerminated = client.status === 'Terminated';
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Healthy"];
   const sentCfg = SENTIMENT_CONFIG[client.client_sentiment] || SENTIMENT_CONFIG["Neutral"];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const replyDays = client.last_client_reply_date
-    ? differenceInDays(new Date(), new Date(client.last_client_reply_date))
+    ? differenceInDays(today, new Date(client.last_client_reply_date + "T00:00:00"))
     : null;
 
   const stats = [
