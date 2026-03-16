@@ -93,6 +93,14 @@ export default function Dashboard() {
       const status = computeAutoStatus(c);
       if (filters.status !== "All" && status !== filters.status) return false;
       if (filters.group !== "All" && String(c.group) !== filters.group) return false;
+      if (filters.sequence && filters.sequence !== "All") {
+        const ir = instantlyPcts[c.id];
+        const pct = ir?.pct;
+        if (filters.sequence === "red" && !(pct != null && pct >= 80)) return false;
+        if (filters.sequence === "orange" && !(pct != null && pct >= 60 && pct < 80)) return false;
+        if (filters.sequence === "red_orange" && !(pct != null && pct >= 60)) return false;
+        if (filters.sequence === "green" && !(pct != null && pct < 60)) return false;
+      }
       return true;
     })
     .sort((a, b) => {
