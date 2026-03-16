@@ -152,22 +152,10 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    // 5. Resolve user names so the LLM can distinguish client vs agency staff
+    // 5. Resolve user names AND identify GBV staff vs client in a single pass
     const uniqueUsers = [...new Set(messages.map(m => m.user).filter(Boolean))];
-    const userMap = {};
-    for (const uid of uniqueUsers) {
-      const uResp = await fetch(`https://slack.com/api/users.info?user=${uid}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const uData = await uResp.json();
-      if (uData.ok && uData.user) {
-        userMap[uid] = uData.user.real_name || uData.user.profile?.display_name || uData.user.name || uid;
-      } else {
-        userMap[uid] = uid;
-      }
-    }
-
-    // Fetch all app users (GBV team) to identify staff vs client messages
+    
+    // Fetch all app users (GBV team) to identify staff
     let gbvEmails = new Set();
     try {
       const appUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
@@ -178,16 +166,21 @@ Deno.serve(async (req) => {
       console.error("Could not fetch app users for GBV identification:", e.message);
     }
 
-    // Build a map of Slack user ID -> is GBV staff (by matching Slack email to app users)
+    const userMap = {};
     const userIsGbv = {};
     for (const uid of uniqueUsers) {
-      // Fetch email from Slack profile
-      const uResp2 = await fetch(`https://slack.com/api/users.info?user=${uid}`, {
+      const uResp = await fetch(`https://slack.com/api/users.info?user=${uid}`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
-      const uData2 = await uResp2.json();
-      const slackEmail = uData2.ok ? (uData2.user?.profile?.email || "").toLowerCase() : "";
-      userIsGbv[uid] = slackEmail ? gbvEmails.has(slackEmail) : false;
+      const uData = await uResp.json();
+      if (uData.ok && uData.user) {
+        userMap[uid] = uData.user.real_name || uData.user.profile?.display_name || uData.user.name || uid;
+        const slackEmail = (uData.user.profile?.email || "").toLowerCase();
+        userIsGbv[uid] = slackEmail ? gbvEmails.has(slackEmail) : false;
+      } else {
+        userMap[uid] = uid;
+        userIsGbv[uid] = false;
+      }
     }
 
     // Compute last touchpoint dates directly from message data (don't rely on LLM)
