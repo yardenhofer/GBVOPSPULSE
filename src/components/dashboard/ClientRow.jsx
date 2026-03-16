@@ -135,7 +135,7 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         <div className="hidden lg:block text-center">
           {client.waiting_on_leads ? (
             <span className="text-xs font-semibold text-orange-400">
-              {client.waiting_since ? `${differenceInDays(new Date(), new Date(client.waiting_since))}d` : "Yes"}
+              {client.waiting_since ? `${differenceInDays(today, new Date(client.waiting_since + "T00:00:00"))}d` : "Yes"}
             </span>
           ) : (
             <span className="text-xs text-gray-400">—</span>
