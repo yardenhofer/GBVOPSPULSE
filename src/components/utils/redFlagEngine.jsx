@@ -1,8 +1,15 @@
 import { differenceInDays } from 'date-fns';
 
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  // Append T00:00:00 to date-only strings to avoid UTC midnight parsing
+  return new Date(dateStr.length === 10 ? dateStr + "T00:00:00" : dateStr);
+}
+
 export function computeRedFlags(client) {
   const flags = [];
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
   // 1. Waiting on lead list
   if (client.waiting_on_leads && client.waiting_since) {
