@@ -32,13 +32,29 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
   const [amOptions, setAmOptions] = useState([]);
 
   useEffect(() => {
-    base44.functions.invoke("listUsers", {}).then(res => {
-      const users = res.data.users || [];
-      const ams = [...new Set(users.map(u => u.email).filter(Boolean))];
-      setAmOptions(ams);
-    }).catch(() => {
-      if (client.assigned_am) setAmOptions([client.assigned_am]);
-    });
+    async function loadAMs() {
+      // Build a fallback set from what we know
+      const fallbackSet = new Set();
+      if (client.assigned_am) fallbackSet.add(client.assigned_am);
+      try {
+        const me = await base44.auth.me();
+        if (me?.email) fallbackSet.add(me.email);
+      } catch {}
+
+      try {
+        const res = await base44.functions.invoke("listUsers", {});
+        const users = res.data.users || [];
+        const ams = [...new Set(users.map(u => u.email).filter(Boolean))];
+        if (ams.length > 0) {
+          setAmOptions(["", ...ams]);
+          return;
+        }
+      } catch {}
+
+      // Fallback: at least show current AM + current user
+      setAmOptions(["", ...fallbackSet]);
+    }
+    loadAMs();
   }, []);
 
   const [form, setForm] = useState({
