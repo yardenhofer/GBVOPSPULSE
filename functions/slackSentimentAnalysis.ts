@@ -167,14 +167,57 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fetch all app users (GBV team) to identify staff vs client messages
+    let gbvEmails = new Set();
+    try {
+      const appUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
+      for (const u of appUsers) {
+        if (u.email) gbvEmails.add(u.email.toLowerCase());
+      }
+    } catch (e) {
+      console.error("Could not fetch app users for GBV identification:", e.message);
+    }
+
+    // Build a map of Slack user ID -> is GBV staff (by matching Slack email to app users)
+    const userIsGbv = {};
+    for (const uid of uniqueUsers) {
+      // Fetch email from Slack profile
+      const uResp2 = await fetch(`https://slack.com/api/users.info?user=${uid}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const uData2 = await uResp2.json();
+      const slackEmail = uData2.ok ? (uData2.user?.profile?.email || "").toLowerCase() : "";
+      userIsGbv[uid] = slackEmail ? gbvEmails.has(slackEmail) : false;
+    }
+
+    // Compute last touchpoint dates directly from message data (don't rely on LLM)
+    let lastGbvDate = null;
+    let lastClientDate = null;
+    for (const m of messages) {
+      const msgDate = new Date(parseFloat(m.ts) * 1000).toISOString().split('T')[0];
+      if (userIsGbv[m.user]) {
+        if (!lastGbvDate || msgDate > lastGbvDate) lastGbvDate = msgDate;
+      } else {
+        if (!lastClientDate || msgDate > lastClientDate) lastClientDate = msgDate;
+      }
+    }
+    console.log(`#${channel.name}: Computed touchpoints — last GBV: ${lastGbvDate}, last client: ${lastClientDate}`);
+
+    // Build GBV staff name list for LLM context
+    const gbvNames = Object.entries(userIsGbv)
+      .filter(([_, isGbv]) => isGbv)
+      .map(([uid]) => userMap[uid])
+      .filter(Boolean);
+
     // Build message text with sender names — use up to 100 messages for better context
     const messageText = messages.slice(-100).map(m => {
       const sender = userMap[m.user] || 'Unknown';
       const date = new Date(parseFloat(m.ts) * 1000).toISOString().split('T')[0];
-      return `[${date}] [${sender}]: ${m.text}`;
+      const tag = userIsGbv[m.user] ? ' [GBV STAFF]' : ' [CLIENT]';
+      return `[${date}] [${sender}${tag}]: ${m.text}`;
     }).join('\n---\n');
 
-    console.log(`#${channel.name}: ${messages.length} total messages (${threadParents.length} threads expanded). Sending ${Math.min(messages.length, 100)} to LLM.`);
+    console.log(`#${channel.name}: ${messages.length} total messages (${threadParents.length} threads expanded). Sending ${Math.min(messages.length, 100)} to LLM. GBV staff identified: ${gbvNames.join(', ')}`);
 
     // 6. Analyze with LLM
     const analysis = await base44.asServiceRole.integrations.Core.InvokeLLM({
