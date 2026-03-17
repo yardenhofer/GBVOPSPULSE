@@ -152,6 +152,10 @@ export default function ClientDetail() {
         client={client}
         status={status}
         onBack={() => navigate(createPageUrl("Dashboard"))}
+        onOffboard={async () => {
+          await base44.functions.invoke('offboardClient', { client_id: client.id });
+          setClient(prev => ({ ...prev, status: 'Off-Boarding', offboarding_date: new Date().toISOString().split("T")[0] }));
+        }}
         onTerminate={async () => {
           const today = new Date().toISOString().split("T")[0];
           await base44.entities.Client.update(client.id, { status: "Terminated", terminated_date: today });

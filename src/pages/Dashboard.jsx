@@ -25,7 +25,7 @@ function getCachedInstantlyResult(client) {
 
 const DEFAULT_FILTERS = { search: "", sort: "risk", package: "All", status: "All", group: "All", sequence: "All" };
 
-const STATUS_ORDER = { Critical: 0, "At Risk": 1, Monitor: 2, Healthy: 3 };
+const STATUS_ORDER = { Critical: 0, "At Risk": 1, Monitor: 2, Healthy: 3, "Off-Boarding": 4 };
 
 export default function Dashboard() {
   const [clients, setClients] = useState([]);
@@ -57,7 +57,8 @@ export default function Dashboard() {
 
   const groups = [...new Set(clients.map(c => c.group).filter(g => g != null))].sort((a, b) => a - b);
 
-  const activeClients = clients.filter(c => c.status !== "Terminated");
+  const activeClients = clients.filter(c => c.status !== "Terminated" && c.status !== "Off-Boarding");
+  const offboardingClients = clients.filter(c => c.status === "Off-Boarding");
   const terminatedClients = clients.filter(c => c.status === "Terminated");
   const escalatedClients = activeClients.filter(c => c.is_escalated);
   const awaitingLeadsClients = activeClients.filter(c => c.waiting_on_leads);
@@ -65,7 +66,8 @@ export default function Dashboard() {
   const filtered = clients
     .filter(c => {
       if (activeTab === "archived") return c.status === "Terminated";
-      if (c.status === "Terminated") return false;
+      if (activeTab === "offboarding") return c.status === "Off-Boarding";
+      if (c.status === "Terminated" || c.status === "Off-Boarding") return false;
       if (activeTab === "escalated") return c.is_escalated;
       if (activeTab === "awaiting_leads") return c.waiting_on_leads;
       if (filters.search && !c.name.toLowerCase().includes(filters.search.toLowerCase()) &&
@@ -164,6 +166,21 @@ export default function Dashboard() {
           {awaitingLeadsClients.length > 0 && (
             <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
               {awaitingLeadsClients.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("offboarding")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "offboarding"
+              ? "border-violet-500 text-violet-500"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          🚪 Off-Boarding
+          {offboardingClients.length > 0 && (
+            <span className="bg-violet-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {offboardingClients.length}
             </span>
           )}
         </button>
