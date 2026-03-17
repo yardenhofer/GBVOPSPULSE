@@ -12,6 +12,7 @@ export default function ClientHeader({ client, status, onBack, onDelete, onTermi
   const [deleting, setDeleting] = useState(false);
   const [terminating, setTerminating] = useState(false);
   const [offboarding, setOffboarding] = useState(false);
+  const [offboardError, setOffboardError] = useState("");
   const isTerminated = client.status === 'Terminated';
   const isOffBoarding = client.status === 'Off-Boarding';
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Healthy"];
@@ -154,9 +155,12 @@ export default function ClientHeader({ client, status, onBack, onDelete, onTermi
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Daily reminders will be sent until a team member replies <strong>CONFIRMED</strong> in the Slack thread. Once confirmed, the client will be automatically archived.
             </p>
+            {offboardError && (
+              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-500/10 rounded-lg px-3 py-2">{offboardError}</p>
+            )}
             <div className="flex items-center gap-3 justify-end">
               <button
-                onClick={() => setShowOffboardConfirm(false)}
+                onClick={() => { setShowOffboardConfirm(false); setOffboardError(""); }}
                 className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 Cancel
@@ -164,9 +168,16 @@ export default function ClientHeader({ client, status, onBack, onDelete, onTermi
               <button
                 onClick={async () => {
                   setOffboarding(true);
-                  await onOffboard();
-                  setShowOffboardConfirm(false);
-                  setOffboarding(false);
+                  setOffboardError("");
+                  try {
+                    await onOffboard();
+                    setShowOffboardConfirm(false);
+                  } catch (err) {
+                    const msg = err?.response?.data?.error || err.message || "Off-boarding failed";
+                    setOffboardError(msg);
+                  } finally {
+                    setOffboarding(false);
+                  }
                 }}
                 disabled={offboarding}
                 className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
