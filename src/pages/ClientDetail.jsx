@@ -161,6 +161,10 @@ export default function ClientDetail() {
           await base44.entities.Client.update(client.id, { status: "Terminated", terminated_date: today });
           navigate(createPageUrl("Dashboard"));
         }}
+        onDelete={async () => {
+          await base44.entities.Client.delete(client.id);
+          navigate(createPageUrl("Dashboard"));
+        }}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
