@@ -4,13 +4,6 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Allow scheduled calls (no user) or admin users
-    let user = null;
-    try { user = await base44.auth.me(); } catch (_) {}
-    if (user && user.role !== 'admin') {
-      return Response.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     // Get all clients in Off-Boarding that are not yet confirmed
     const offboarding = await base44.asServiceRole.entities.Client.filter({
       status: 'Off-Boarding',
@@ -37,7 +30,6 @@ Deno.serve(async (req) => {
 
       let isConfirmed = false;
       if (repliesData.ok && repliesData.messages) {
-        // Skip the first message (the original post), check thread replies
         for (const msg of repliesData.messages.slice(1)) {
           if (msg.text && msg.text.toUpperCase().includes('CONFIRMED')) {
             isConfirmed = true;
@@ -47,7 +39,6 @@ Deno.serve(async (req) => {
       }
 
       if (isConfirmed) {
-        // Mark as confirmed and move to Terminated
         const today = new Date().toISOString().split('T')[0];
         await base44.asServiceRole.entities.Client.update(client.id, {
           offboarding_confirmed: true,
@@ -56,9 +47,8 @@ Deno.serve(async (req) => {
         });
         confirmed++;
       } else {
-        // Only send a Slack reminder once per day (check if last reminder was today)
-        const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
+        // Only send a Slack reminder once per day
+        const todayStr = new Date().toISOString().split('T')[0];
         const lastReminder = client.last_offboard_reminder_date || '';
         
         if (lastReminder !== todayStr) {
@@ -90,6 +80,7 @@ Deno.serve(async (req) => {
 
     return Response.json({ ok: true, checked: offboarding.length, confirmed, reminded });
   } catch (error) {
+    console.error('offboardReminder error:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
