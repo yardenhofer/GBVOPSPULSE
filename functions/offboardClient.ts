@@ -2,24 +2,19 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 Deno.serve(async (req) => {
   try {
-    console.log('t0', Date.now());
     const base44 = createClientFromRequest(req);
-    console.log('t1 sdk init', Date.now());
     const user = await base44.auth.me();
-    console.log('t2 auth', Date.now());
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { client_id } = await req.json();
     if (!client_id) return Response.json({ error: 'client_id required' }, { status: 400 });
 
-    console.log('t3 starting parallel', Date.now());
     // Parallel: fetch client, slack token, and cached channel ID all at once
     const [client, connection, settings] = await Promise.all([
       base44.asServiceRole.entities.Client.get(client_id),
       base44.asServiceRole.connectors.getConnection('slackbot'),
       base44.asServiceRole.entities.AppSettings.filter({ key: 'offboarding_channel_id' })
     ]);
-    console.log('t4 parallel done', Date.now());
 
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
     const { accessToken } = connection;
