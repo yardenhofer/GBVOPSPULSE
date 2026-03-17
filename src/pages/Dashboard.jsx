@@ -75,7 +75,7 @@ export default function Dashboard() {
       if (filters.status !== "All" && status !== filters.status) return false;
       if (filters.group !== "All" && String(c.group) !== filters.group) return false;
       if (filters.sequence && filters.sequence !== "All") {
-        const ir = instantlyPcts[c.id];
+        const ir = getCachedInstantlyResult(c);
         const pct = ir?.pct;
         if (filters.sequence === "red" && !(pct != null && pct >= 80)) return false;
         if (filters.sequence === "orange" && !(pct != null && pct >= 60 && pct < 80)) return false;
@@ -215,7 +215,7 @@ export default function Dashboard() {
             status={computeAutoStatus(c)}
             isOwn={user?.email === c.assigned_am}
             onClick={() => navigate(createPageUrl(`ClientDetail?id=${c.id}`))}
-            instantlyResult={instantlyPcts[c.id]}
+            instantlyResult={getCachedInstantlyResult(c)}
           />
         ))}
       </div>
