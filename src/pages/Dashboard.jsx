@@ -11,23 +11,16 @@ import ClientRow from "../components/dashboard/ClientRow";
 import ClientTableHeader from "../components/dashboard/ClientTableHeader";
 import { computeRedFlags, computeAutoStatus } from "../components/utils/redFlagEngine";
 
-async function fetchInstantlyStats(clientId) {
-  try {
-    const res = await base44.functions.invoke('instantlySync', { client_id: clientId, time_filter: 'month' });
-    if (res.data?.error) return { error: res.data.error };
-    if (res.data?.stats) {
-      const activeCampaigns = res.data.stats.campaigns?.filter(c => c.status === 'active') || [];
-      if (activeCampaigns.length > 0) {
-        const totalLeads = activeCampaigns.reduce((s, c) => s + (c.leads_count || 0), 0);
-        const totalCompleted = activeCampaigns.reduce((s, c) => s + (c.completed_count || 0), 0);
-        return { pct: totalLeads > 0 ? Math.round((totalCompleted / totalLeads) * 100) : 0 };
-      }
-      return { pct: 0, noActive: true };
-    }
-    return { error: 'No data' };
-  } catch (e) {
-    return { error: e.message || 'Failed' };
+function getCachedInstantlyResult(client) {
+  if (!client.instantly_api_key) return null;
+  if (client.instantly_cache_error) return { error: client.instantly_cache_error };
+  if (client.instantly_cache_updated) {
+    return {
+      pct: client.instantly_cache_pct ?? 0,
+      noActive: client.instantly_cache_no_active || false,
+    };
   }
+  return null; // not yet synced
 }
 
 const DEFAULT_FILTERS = { search: "", sort: "risk", package: "All", status: "All", group: "All", sequence: "All" };
@@ -40,7 +33,6 @@ export default function Dashboard() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("all"); // "all" | "escalated" | "awaiting_leads"
-  const [instantlyPcts, setInstantlyPcts] = useState({}); // { clientId: number|null }
   const navigate = useNavigate();
 
   useEffect(() => {
