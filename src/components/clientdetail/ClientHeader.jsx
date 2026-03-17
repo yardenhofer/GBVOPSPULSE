@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { differenceInDays, format } from "date-fns";
-import { ArrowLeft, DollarSign, Target, Calendar, MessageCircle, Archive } from "lucide-react";
+import { ArrowLeft, DollarSign, Target, Calendar, MessageCircle, Archive, LogOut } from "lucide-react";
 import { STATUS_CONFIG, SENTIMENT_CONFIG } from "../utils/redFlagEngine";
 
-export default function ClientHeader({ client, status, onBack, onDelete, onTerminate }) {
+export default function ClientHeader({ client, status, onBack, onDelete, onTerminate, onOffboard }) {
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showOffboardConfirm, setShowOffboardConfirm] = useState(false);
   const [terminating, setTerminating] = useState(false);
+  const [offboarding, setOffboarding] = useState(false);
   const isTerminated = client.status === 'Terminated';
+  const isOffBoarding = client.status === 'Off-Boarding';
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG["Healthy"];
   const sentCfg = SENTIMENT_CONFIG[client.client_sentiment] || SENTIMENT_CONFIG["Neutral"];
   const today = new Date();
@@ -42,7 +45,17 @@ export default function ClientHeader({ client, status, onBack, onDelete, onTermi
           <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${sentCfg.bg} ${sentCfg.color}`}>
             {sentCfg.emoji} {client.client_sentiment || "Unknown"}
           </span>
-          {onTerminate && !isTerminated && (
+          {onOffboard && !isTerminated && !isOffBoarding && (
+            <button
+              onClick={() => setShowOffboardConfirm(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-500/10 border border-violet-300 dark:border-violet-500/30 transition-colors"
+              title="Start off-boarding"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Off-Board
+            </button>
+          )}
+          {onTerminate && !isTerminated && !isOffBoarding && (
             <button
               onClick={() => setShowConfirm(true)}
               className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
@@ -50,6 +63,11 @@ export default function ClientHeader({ client, status, onBack, onDelete, onTermi
             >
               <Archive className="w-4 h-4" />
             </button>
+          )}
+          {isOffBoarding && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">
+              Off-Boarding since {client.offboarding_date || "—"}
+            </span>
           )}
           {isTerminated && (
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-500/10 text-gray-400 border border-gray-500/20">
@@ -70,6 +88,39 @@ export default function ClientHeader({ client, status, onBack, onDelete, onTermi
           </div>
         ))}
       </div>
+      {showOffboardConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowOffboardConfirm(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 max-w-md mx-4 space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Off-Board Client</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              This will move <strong>{client.name}</strong> to the Off-Boarding tab and post a checklist to <strong>#client-offboarding</strong> in Slack.
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Daily reminders will be sent until a team member replies <strong>CONFIRMED</strong> in the Slack thread. Once confirmed, the client will be automatically archived.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowOffboardConfirm(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setOffboarding(true);
+                  await onOffboard();
+                  setShowOffboardConfirm(false);
+                  setOffboarding(false);
+                }}
+                disabled={offboarding}
+                className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {offboarding ? "Sending…" : "Start Off-Boarding"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowConfirm(false)}>
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm mx-4 space-y-4" onClick={e => e.stopPropagation()}>
