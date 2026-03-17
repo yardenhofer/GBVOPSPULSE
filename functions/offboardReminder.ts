@@ -4,17 +4,22 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
+    console.log('offboardReminder: starting');
+    
     // Get all clients in Off-Boarding that are not yet confirmed
     const offboarding = await base44.asServiceRole.entities.Client.filter({
       status: 'Off-Boarding',
       offboarding_confirmed: false
     });
+    console.log('offboardReminder: found', offboarding.length, 'clients');
 
     if (offboarding.length === 0) {
       return Response.json({ ok: true, message: 'No pending offboarding clients', checked: 0 });
     }
 
+    console.log('offboardReminder: getting slack connection');
     const { accessToken } = await base44.asServiceRole.connectors.getConnection('slackbot');
+    console.log('offboardReminder: got slack token');
     let confirmed = 0;
     let reminded = 0;
 
