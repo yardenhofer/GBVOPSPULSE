@@ -56,26 +56,35 @@ Deno.serve(async (req) => {
         });
         confirmed++;
       } else {
-        // Send a reminder in the thread
-        const daysSince = client.offboarding_date
-          ? Math.floor((Date.now() - new Date(client.offboarding_date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24))
-          : '?';
+        // Only send a Slack reminder once per day (check if last reminder was today)
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const lastReminder = client.last_offboard_reminder_date || '';
+        
+        if (lastReminder !== todayStr) {
+          const daysSince = client.offboarding_date
+            ? Math.floor((Date.now() - new Date(client.offboarding_date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24))
+            : '?';
 
-        await fetch('https://slack.com/api/chat.postMessage', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            channel: client.offboarding_slack_channel,
-            thread_ts: client.offboarding_slack_ts,
-            username: 'GBV Ops Center',
-            icon_emoji: ':bell:',
-            text: `🔔 *Reminder:* Off-boarding for *${client.name}* has been pending for *${daysSince} day(s)*.\n\nPlease complete the checklist and reply *CONFIRMED* to this thread.`
-          })
-        });
-        reminded++;
+          await fetch('https://slack.com/api/chat.postMessage', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              channel: client.offboarding_slack_channel,
+              thread_ts: client.offboarding_slack_ts,
+              username: 'GBV Ops Center',
+              icon_emoji: ':bell:',
+              text: `🔔 *Reminder:* Off-boarding for *${client.name}* has been pending for *${daysSince} day(s)*.\n\nPlease complete the checklist and reply *CONFIRMED* to this thread.`
+            })
+          });
+          await base44.asServiceRole.entities.Client.update(client.id, {
+            last_offboard_reminder_date: todayStr
+          });
+          reminded++;
+        }
       }
     }
 
