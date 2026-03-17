@@ -9,29 +9,29 @@ Deno.serve(async (req) => {
     const { client_id } = await req.json();
     if (!client_id) return Response.json({ error: 'client_id required' }, { status: 400 });
 
-    const client = await base44.asServiceRole.entities.Client.get(client_id);
+    // Parallel: fetch client, slack token, and cached channel ID all at once
+    const [client, connection, settings] = await Promise.all([
+      base44.asServiceRole.entities.Client.get(client_id),
+      base44.asServiceRole.connectors.getConnection('slackbot'),
+      base44.asServiceRole.entities.AppSettings.filter({ key: 'offboarding_channel_id' })
+    ]);
+
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
+    const { accessToken } = connection;
 
-    // Get Slack Bot access token
-    const { accessToken } = await base44.asServiceRole.connectors.getConnection('slackbot');
+    let channelId = (settings.length > 0 && settings[0].value) ? settings[0].value : null;
 
-    // Find #client-offboarding channel via search (faster than paginating all channels)
-    let channelId = null;
-
-    // Try cached channel from AppSettings first
-    const settings = await base44.asServiceRole.entities.AppSettings.filter({ key: 'offboarding_channel_id' });
-    if (settings.length > 0 && settings[0].value) {
-      channelId = settings[0].value;
-    } else {
-      // Fetch first page only — channel should be near the top or use a single page
-      const url = `https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=1000`;
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    if (!channelId) {
+      // Small page size to stay under CPU limits
+      const res = await fetch(
+        'https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200',
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
       const data = await res.json();
       if (data.ok) {
         const found = data.channels.find(ch => ch.name === 'client-offboarding');
         if (found) {
           channelId = found.id;
-          // Cache for future calls
           await base44.asServiceRole.entities.AppSettings.create({ key: 'offboarding_channel_id', value: channelId });
         }
       }
@@ -41,51 +41,23 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Could not find #client-offboarding channel. Please create it in Slack first.' }, { status: 400 });
     }
 
-    // Post the offboarding checklist message
-    const message = {
-      channel: channelId,
-      username: 'GBV Ops Center',
-      icon_emoji: ':clipboard:',
-      blocks: [
-        {
-          type: 'header',
-          text: { type: 'plain_text', text: `🚪 Client Off-Boarding: ${client.name}`, emoji: true }
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*Initiated by:* ${user.full_name || user.email}\n*Date:* ${new Date().toLocaleDateString('en-US')}\n*Package:* ${client.package_type || '—'}\n*AM:* ${client.assigned_am || '—'}`
-          }
-        },
-        { type: 'divider' },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: '*Off-Boarding Checklist:*\n\n1️⃣ Turn off Instantly workspace\n2️⃣ Archive Slack Channel\n3️⃣ Ensure email domains have been cancelled\n4️⃣ Turn off auto billing (Notify Leon for Fanbasis)'
-          }
-        },
-        { type: 'divider' },
-        {
-          type: 'context',
-          elements: [
-            {
-              type: 'mrkdwn',
-              text: '⚠️ *Reply with CONFIRMED in a thread once all steps are complete.* Daily reminders will be sent until confirmed.'
-            }
-          ]
-        }
-      ]
-    };
-
+    // Post the offboarding checklist
     const postRes = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(message)
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channel: channelId,
+        username: 'GBV Ops Center',
+        icon_emoji: ':clipboard:',
+        blocks: [
+          { type: 'header', text: { type: 'plain_text', text: `🚪 Client Off-Boarding: ${client.name}`, emoji: true } },
+          { type: 'section', text: { type: 'mrkdwn', text: `*Initiated by:* ${user.full_name || user.email}\n*Date:* ${new Date().toLocaleDateString('en-US')}\n*Package:* ${client.package_type || '—'}\n*AM:* ${client.assigned_am || '—'}` } },
+          { type: 'divider' },
+          { type: 'section', text: { type: 'mrkdwn', text: '*Off-Boarding Checklist:*\n\n1️⃣ Turn off Instantly workspace\n2️⃣ Archive Slack Channel\n3️⃣ Ensure email domains have been cancelled\n4️⃣ Turn off auto billing (Notify Leon for Fanbasis)' } },
+          { type: 'divider' },
+          { type: 'context', elements: [{ type: 'mrkdwn', text: '⚠️ *Reply with CONFIRMED in a thread once all steps are complete.* Daily reminders will be sent until confirmed.' }] }
+        ]
+      })
     });
     const postData = await postRes.json();
 
@@ -93,7 +65,6 @@ Deno.serve(async (req) => {
       return Response.json({ error: `Slack error: ${postData.error}` }, { status: 500 });
     }
 
-    // Update client status to Off-Boarding and store message info
     const today = new Date().toISOString().split('T')[0];
     await base44.asServiceRole.entities.Client.update(client_id, {
       status: 'Off-Boarding',
