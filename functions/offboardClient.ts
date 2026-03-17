@@ -1,0 +1,102 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { client_id } = await req.json();
+    if (!client_id) return Response.json({ error: 'client_id required' }, { status: 400 });
+
+    const client = await base44.asServiceRole.entities.Client.get(client_id);
+    if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
+
+    // Get Slack Bot access token
+    const { accessToken } = await base44.asServiceRole.connectors.getConnection('slackbot');
+
+    // Find #client-offboarding channel
+    let channelId = null;
+    let cursor = '';
+    while (true) {
+      const url = `https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200${cursor ? '&cursor=' + cursor : ''}`;
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+      const data = await res.json();
+      if (!data.ok) break;
+      const found = data.channels.find(ch => ch.name === 'client-offboarding');
+      if (found) { channelId = found.id; break; }
+      cursor = data.response_metadata?.next_cursor;
+      if (!cursor) break;
+    }
+
+    if (!channelId) {
+      return Response.json({ error: 'Could not find #client-offboarding channel. Please create it in Slack first.' }, { status: 400 });
+    }
+
+    // Post the offboarding checklist message
+    const message = {
+      channel: channelId,
+      username: 'GBV Ops Center',
+      icon_emoji: ':clipboard:',
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: `🚪 Client Off-Boarding: ${client.name}`, emoji: true }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Initiated by:* ${user.full_name || user.email}\n*Date:* ${new Date().toLocaleDateString('en-US')}\n*Package:* ${client.package_type || '—'}\n*AM:* ${client.assigned_am || '—'}`
+          }
+        },
+        { type: 'divider' },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: '*Off-Boarding Checklist:*\n\n1️⃣ Turn off Instantly workspace\n2️⃣ Archive Slack Channel\n3️⃣ Ensure email domains have been cancelled\n4️⃣ Turn off auto billing (Notify Leon for Fanbasis)'
+          }
+        },
+        { type: 'divider' },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: '⚠️ *Reply with CONFIRMED in a thread once all steps are complete.* Daily reminders will be sent until confirmed.'
+            }
+          ]
+        }
+      ]
+    };
+
+    const postRes = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(message)
+    });
+    const postData = await postRes.json();
+
+    if (!postData.ok) {
+      return Response.json({ error: `Slack error: ${postData.error}` }, { status: 500 });
+    }
+
+    // Update client status to Off-Boarding and store message info
+    const today = new Date().toISOString().split('T')[0];
+    await base44.asServiceRole.entities.Client.update(client_id, {
+      status: 'Off-Boarding',
+      offboarding_slack_ts: postData.ts,
+      offboarding_slack_channel: channelId,
+      offboarding_confirmed: false,
+      offboarding_date: today
+    });
+
+    return Response.json({ ok: true, ts: postData.ts, channel: channelId });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
