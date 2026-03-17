@@ -15,18 +15,26 @@ Deno.serve(async (req) => {
     // Get Slack Bot access token
     const { accessToken } = await base44.asServiceRole.connectors.getConnection('slackbot');
 
-    // Find #client-offboarding channel
+    // Find #client-offboarding channel via search (faster than paginating all channels)
     let channelId = null;
-    let cursor = '';
-    while (true) {
-      const url = `https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200${cursor ? '&cursor=' + cursor : ''}`;
+
+    // Try cached channel from AppSettings first
+    const settings = await base44.asServiceRole.entities.AppSettings.filter({ key: 'offboarding_channel_id' });
+    if (settings.length > 0 && settings[0].value) {
+      channelId = settings[0].value;
+    } else {
+      // Fetch first page only — channel should be near the top or use a single page
+      const url = `https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=1000`;
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
       const data = await res.json();
-      if (!data.ok) break;
-      const found = data.channels.find(ch => ch.name === 'client-offboarding');
-      if (found) { channelId = found.id; break; }
-      cursor = data.response_metadata?.next_cursor;
-      if (!cursor) break;
+      if (data.ok) {
+        const found = data.channels.find(ch => ch.name === 'client-offboarding');
+        if (found) {
+          channelId = found.id;
+          // Cache for future calls
+          await base44.asServiceRole.entities.AppSettings.create({ key: 'offboarding_channel_id', value: channelId });
+        }
+      }
     }
 
     if (!channelId) {
