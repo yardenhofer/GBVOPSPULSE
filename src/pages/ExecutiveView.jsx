@@ -219,7 +219,7 @@ export default function ExecutiveView() {
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {am.clients.length} clients · {am.checkInPct}% check-in · {am.healthScore}% healthy
+                    {am.clients.length} clients · {am.doneCheckins}/{am.expectedCheckins} check-ins ({am.checkInPct}%) · {am.healthScore}% healthy
                   </p>
                 </div>
               </div>
