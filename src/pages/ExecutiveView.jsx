@@ -178,9 +178,23 @@ export default function ExecutiveView() {
 
       {/* AM Performance */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <ClipboardCheck className="w-4 h-4 text-blue-400" />
-          <h2 className="font-semibold text-gray-900 dark:text-white">AM Performance</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4 text-blue-400" />
+            <h2 className="font-semibold text-gray-900 dark:text-white">AM Performance</h2>
+          </div>
+          <Select value={amWindow} onValueChange={setAmWindow}>
+            <SelectTrigger className="w-[130px] h-8 text-xs">
+              <Calendar className="w-3 h-3 mr-1 opacity-50" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="60">Last 60 days</SelectItem>
+              <SelectItem value="mtd">Month to date</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         {amList.length === 0 ? (
           <p className="text-sm text-gray-500">No AMs assigned to clients yet.</p>
