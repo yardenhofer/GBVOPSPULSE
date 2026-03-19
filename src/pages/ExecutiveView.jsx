@@ -12,21 +12,35 @@ export default function ExecutiveView() {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [sendingDigest, setSendingDigest] = useState(false);
   const [digestSent, setDigestSent] = useState(false);
+  const [amWindow, setAmWindow] = useState("7"); // "7", "30", "60", "mtd"
 
   useEffect(() => {
     async function load() {
-      const today = format(new Date(), "yyyy-MM-dd");
-      const weekStart = format(startOfWeek(new Date()), "yyyy-MM-dd");
-      const [cl, ci] = await Promise.all([
-        base44.entities.Client.list("-updated_date", 200),
-        base44.entities.DailyCheckIn.filter({ date: today }),
-      ]);
+      const cl = await base44.entities.Client.list("-updated_date", 200);
       setClients(cl);
-      setCheckIns(ci);
       setLoading(false);
     }
     load();
   }, []);
+
+  // Load check-ins whenever the window changes
+  useEffect(() => {
+    async function loadCheckIns() {
+      const now = new Date();
+      let startDate;
+      if (amWindow === "mtd") {
+        startDate = startOfMonth(now);
+      } else {
+        startDate = subDays(now, parseInt(amWindow));
+      }
+      const startStr = format(startDate, "yyyy-MM-dd");
+      // Fetch all check-ins and filter by date >= startStr
+      const all = await base44.entities.DailyCheckIn.list("-date", 2000);
+      const filtered = all.filter(ci => ci.date >= startStr);
+      setCheckIns(filtered);
+    }
+    loadCheckIns();
+  }, [amWindow]);
 
   // Compute stats
   const withStatus = clients.map(c => ({ ...c, _status: computeAutoStatus(c), _flags: computeRedFlags(c) }));
