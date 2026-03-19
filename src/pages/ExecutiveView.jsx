@@ -58,7 +58,28 @@ export default function ExecutiveView() {
     (c.leads_this_week || 0) < c.target_leads_per_week
   );
 
-  // AM performance
+  // AM performance — check-in % = completed check-ins / (clients × days in window)
+  const now = new Date();
+  let windowStartDate;
+  if (amWindow === "mtd") {
+    windowStartDate = startOfMonth(now);
+  } else {
+    windowStartDate = subDays(now, parseInt(amWindow));
+  }
+  // Count weekdays (Mon-Fri) in the window as expected check-in days
+  const windowDays = (() => {
+    let count = 0;
+    const d = new Date(windowStartDate);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    while (d <= today) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) count++;
+      d.setDate(d.getDate() + 1);
+    }
+    return Math.max(count, 1);
+  })();
+
   const amMap = {};
   clients.forEach(c => {
     if (!c.assigned_am) return;
@@ -73,10 +94,11 @@ export default function ExecutiveView() {
   });
   const amList = Object.values(amMap).map(am => {
     const healthy = am.clients.filter(c => computeAutoStatus(c) === "Healthy").length;
-    const checkInPct = am.clients.length > 0 ? Math.round((am.doneCheckins / am.clients.length) * 100) : 0;
+    const expectedCheckins = am.clients.length * windowDays;
+    const checkInPct = expectedCheckins > 0 ? Math.min(100, Math.round((am.doneCheckins / expectedCheckins) * 100)) : 0;
     const healthScore = am.clients.length > 0 ? Math.round((healthy / am.clients.length) * 100) : 0;
     const score = Math.round((checkInPct + healthScore) / 2);
-    return { ...am, score, checkInPct, healthScore };
+    return { ...am, score, checkInPct, healthScore, doneCheckins: am.doneCheckins, expectedCheckins };
   }).sort((a, b) => b.score - a.score);
 
   async function handleExportPdf() {
