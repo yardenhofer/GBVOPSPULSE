@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { computeRedFlags, computeAutoStatus, STATUS_CONFIG } from "../components/utils/redFlagEngine";
-import { format, startOfWeek } from "date-fns";
-import { DollarSign, TrendingDown, Users, BarChart3, ClipboardCheck, Download, Mail } from "lucide-react";
+import { format, startOfWeek, subDays, startOfMonth } from "date-fns";
+import { DollarSign, TrendingDown, Users, BarChart3, ClipboardCheck, Download, Mail, Calendar } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function ExecutiveView() {
   const [clients, setClients] = useState([]);
