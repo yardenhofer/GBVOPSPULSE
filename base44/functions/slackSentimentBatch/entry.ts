@@ -41,6 +41,9 @@ Deno.serve(async (req) => {
       console.error(`✗✗ ${client.name}: FAILED after 2 attempts — ${lastError}`);
       errors.push({ client: client.name, error: lastError });
     }
+
+    // Small delay to avoid Slack rate limits and reduce CPU overhead
+    await new Promise(r => setTimeout(r, 500));
   }
 
   console.log(`Done: ${results.length} succeeded, ${errors.length} failed`);
