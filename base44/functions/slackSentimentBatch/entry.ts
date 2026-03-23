@@ -9,9 +9,9 @@ Deno.serve(async (req) => {
     return Response.json({ success: true, message: "No clients to analyze" });
   }
 
-  // Include all active clients — the sentiment analysis function auto-matches Slack channels
-  const eligible = clients.filter(c => c.status !== 'Terminated');
-  console.log(`${eligible.length} active clients for Slack analysis (${clients.length - eligible.length} terminated/skipped)`);
+  // Filter to clients that have a Slack channel configured
+  const eligible = clients.filter(c => c.slack_channel_id || c.slack_channel_name);
+  console.log(`${eligible.length} clients eligible for Slack analysis (${clients.length - eligible.length} skipped — no channel)`);
 
   const results = [];
   const errors = [];
