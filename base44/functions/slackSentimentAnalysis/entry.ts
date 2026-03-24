@@ -200,6 +200,11 @@ Deno.serve(async (req) => {
         if (!lastClientDate || msgDate > lastClientDate) lastClientDate = msgDate;
       }
     }
+    // Log classification details for debugging
+    const classificationLog = Object.entries(userIsGbv).map(([uid, isGbv]) => 
+      `${userMap[uid] || uid}: ${isGbv ? 'GBV' : 'CLIENT'}`
+    ).join(', ');
+    console.log(`#${channel.name}: User classifications — ${classificationLog}`);
     console.log(`#${channel.name}: Computed touchpoints — last GBV: ${lastGbvDate}, last client: ${lastClientDate}`);
 
     // Build GBV staff name list for LLM context
