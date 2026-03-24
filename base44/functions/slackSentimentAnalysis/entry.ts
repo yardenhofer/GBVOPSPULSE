@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
   let allChannels = [];
   let cursor = "";
   do {
-    const url = `https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200${cursor ? `&cursor=${cursor}` : ""}`;
+    const url = `https://slack.com/api/conversations.list?types=public_channel,private_channel&exclude_archived=true&limit=200${cursor ? `&cursor=${cursor}` : ""}`;
     const data = await slackFetch(url);
     if (!data.ok) {
       console.error("Slack channels.list error:", data.error);

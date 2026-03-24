@@ -23,10 +23,17 @@ Deno.serve(async (req) => {
     cursor = data.response_metadata?.next_cursor || "";
   } while (cursor);
 
-  const channelNames = allChannels.map(ch => ({ name: ch.name, id: ch.id, is_private: ch.is_private, is_member: ch.is_member }));
+  const channelNames = allChannels.map(ch => ({ name: ch.name, id: ch.id, is_private: ch.is_private, is_member: ch.is_member, is_archived: ch.is_archived }));
+
+  // If query param provided, filter
+  const filterName = new URL(req.url).searchParams.get("filter") || null;
+  const filtered = filterName 
+    ? channelNames.filter(ch => ch.name.toLowerCase().includes(filterName.toLowerCase()))
+    : channelNames;
 
   return Response.json({ 
     total_channels: allChannels.length, 
-    channels: channelNames 
+    showing: filtered.length,
+    channels: filtered 
   });
 });
