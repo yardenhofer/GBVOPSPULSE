@@ -3,6 +3,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
+  // Parse body ONCE upfront (before any other reads)
+  let body = {};
+  try { body = await req.json(); } catch(e) { /* no body */ }
+  const singleClientId = body.client_id || null;
+
   // Allow both admin users and service-role calls (from batch scheduler)
   let isAuthorized = false;
   try {
@@ -11,33 +16,40 @@ Deno.serve(async (req) => {
   } catch (e) { /* service role call — no user token */ }
   
   if (!isAuthorized) {
-    // Check if this is a service-role invocation (has client_id in body from batch)
     // Service role calls come from other backend functions via base44.asServiceRole.functions.invoke
     // They won't have a user, but they're internal so we allow them
-    try {
-      const testBody = await req.clone().json();
-      if (testBody?.client_id) isAuthorized = true;
-    } catch(e) {}
+    if (singleClientId) isAuthorized = true;
   }
   
   if (!isAuthorized) {
     return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
   }
 
-  // Support single-client mode to avoid timeouts
-  let body = {};
-  try { body = await req.json(); } catch(e) { /* no body */ }
-  const singleClientId = body.client_id || null;
-
   const { accessToken } = await base44.asServiceRole.connectors.getConnection("slackbot");
+
+  // Helper: call Slack API with automatic rate-limit retry
+  async function slackFetch(url) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const data = await resp.json();
+      if (data.ok) return data;
+      if (data.error === 'ratelimited') {
+        const retryAfter = parseInt(resp.headers.get('Retry-After') || '5', 10);
+        console.log(`Slack rate limited, waiting ${retryAfter}s...`);
+        await new Promise(r => setTimeout(r, retryAfter * 1000));
+        continue;
+      }
+      return data; // non-rate-limit error, return as-is
+    }
+    return { ok: false, error: 'ratelimited_after_retries' };
+  }
 
   // 1. Get all Slack channels
   let allChannels = [];
   let cursor = "";
   do {
     const url = `https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200${cursor ? `&cursor=${cursor}` : ""}`;
-    const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const data = await resp.json();
+    const data = await slackFetch(url);
     if (!data.ok) {
       console.error("Slack channels.list error:", data.error);
       break;
@@ -111,8 +123,7 @@ Deno.serve(async (req) => {
     let histCursor = "";
     do {
       const histUrl = `https://slack.com/api/conversations.history?channel=${channel.id}&oldest=${since}&limit=200${histCursor ? `&cursor=${histCursor}` : ""}`;
-      const histResp = await fetch(histUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const histData = await histResp.json();
+      const histData = await slackFetch(histUrl);
       
       if (!histData.ok) {
         console.error(`Error fetching history for #${channel.name}:`, histData.error);
@@ -125,11 +136,9 @@ Deno.serve(async (req) => {
     // 4b. Fetch thread replies for any threaded messages
     const threadParents = allMessages.filter(m => m.reply_count && m.reply_count > 0 && m.ts);
     for (const parent of threadParents) {
-      const repliesResp = await fetch(
-        `https://slack.com/api/conversations.replies?channel=${channel.id}&ts=${parent.ts}&oldest=${since}&limit=200`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+      const repliesData = await slackFetch(
+        `https://slack.com/api/conversations.replies?channel=${channel.id}&ts=${parent.ts}&oldest=${since}&limit=200`
       );
-      const repliesData = await repliesResp.json();
       if (repliesData.ok && repliesData.messages) {
         // replies includes the parent, skip it to avoid duplicates
         const replies = repliesData.messages.filter(r => r.ts !== parent.ts);
@@ -169,10 +178,7 @@ Deno.serve(async (req) => {
     const userMap = {};
     const userIsGbv = {};
     for (const uid of uniqueUsers) {
-      const uResp = await fetch(`https://slack.com/api/users.info?user=${uid}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const uData = await uResp.json();
+      const uData = await slackFetch(`https://slack.com/api/users.info?user=${uid}`);
       if (uData.ok && uData.user) {
         userMap[uid] = uData.user.real_name || uData.user.profile?.display_name || uData.user.name || uid;
         const slackEmail = (uData.user.profile?.email || "").toLowerCase();
