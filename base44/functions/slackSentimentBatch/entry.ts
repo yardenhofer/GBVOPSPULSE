@@ -6,7 +6,7 @@ Deno.serve(async (req) => {
 
     let body = {};
     try { body = await req.clone().json(); } catch(e) { /* no body */ }
-    const BATCH_SIZE = body.batch_size || 6;
+    const BATCH_SIZE = body.batch_size || 4;
 
     // 1. Load clients + insights in parallel
     const [clients, allInsights] = await Promise.all([
@@ -56,14 +56,14 @@ Deno.serve(async (req) => {
     const { accessToken } = await base44.asServiceRole.connectors.getConnection("slackbot");
 
     async function slackFetch(url) {
-      for (let attempt = 0; attempt < 5; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
         const data = await resp.json();
         if (data.ok) return data;
         if (data.error === 'ratelimited') {
-          const backoff = (attempt + 1) * 5;
-          console.log(`Rate limited (attempt ${attempt + 1}/5), waiting ${backoff}s...`);
-          await new Promise(r => setTimeout(r, backoff * 1000));
+          const wait = (attempt + 1) * 5; // 5s, 10s, 15s — max 30s total
+          console.log(`Rate limited (attempt ${attempt + 1}/3), waiting ${wait}s...`);
+          await new Promise(r => setTimeout(r, wait * 1000));
           continue;
         }
         return data;
@@ -71,13 +71,27 @@ Deno.serve(async (req) => {
       return { ok: false, error: 'ratelimited_after_retries' };
     }
 
-    // Clients with a cached slack_channel_id can skip the expensive channel list call.
-    // Only fetch the full channel list if some clients need name-based matching.
+    // Prioritize clients with cached slack_channel_id (no channel list fetch needed).
+    // Only fetch the full channel list if we still have batch slots AND there are unmatched clients.
     const clientsWithCachedId = needsRefresh.filter(c => c.slack_channel_id);
     const clientsNeedingMatch = needsRefresh.filter(c => !c.slack_channel_id && (c.slack_channel_name || c.name));
 
-    let allChannels = [];
-    if (clientsNeedingMatch.length > 0) {
+    // 3. Build eligible list — start with cached-ID clients (cheapest)
+    const matchable = [];
+    for (const c of clientsWithCachedId) {
+      matchable.push({ client: c, channel: { id: c.slack_channel_id, name: c.slack_channel_name || c.name } });
+    }
+
+    // Sort cached clients by oldest insight first
+    matchable.sort((a, b) => {
+      const aDate = latestInsightByClient[a.client.id] || "1970-01-01";
+      const bDate = latestInsightByClient[b.client.id] || "1970-01-01";
+      return aDate.localeCompare(bDate);
+    });
+
+    // Only fetch channel list if we need more clients to fill the batch
+    if (matchable.length < BATCH_SIZE && clientsNeedingMatch.length > 0) {
+      let allChannels = [];
       let cursor = "";
       do {
         const url = `https://slack.com/api/conversations.list?types=public_channel,private_channel&exclude_archived=true&limit=200${cursor ? `&cursor=${cursor}` : ""}`;
@@ -88,47 +102,35 @@ Deno.serve(async (req) => {
         if (cursor) await new Promise(r => setTimeout(r, 1500));
       } while (cursor);
       console.log(`Fetched ${allChannels.length} channels for ${clientsNeedingMatch.length} clients needing match`);
+
+      for (const c of clientsNeedingMatch) {
+        let channel = null;
+        if (c.slack_channel_name) {
+          const manualName = c.slack_channel_name.toLowerCase().replace(/^#/, '').trim();
+          channel = allChannels.find(ch => ch.name.toLowerCase() === manualName);
+        }
+        if (!channel) {
+          const normalizedName = c.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          channel = allChannels.find(ch => {
+            const chNameStripped = ch.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return chNameStripped.includes(normalizedName) || normalizedName.includes(chNameStripped);
+          });
+        }
+        if (channel) matchable.push({ client: c, channel });
+      }
     } else {
-      console.log(`All ${clientsWithCachedId.length} clients have cached channel IDs, skipping channel list`);
+      console.log(`${matchable.length} cached-ID clients available, skipping channel list fetch`);
     }
-
-    // 3. Build eligible list — cached ID clients get a lightweight channel stub
-    const matchable = [];
-    for (const c of clientsWithCachedId) {
-      matchable.push({ client: c, channel: { id: c.slack_channel_id, name: c.slack_channel_name || c.name } });
-    }
-    for (const c of clientsNeedingMatch) {
-      let channel = null;
-      if (c.slack_channel_name) {
-        const manualName = c.slack_channel_name.toLowerCase().replace(/^#/, '').trim();
-        channel = allChannels.find(ch => ch.name.toLowerCase() === manualName);
-      }
-      if (!channel) {
-        const normalizedName = c.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-        channel = allChannels.find(ch => {
-          const chNameStripped = ch.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return chNameStripped.includes(normalizedName) || normalizedName.includes(chNameStripped);
-        });
-      }
-      if (channel) matchable.push({ client: c, channel });
-    }
-
-    // Sort by oldest insight first (clients never analyzed come first)
-    matchable.sort((a, b) => {
-      const aDate = latestInsightByClient[a.client.id] || "1970-01-01";
-      const bDate = latestInsightByClient[b.client.id] || "1970-01-01";
-      return aDate.localeCompare(bDate);
-    });
 
     const eligible = matchable.slice(0, BATCH_SIZE);
-    console.log(`Batch: processing ${eligible.length} of ${matchable.length} matchable (${needsRefresh.length - matchable.length} no channel match)`);
+    console.log(`Batch: processing ${eligible.length} of ${matchable.length} matchable (${clientsNeedingMatch.length} without cached channel ID)`);
 
     if (eligible.length === 0) {
       return Response.json({ success: true, message: "No matchable clients to analyze", processed: 0 });
     }
 
     // Pause after channel listing to let rate limits recover
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise(r => setTimeout(r, 8000));
 
     // 4. Fetch GBV staff emails once
     let gbvEmails = new Set();
@@ -148,7 +150,7 @@ Deno.serve(async (req) => {
     const results = [];
     const errors = [];
     const startTime = Date.now();
-    const MAX_RUNTIME_MS = 150000; // 2.5 min safety margin
+    const MAX_RUNTIME_MS = 140000; // ~2.3 min safety margin (function timeout is 180s)
 
     for (const { client, channel } of eligible) {
       if (Date.now() - startTime > MAX_RUNTIME_MS) {
@@ -347,7 +349,7 @@ ${messageText}`,
       }
 
       // Delay between clients to let Slack rate limits recover
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 8000));
     }
 
     const remaining = needsRefresh.length - results.length;
