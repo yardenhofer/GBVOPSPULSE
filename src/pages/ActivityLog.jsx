@@ -25,8 +25,8 @@ export default function ActivityLog() {
       const a = await base44.entities.UserActivity.list("-created_date", 200);
       setActivities(a);
       try {
-        const u = await base44.entities.User.list("-full_name", 200);
-        setUsers(u);
+        const res = await base44.functions.invoke("listUsers", {});
+        setUsers(res.data.users || []);
       } catch {
         // Non-admin users can't list users - that's OK
       }

@@ -22,7 +22,7 @@ export default function DailyEntries() {
   useEffect(() => {
     Promise.all([
       base44.entities.Client.list("-name", 200),
-      base44.entities.User.list("-full_name", 200),
+      base44.functions.invoke("listUsers", {}).then(res => res.data.users || []),
     ]).then(([c, u]) => {
       setClients(c);
       setUsers(u);
