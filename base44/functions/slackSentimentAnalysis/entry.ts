@@ -26,17 +26,17 @@ Deno.serve(async (req) => {
 
   // Helper: call Slack API with automatic rate-limit retry
   async function slackFetch(url) {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
       const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       const data = await resp.json();
       if (data.ok) return data;
       if (data.error === 'ratelimited') {
-        const retryAfter = parseInt(resp.headers.get('Retry-After') || '5', 10);
-        console.log(`Slack rate limited, waiting ${retryAfter}s...`);
+        const retryAfter = Math.min(parseInt(resp.headers.get('Retry-After') || '3', 10), 10);
+        console.log(`Rate limited (attempt ${attempt + 1}), waiting ${retryAfter}s...`);
         await new Promise(r => setTimeout(r, retryAfter * 1000));
         continue;
       }
-      return data; // non-rate-limit error, return as-is
+      return data;
     }
     return { ok: false, error: 'ratelimited_after_retries' };
   }
