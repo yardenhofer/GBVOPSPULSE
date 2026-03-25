@@ -7,7 +7,7 @@ import { base44 } from "@/api/base44Client";
 const NAV = [
   { label: "Dashboard",      page: "Dashboard",     icon: LayoutDashboard },
   { label: "Daily Check-In", page: "DailyCheckIn",  icon: ClipboardCheck },
-  { label: "Daily Entries",  page: "DailyEntries",   icon: ClipboardList },
+  { label: "Daily Entries",  page: "DailyEntries",   icon: ClipboardList, adminOnly: true },
   { label: "Alerts",         page: "Alerts",         icon: Bell },
   { label: "Executive View", page: "ExecutiveView",  icon: TrendingUp },
   { label: "Lead Approvals", page: "LeadListApprovals", icon: FileCheck },
