@@ -26,14 +26,15 @@ Deno.serve(async (req) => {
 
   // Helper: call Slack API with automatic rate-limit retry
   async function slackFetch(url) {
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       const data = await resp.json();
       if (data.ok) return data;
       if (data.error === 'ratelimited') {
-        const retryAfter = Math.min(parseInt(resp.headers.get('Retry-After') || '3', 10), 10);
-        console.log(`Rate limited (attempt ${attempt + 1}), waiting ${retryAfter}s...`);
-        await new Promise(r => setTimeout(r, retryAfter * 1000));
+        // Exponential backoff: 5s, 10s, 15s, 20s, 25s
+        const backoff = (attempt + 1) * 5;
+        console.log(`Rate limited (attempt ${attempt + 1}/5), waiting ${backoff}s...`);
+        await new Promise(r => setTimeout(r, backoff * 1000));
         continue;
       }
       return data;
@@ -64,6 +65,10 @@ Deno.serve(async (req) => {
   } else {
     clients = await base44.asServiceRole.entities.Client.list("-updated_date", 200);
   }
+
+  // Wait after channel listing to let Slack rate limits recover before fetching history
+  console.log("Waiting 5s for rate limit recovery after channel listing...");
+  await new Promise(r => setTimeout(r, 5000));
 
   // 3. Auto-match channels to clients
   const results = [];
@@ -118,17 +123,25 @@ Deno.serve(async (req) => {
     const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
     let allMessages = [];
     let histCursor = "";
+    let historyFailed = false;
     do {
       const histUrl = `https://slack.com/api/conversations.history?channel=${channel.id}&oldest=${since}&limit=200${histCursor ? `&cursor=${histCursor}` : ""}`;
       const histData = await slackFetch(histUrl);
       
       if (!histData.ok) {
         console.error(`Error fetching history for #${channel.name}:`, histData.error);
+        historyFailed = true;
         break;
       }
       allMessages = allMessages.concat(histData.messages || []);
       histCursor = histData.response_metadata?.next_cursor || "";
     } while (histCursor);
+
+    // If history fetch failed entirely (rate limited), skip this client — don't analyze with partial data
+    if (historyFailed && allMessages.length === 0) {
+      console.error(`Skipping ${client.name}: could not fetch any history (rate limited)`);
+      continue;
+    }
 
     // 4b. Fetch thread replies for any threaded messages
     const threadParents = allMessages.filter(m => m.reply_count && m.reply_count > 0 && m.ts);
