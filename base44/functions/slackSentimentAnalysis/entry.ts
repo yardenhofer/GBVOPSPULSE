@@ -306,13 +306,11 @@ ${messageText}`,
       }
     }
 
-    // Update last AM touchpoint from computed Slack data (not LLM)
-    if (lastGbvDate) {
+    // Only update touchpoint dates if newer than existing (don't overwrite with stale data)
+    if (lastGbvDate && (!client.last_am_touchpoint || lastGbvDate > client.last_am_touchpoint)) {
       updateData.last_am_touchpoint = lastGbvDate;
     }
-
-    // Update last client reply date from computed Slack data (not LLM)
-    if (lastClientDate) {
+    if (lastClientDate && (!client.last_client_reply_date || lastClientDate > client.last_client_reply_date)) {
       updateData.last_client_reply_date = lastClientDate;
     }
 

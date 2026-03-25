@@ -304,8 +304,13 @@ ${messageText}`,
             updateData.unhappy_since = null;
           }
         }
-        if (lastGbvDate) updateData.last_am_touchpoint = lastGbvDate;
-        if (lastClientDate) updateData.last_client_reply_date = lastClientDate;
+        // Only update touchpoint dates if newer than existing (don't overwrite with stale data from incomplete fetches)
+        if (lastGbvDate && (!client.last_am_touchpoint || lastGbvDate > client.last_am_touchpoint)) {
+          updateData.last_am_touchpoint = lastGbvDate;
+        }
+        if (lastClientDate && (!client.last_client_reply_date || lastClientDate > client.last_client_reply_date)) {
+          updateData.last_client_reply_date = lastClientDate;
+        }
 
         if (Object.keys(updateData).length > 0) {
           await base44.asServiceRole.entities.Client.update(client.id, updateData);
