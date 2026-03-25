@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -8,17 +8,14 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch(e) { /* no body */ }
   const singleClientId = body.client_id || null;
 
-  // Allow both admin users and service-role calls (from batch scheduler)
+  // Allow admin users OR service-role calls (from batch scheduler / automations)
   let isAuthorized = false;
   try {
     const user = await base44.auth.me();
     if (user?.role === 'admin') isAuthorized = true;
-  } catch (e) { /* service role call — no user token */ }
-  
-  if (!isAuthorized) {
-    // Service role calls come from other backend functions via base44.asServiceRole.functions.invoke
-    // They won't have a user, but they're internal so we allow them
-    if (singleClientId) isAuthorized = true;
+  } catch (e) {
+    // No user token — this is a service-role or automation call, allow it
+    isAuthorized = true;
   }
   
   if (!isAuthorized) {
