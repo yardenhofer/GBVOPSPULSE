@@ -179,6 +179,18 @@ Deno.serve(async (req) => {
           histCursor = histData.response_metadata?.next_cursor || "";
         } while (histCursor);
 
+        // Fetch thread replies for any threaded messages
+        const threadParents = allMessages.filter(m => m.reply_count && m.reply_count > 0 && m.ts);
+        for (const parent of threadParents) {
+          const repliesData = await slackFetch(
+            `https://slack.com/api/conversations.replies?channel=${channel.id}&ts=${parent.ts}&oldest=${since}&limit=200`
+          );
+          if (repliesData.ok && repliesData.messages) {
+            const replies = repliesData.messages.filter(r => r.ts !== parent.ts);
+            allMessages = allMessages.concat(replies);
+          }
+        }
+
         // Deduplicate and filter
         const seenTs = new Set();
         const messages = allMessages
