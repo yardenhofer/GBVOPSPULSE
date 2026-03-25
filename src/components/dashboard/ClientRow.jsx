@@ -7,6 +7,7 @@ const STATUS_GLOW = {
   Monitor: "status-glow-monitor",
   "At Risk": "status-glow-at-risk",
   Critical: "status-glow-critical",
+  Terminated: "status-glow-critical",
 };
 
 export default function ClientRow({ client, flags, status, isOwn, onClick, instantlyResult }) {
