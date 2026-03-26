@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { CheckCircle2, XCircle, Clock, FileText, ExternalLink, Loader2, MessageSquare, Eye } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, FileText, ExternalLink, Loader2, MessageSquare, Eye, ShieldCheck, AlertTriangle } from "lucide-react";
 import CsvPreviewModal from "./CsvPreviewModal";
 import AiAnalysisPanel from "./AiAnalysisPanel";
 import AiScoreBadge from "./AiScoreBadge";
@@ -15,7 +15,10 @@ const STATUS_STYLES = {
   Pending: { icon: Clock, color: "text-yellow-500", bg: "bg-yellow-500/10", border: "border-yellow-500/20", label: "Pending Review" },
   Approved: { icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", border: "border-green-500/20", label: "Approved" },
   Denied: { icon: XCircle, color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/20", label: "Denied" },
+  "Pending Senior Review": { icon: Clock, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", label: "Awaiting Senior Review" },
 };
+
+const SENIOR_REVIEWERS = ["yardenhofer@gmail.com", "ibraheem@growbigventures.com"];
 
 export default function ApprovalCard({ item, isAdmin, user, onUpdated, client }) {
   const [feedback, setFeedback] = useState("");
@@ -26,14 +29,48 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated, client })
   const cfg = STATUS_STYLES[item.status] || STATUS_STYLES.Pending;
   const StatusIcon = cfg.icon;
 
+  const isSeniorReviewer = SENIOR_REVIEWERS.includes(user?.email);
+
   async function handleAction(status) {
     setActing(true);
-    await base44.entities.LeadListApproval.update(item.id, {
-      status,
-      reviewed_by: user.email,
-      reviewed_date: new Date().toISOString(),
-      admin_feedback: feedback.trim() || null,
-    });
+    // If approving and this is a first-time client list, route to senior review instead
+    if (status === "Approved" && item.requires_senior_approval && !item.senior_approved_by) {
+      // Senior reviewers give final approval directly
+      if (isSeniorReviewer) {
+        await base44.entities.LeadListApproval.update(item.id, {
+          status: "Approved",
+          reviewed_by: item.reviewed_by || user.email,
+          reviewed_date: item.reviewed_date || new Date().toISOString(),
+          admin_feedback: item.admin_feedback || feedback.trim() || null,
+          senior_approved_by: user.email,
+          senior_approved_date: new Date().toISOString(),
+          senior_feedback: feedback.trim() || null,
+        });
+      } else {
+        // Regular admin approval → move to senior review
+        await base44.entities.LeadListApproval.update(item.id, {
+          status: "Pending Senior Review",
+          reviewed_by: user.email,
+          reviewed_date: new Date().toISOString(),
+          admin_feedback: feedback.trim() || null,
+        });
+      }
+    } else if (item.status === "Pending Senior Review" && isSeniorReviewer) {
+      // Senior reviewer acting on a pending senior review item
+      await base44.entities.LeadListApproval.update(item.id, {
+        status,
+        senior_approved_by: status === "Approved" ? user.email : null,
+        senior_approved_date: status === "Approved" ? new Date().toISOString() : null,
+        senior_feedback: feedback.trim() || null,
+      });
+    } else {
+      await base44.entities.LeadListApproval.update(item.id, {
+        status,
+        reviewed_by: user.email,
+        reviewed_date: new Date().toISOString(),
+        admin_feedback: feedback.trim() || null,
+      });
+    }
     setActing(false);
     setShowFeedback(false);
     setFeedback("");
@@ -52,7 +89,13 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated, client })
             {" · "}{formatDate(item.created_date)}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {item.requires_senior_approval && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/20">
+              <AlertTriangle className="w-3 h-3" />
+              1st Client List
+            </span>
+          )}
           <AiScoreBadge score={item.ai_score} recommendation={item.ai_recommendation} />
           <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
             <StatusIcon className="w-3 h-3" />
@@ -108,7 +151,7 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated, client })
 
       {/* Admin feedback (if reviewed) */}
       {item.admin_feedback && item.status !== "Pending" && (
-        <div className={`rounded-lg px-3 py-2 ${item.status === "Approved" ? "bg-green-50 dark:bg-green-500/5" : "bg-red-50 dark:bg-red-500/5"}`}>
+        <div className={`rounded-lg px-3 py-2 ${item.status === "Denied" ? "bg-red-50 dark:bg-red-500/5" : "bg-green-50 dark:bg-green-500/5"}`}>
           <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">
             Admin Feedback ({item.reviewed_by}):
           </p>
@@ -119,11 +162,34 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated, client })
         </div>
       )}
 
+      {/* Senior review info */}
+      {item.requires_senior_approval && item.status === "Pending Senior Review" && (
+        <div className="rounded-lg px-3 py-2 bg-purple-50 dark:bg-purple-500/5 border border-purple-200 dark:border-purple-500/20">
+          <p className="text-xs font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            First list for this client — requires final sign-off from Yarden or Ibraheem
+          </p>
+        </div>
+      )}
+
+      {/* Senior reviewer feedback (if senior reviewed) */}
+      {item.senior_feedback && item.senior_approved_by && (
+        <div className="rounded-lg px-3 py-2 bg-purple-50 dark:bg-purple-500/5">
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-0.5">
+            Senior Review ({item.senior_approved_by}):
+          </p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{item.senior_feedback}</p>
+          {item.senior_approved_date && (
+            <p className="text-xs text-gray-400 mt-1">{formatDate(item.senior_approved_date)}</p>
+          )}
+        </div>
+      )}
+
       {/* AI Analysis */}
       <AiAnalysisPanel item={item} onAnalyzed={onUpdated} />
 
-      {/* Admin actions (only for pending items) */}
-      {isAdmin && item.status === "Pending" && (
+      {/* Admin actions (for pending items, or pending senior review for senior reviewers) */}
+      {isAdmin && (item.status === "Pending" || (item.status === "Pending Senior Review" && isSeniorReviewer)) && (
         <div className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">
           {!showFeedback ? (
             <div className="flex items-center gap-2">

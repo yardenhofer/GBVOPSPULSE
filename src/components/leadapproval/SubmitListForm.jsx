@@ -110,6 +110,12 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
 
     setSubmitting(true);
     try {
+      // Check if this is the first-ever approved lead list for this client
+      const existingApprovals = await base44.entities.LeadListApproval.filter(
+        { client_id: clientId, status: "Approved" }, "-created_date", 1
+      );
+      const isFirstForClient = existingApprovals.length === 0;
+
       await base44.entities.LeadListApproval.create({
         client_id: clientId,
         client_name: selectedClient?.name || "",
@@ -123,6 +129,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
         notes: notes.trim() || null,
         lead_count: leadCount ? Number(leadCount) : null,
         status: "Pending",
+        requires_senior_approval: isFirstForClient,
       });
       // Reset
       setClientId("");

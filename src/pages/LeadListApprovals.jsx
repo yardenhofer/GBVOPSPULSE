@@ -40,6 +40,7 @@ export default function LeadListApprovals() {
   const filteredItems = items.filter(i => statusFilter === "All" || i.status === statusFilter);
 
   const pendingCount = items.filter(i => i.status === "Pending").length;
+  const seniorPendingCount = items.filter(i => i.status === "Pending Senior Review").length;
 
   if (loading) {
     return (
@@ -86,25 +87,30 @@ export default function LeadListApprovals() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800">
-        {["All", "Pending", "Approved", "Denied"].map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              statusFilter === s
-                ? s === "Pending" ? "border-yellow-500 text-yellow-500"
-                : s === "Approved" ? "border-green-500 text-green-500"
-                : s === "Denied" ? "border-red-500 text-red-500"
-                : "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-            }`}>
-            {s}
-            {s === "Pending" && pendingCount > 0 && (
-              <span className="ml-1.5 bg-yellow-500 text-white text-xs font-bold rounded-full w-5 h-5 inline-flex items-center justify-center">
-                {pendingCount}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800 overflow-x-auto">
+        {["All", "Pending", "Pending Senior Review", "Approved", "Denied"].map(s => {
+          const tabLabel = s === "Pending Senior Review" ? "Senior Review" : s;
+          const count = s === "Pending" ? pendingCount : s === "Pending Senior Review" ? seniorPendingCount : 0;
+          const activeColor = s === "Pending" ? "border-yellow-500 text-yellow-500"
+            : s === "Pending Senior Review" ? "border-purple-500 text-purple-500"
+            : s === "Approved" ? "border-green-500 text-green-500"
+            : s === "Denied" ? "border-red-500 text-red-500"
+            : "border-blue-600 text-blue-600";
+          const badgeBg = s === "Pending Senior Review" ? "bg-purple-500" : "bg-yellow-500";
+          return (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                statusFilter === s ? activeColor : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+              }`}>
+              {tabLabel}
+              {count > 0 && (
+                <span className={`ml-1.5 ${badgeBg} text-white text-xs font-bold rounded-full w-5 h-5 inline-flex items-center justify-center`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* List */}
