@@ -18,7 +18,7 @@ const STATUS_STYLES = {
   "Pending Senior Review": { icon: Clock, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", label: "Awaiting Senior Review" },
 };
 
-const SENIOR_REVIEWERS = ["yardenhofer@gmail.com", "ibraheem@growbigventures.com"];
+const SENIOR_REVIEWERS = ["yardenhofer@gmail.com", "ibraheem@growbigventures.com", "leon@growbigventures.com"];
 
 export default function ApprovalCard({ item, isAdmin, user, onUpdated, client }) {
   const [feedback, setFeedback] = useState("");
