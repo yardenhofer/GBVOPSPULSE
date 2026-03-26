@@ -74,6 +74,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     waiting_since: client.waiting_since || "",
     is_escalated: client.is_escalated || false,
     unhappy_since: client.unhappy_since || "",
+    status_override: client.status_override || "",
     notes: client.notes || "",
     instantly_api_key: client.instantly_api_key || "",
     slack_channel_name: client.slack_channel_name || "",
@@ -89,6 +90,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
       revenue: form.revenue !== "" ? Number(form.revenue) : null,
       group: form.group !== "" ? Number(form.group) : null,
       contract_end_date: form.contract_end_date || null,
+      status_override: form.status_override || null,
     };
     // Auto-set unhappy_since if sentiment changed to Unhappy and not already set
     if (form.client_sentiment === "Unhappy" && !form.unhappy_since) {
@@ -196,6 +198,21 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
             onChange={e => setForm(f => ({ ...f, slack_channel_name: e.target.value }))} />
           <p className="text-xs text-gray-400 mt-0.5">Set this if auto-match can't find the channel</p>
         </div>
+      </div>
+
+      <div className="mt-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/20">
+        <F label="Status Override (suppress auto At Risk / Critical)">
+          <Sel
+            value={form.status_override}
+            onChange={e => setForm(f => ({ ...f, status_override: e.target.value }))}
+            options={["", "Healthy", "Monitor"]}
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            {form.status_override
+              ? `Auto-status capped to "${form.status_override}" — red/yellow flags will still show but won't escalate the status.`
+              : "No override active — status is calculated automatically from red flags."}
+          </p>
+        </F>
       </div>
 
       <div className="mt-3">

@@ -73,9 +73,17 @@ export function computeAutoStatus(client) {
   if (client.status === 'Terminated') return 'Terminated';
   if (client.status === 'Off-Boarding') return 'Off-Boarding';
   const flags = computeRedFlags(client);
-  if (client.is_escalated || flags.some(f => f.severity === 'red')) return 'Critical';
-  if (flags.some(f => f.severity === 'yellow')) return 'At Risk';
-  return client.status || 'Healthy';
+  const autoStatus = client.is_escalated || flags.some(f => f.severity === 'red')
+    ? 'Critical'
+    : flags.some(f => f.severity === 'yellow')
+      ? 'At Risk'
+      : client.status || 'Healthy';
+
+  // Admin override: if set, cap the auto-status to the override level
+  if (client.status_override && (autoStatus === 'At Risk' || autoStatus === 'Critical')) {
+    return client.status_override;
+  }
+  return autoStatus;
 }
 
 export const STATUS_CONFIG = {
