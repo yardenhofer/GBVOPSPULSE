@@ -83,6 +83,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
   const [listType, setListType] = useState("file");
   const [file, setFile] = useState(null);
   const [linkUrl, setLinkUrl] = useState("");
+  const [copyDocUrl, setCopyDocUrl] = useState("");
   const [clientCopy, setClientCopy] = useState("");
   const [notes, setNotes] = useState("");
   const [leadCount, setLeadCount] = useState("");
@@ -126,6 +127,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
         file_url: listType === "file" ? fileUrl : null,
         link_url: listType === "link" ? linkUrl.trim() : null,
         client_copy: clientCopy.trim(),
+        copy_doc_url: copyDocUrl.trim() || null,
         notes: notes.trim() || null,
         lead_count: leadCount ? Number(leadCount) : null,
         status: "Pending",
@@ -137,6 +139,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
       setFile(null);
       setFileUrl("");
       setLinkUrl("");
+      setCopyDocUrl("");
       setClientCopy("");
       setNotes("");
       setLeadCount("");
@@ -222,6 +225,14 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
           <input type="number" value={leadCount} onChange={e => setLeadCount(e.target.value)}
             placeholder="e.g. 500" className={inputCls} />
         </div>
+      </div>
+
+      {/* Working Copy Doc */}
+      <div>
+        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Working Copy Doc Link</label>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1">Link to the Google Doc where copy edits are tracked.</p>
+        <input type="url" value={copyDocUrl} onChange={e => setCopyDocUrl(e.target.value)}
+          placeholder="https://docs.google.com/document/d/..." className={inputCls} />
       </div>
 
       {/* Client Copy - Required */}

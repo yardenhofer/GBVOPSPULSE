@@ -129,6 +129,17 @@ export default function ApprovalCard({ item, isAdmin, user, onUpdated, client })
         )}
       </div>
 
+      {/* Working Copy Doc link */}
+      {item.copy_doc_url && (
+        <div className="flex items-center gap-1.5 text-xs">
+          <ExternalLink className="w-3 h-3 text-blue-500" />
+          <a href={item.copy_doc_url} target="_blank" rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-600 font-medium">
+            Working Copy Doc
+          </a>
+        </div>
+      )}
+
       {/* Client Copy */}
       {item.client_copy && (
         <details className="bg-orange-50/50 dark:bg-orange-500/5 border border-orange-200/30 dark:border-orange-500/10 rounded-lg">

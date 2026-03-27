@@ -1,0 +1,158 @@
+{
+  "name": "LeadListApproval",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "ID of the associated client"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Client name for quick reference"
+    },
+    "submitted_by": {
+      "type": "string",
+      "description": "Email of the AM who submitted"
+    },
+    "submitted_by_name": {
+      "type": "string"
+    },
+    "list_name": {
+      "type": "string",
+      "description": "Name/label for this lead list"
+    },
+    "list_type": {
+      "type": "string",
+      "enum": [
+        "file",
+        "link"
+      ],
+      "description": "Whether the list was uploaded as a file or provided as a link"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "URL of the uploaded CSV file"
+    },
+    "link_url": {
+      "type": "string",
+      "description": "External link to the lead list"
+    },
+    "client_copy": {
+      "type": "string",
+      "description": "Client outreach copy/email sequence submitted for review"
+    },
+    "copy_doc_url": {
+      "type": "string",
+      "description": "Google Doc link for the working copy document where edits are tracked"
+    },
+    "notes": {
+      "type": "string",
+      "description": "AM notes about this list"
+    },
+    "lead_count": {
+      "type": "number",
+      "description": "Approximate number of leads in the list"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pending",
+        "Approved",
+        "Denied",
+        "Pending Senior Review"
+      ],
+      "default": "Pending"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Email of admin who reviewed"
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "admin_feedback": {
+      "type": "string",
+      "description": "Feedback from admin on approval/denial"
+    },
+    "requires_senior_approval": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this is the first lead list for a client and needs senior sign-off"
+    },
+    "senior_approved_by": {
+      "type": "string",
+      "description": "Email of senior reviewer who gave final approval"
+    },
+    "senior_approved_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "senior_feedback": {
+      "type": "string",
+      "description": "Feedback from senior reviewer"
+    },
+    "ai_score": {
+      "type": "number",
+      "description": "AI quality score 1-100 for lead list"
+    },
+    "ai_summary": {
+      "type": "string",
+      "description": "AI analysis summary for lead list"
+    },
+    "ai_strengths": {
+      "type": "string",
+      "description": "Pipe-separated strengths identified by AI"
+    },
+    "ai_concerns": {
+      "type": "string",
+      "description": "Pipe-separated concerns identified by AI"
+    },
+    "ai_recommendation": {
+      "type": "string",
+      "enum": [
+        "Approve",
+        "Review Carefully",
+        "Deny"
+      ],
+      "description": "AI recommendation for lead list"
+    },
+    "ai_analyzed_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "copy_ai_score": {
+      "type": "number",
+      "description": "AI quality score 1-100 for client copy"
+    },
+    "copy_ai_summary": {
+      "type": "string",
+      "description": "AI analysis summary for copy"
+    },
+    "copy_ai_strengths": {
+      "type": "string",
+      "description": "Pipe-separated strengths for copy"
+    },
+    "copy_ai_concerns": {
+      "type": "string",
+      "description": "Pipe-separated concerns for copy"
+    },
+    "copy_ai_recommendation": {
+      "type": "string",
+      "enum": [
+        "Approve",
+        "Review Carefully",
+        "Deny"
+      ],
+      "description": "AI recommendation for copy"
+    }
+  },
+  "required": [
+    "client_id",
+    "client_name",
+    "submitted_by",
+    "list_name",
+    "list_type",
+    "status"
+  ]
+}
