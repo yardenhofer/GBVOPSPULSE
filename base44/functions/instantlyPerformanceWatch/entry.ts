@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     if (!webhookUrl) return Response.json({ error: 'SLACK_WEBHOOK_URL not set' }, { status: 500 });
 
     const rawClients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
-    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || rawClients?.results || []);
     const clientsWithKey = clients.filter(c => c.instantly_api_key);
 
     const opsAlertsUrl = Deno.env.get('SLACK_WEBHOOK_URL_OPS_ALERTS');

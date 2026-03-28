@@ -77,8 +77,9 @@ Deno.serve(async (req) => {
 
     // ── Trigger: scheduled scan (critical + no CRM update in 2 days) ────────
     if (trigger === 'scan' || !trigger) {
-      const rawClients = await base44.asServiceRole.entities.Client.list();
-      const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
+      let rawClients = await base44.asServiceRole.entities.Client.list();
+      if (typeof rawClients === 'string') try { rawClients = JSON.parse(rawClients); } catch(_) {}
+      const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || rawClients?.results || []);
       const alerts = [];
 
       for (const client of clients) {
@@ -125,8 +126,9 @@ Deno.serve(async (req) => {
 
     // ── Trigger: daily recap of all critical/escalated clients ───────────────
     if (trigger === 'daily_recap') {
-      const rawClients2 = await base44.asServiceRole.entities.Client.list();
-      const clients2 = Array.isArray(rawClients2) ? rawClients2 : (rawClients2?.items || rawClients2?.data || Object.values(rawClients2 || {}));
+      let rawClients2 = await base44.asServiceRole.entities.Client.list();
+      if (typeof rawClients2 === 'string') try { rawClients2 = JSON.parse(rawClients2); } catch(_) {}
+      const clients2 = Array.isArray(rawClients2) ? rawClients2 : (rawClients2?.items || rawClients2?.data || rawClients2?.results || []);
       const critical = clients2.filter(c => c.is_escalated || c.status === 'Critical');
 
       if (critical.length === 0) {

@@ -8,12 +8,39 @@ Deno.serve(async (req) => {
     try { body = await clonedReq.json(); } catch(_) { /* no body */ }
     const BATCH_SIZE = body.batch_size || 4;
 
-    // 1. Load clients + insights sequentially to avoid brotli decompression issues with large parallel responses
+    // Helper to safely unwrap SDK list responses
+    function unwrapList(raw) {
+      if (Array.isArray(raw)) return raw;
+      // SDK sometimes returns a JSON string — parse it
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+          if (parsed && typeof parsed === 'object') {
+            return parsed.items || parsed.data || parsed.results || [];
+          }
+        } catch (e) {
+          console.error("unwrapList: failed to parse string response", e.message);
+        }
+        return [];
+      }
+      if (raw && typeof raw === 'object') {
+        if (Array.isArray(raw.items)) return raw.items;
+        if (Array.isArray(raw.data)) return raw.data;
+        if (Array.isArray(raw.results)) return raw.results;
+      }
+      console.error("unwrapList: unexpected shape", typeof raw);
+      return [];
+    }
+
+    // 1. Load clients + insights sequentially to avoid brotli decompression issues
     const rawClients = await base44.asServiceRole.entities.Client.list("-updated_date", 200);
-    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
+    const clients = unwrapList(rawClients);
+    console.log(`Loaded ${clients.length} clients (raw type: ${Array.isArray(rawClients) ? 'array' : typeof rawClients})`);
     
     const rawInsights = await base44.asServiceRole.entities.SlackInsight.list("-analysis_date", 200);
-    const allInsights = Array.isArray(rawInsights) ? rawInsights : (rawInsights?.items || rawInsights?.data || Object.values(rawInsights || {}));
+    const allInsights = unwrapList(rawInsights);
+    console.log(`Loaded ${allInsights.length} insights (raw type: ${Array.isArray(rawInsights) ? 'array' : typeof rawInsights})`);
 
     const activeClients = clients.filter(c => c.status !== "Terminated" && c.status !== "Off-Boarding");
 
@@ -128,7 +155,7 @@ Deno.serve(async (req) => {
     let gbvEmails = new Set();
     try {
       const rawUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
-      const appUsers = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.items || rawUsers?.data || Object.values(rawUsers || {}));
+      const appUsers = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.items || rawUsers?.data || rawUsers?.results || []);
       for (const u of appUsers) {
         if (u.email) gbvEmails.add(u.email.toLowerCase());
       }

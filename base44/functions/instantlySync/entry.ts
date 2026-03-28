@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     }
 
     const rawClients = await base44.entities.Client.filter({ id: client_id });
-    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || rawClients?.results || []);
     const client = clients[0];
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
 

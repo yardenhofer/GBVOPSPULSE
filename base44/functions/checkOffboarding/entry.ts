@@ -7,7 +7,7 @@ Deno.serve(async (req) => {
   const rawOffboarding = await base44.asServiceRole.entities.Client.filter({
     status: 'Off-Boarding'
   });
-  const allOffboarding = Array.isArray(rawOffboarding) ? rawOffboarding : (rawOffboarding?.items || rawOffboarding?.data || Object.values(rawOffboarding || {}));
+  const allOffboarding = Array.isArray(rawOffboarding) ? rawOffboarding : (rawOffboarding?.items || rawOffboarding?.data || rawOffboarding?.results || []);
   
   const offboarding = allOffboarding.filter(c => !c.offboarding_confirmed);
 

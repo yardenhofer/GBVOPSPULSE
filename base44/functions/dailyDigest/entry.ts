@@ -15,8 +15,9 @@ Deno.serve(async (req) => {
       isScheduled = true;
     }
 
-    const rawClients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
-    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
+    let rawClients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
+    if (typeof rawClients === 'string') try { rawClients = JSON.parse(rawClients); } catch(_) {}
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || rawClients?.results || []);
     const today = new Date().toISOString().slice(0, 10);
 
     // Group clients by AM

@@ -15,8 +15,9 @@ Deno.serve(async (req) => {
     const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
     if (!webhookUrl) return Response.json({ error: 'SLACK_WEBHOOK_URL not set' }, { status: 500 });
 
-    const rawClients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
-    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
+    let rawClients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
+    if (typeof rawClients === 'string') try { rawClients = JSON.parse(rawClients); } catch(_) {}
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || rawClients?.results || []);
     const alerts = [];
 
     for (const client of clients) {
@@ -24,10 +25,11 @@ Deno.serve(async (req) => {
       if (!client.target_leads_per_week || client.target_leads_per_week <= 0) continue;
 
       // Fetch the most recent lead list for this client
-      const rawLeadLists = await base44.asServiceRole.entities.LeadList.filter(
+      let rawLeadLists = await base44.asServiceRole.entities.LeadList.filter(
         { client_id: client.id }, '-updated_date', 1
       );
-      const leadLists = Array.isArray(rawLeadLists) ? rawLeadLists : (rawLeadLists?.items || rawLeadLists?.data || Object.values(rawLeadLists || {}));
+      if (typeof rawLeadLists === 'string') try { rawLeadLists = JSON.parse(rawLeadLists); } catch(_) {}
+      const leadLists = Array.isArray(rawLeadLists) ? rawLeadLists : (rawLeadLists?.items || rawLeadLists?.data || rawLeadLists?.results || []);
       const latestList = leadLists[0];
       if (!latestList) continue;
 
