@@ -83,8 +83,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
-    const allClientsRaw = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
-    const allClients = Array.isArray(allClientsRaw) ? allClientsRaw : (allClientsRaw?.items || allClientsRaw?.data || []);
+    const allClients = await base44.asServiceRole.entities.Client.filter({}, '-updated_date', 200);
     const instantlyClients = allClients.filter(c => c.instantly_api_key && c.status !== 'Terminated');
 
     const results = [];
