@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 async function sendSlack(webhookUrl, { color, emoji, title, fields, footer }, extraWebhookUrl) {
   const payload = {
@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
 
     // ── Trigger: scheduled scan (critical + no CRM update in 2 days) ────────
     if (trigger === 'scan' || !trigger) {
-      const clients = await base44.asServiceRole.entities.Client.list();
+      const rawClients = await base44.asServiceRole.entities.Client.list();
+      const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
       const alerts = [];
 
       for (const client of clients) {
@@ -124,8 +125,9 @@ Deno.serve(async (req) => {
 
     // ── Trigger: daily recap of all critical/escalated clients ───────────────
     if (trigger === 'daily_recap') {
-      const clients = await base44.asServiceRole.entities.Client.list();
-      const critical = clients.filter(c => c.is_escalated || c.status === 'Critical');
+      const rawClients2 = await base44.asServiceRole.entities.Client.list();
+      const clients2 = Array.isArray(rawClients2) ? rawClients2 : (rawClients2?.items || rawClients2?.data || Object.values(rawClients2 || {}));
+      const critical = clients2.filter(c => c.is_escalated || c.status === 'Critical');
 
       if (critical.length === 0) {
         await fetch(opsAlertsUrl, {
