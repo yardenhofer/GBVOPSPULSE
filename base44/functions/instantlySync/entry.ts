@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 const INSTANTLY_API = 'https://api.instantly.ai/api/v2';
 
@@ -81,7 +81,8 @@ Deno.serve(async (req) => {
       startDate = d.toISOString().split('T')[0];
     }
 
-    const clients = await base44.entities.Client.filter({ id: client_id });
+    const rawClients = await base44.entities.Client.filter({ id: client_id });
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
     const client = clients[0];
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
 

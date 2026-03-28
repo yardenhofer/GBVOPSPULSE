@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
   try {
@@ -19,7 +19,8 @@ Deno.serve(async (req) => {
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
     const { accessToken } = connection;
 
-    let channelId = (settings.length > 0 && settings[0].value) ? settings[0].value : null;
+    const settingsArr = Array.isArray(settings) ? settings : (settings?.items || settings?.data || Object.values(settings || {}));
+    let channelId = (settingsArr.length > 0 && settingsArr[0].value) ? settingsArr[0].value : null;
 
     if (!channelId) {
       // Small page size to stay under CPU limits

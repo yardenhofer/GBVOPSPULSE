@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
   try {
@@ -10,7 +10,8 @@ Deno.serve(async (req) => {
     }
 
     // Get the main admin email from AppSettings
-    const settings = await base44.asServiceRole.entities.AppSettings.filter({ key: "lead_list_main_admin" });
+    const rawSettings = await base44.asServiceRole.entities.AppSettings.filter({ key: "lead_list_main_admin" });
+    const settings = Array.isArray(rawSettings) ? rawSettings : (rawSettings?.items || rawSettings?.data || Object.values(rawSettings || {}));
     const mainAdminEmail = settings.length > 0 ? settings[0].value : null;
 
     if (!mainAdminEmail) {

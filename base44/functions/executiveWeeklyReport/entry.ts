@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
   try {
@@ -7,7 +7,8 @@ Deno.serve(async (req) => {
     const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
     if (!webhookUrl) return Response.json({ error: 'SLACK_WEBHOOK_URL not set' }, { status: 500 });
 
-    const clients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
+    const rawClients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const totalRevenue = clients.reduce((sum, c) => sum + (c.revenue || 0), 0);

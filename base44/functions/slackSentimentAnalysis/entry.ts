@@ -61,9 +61,11 @@ Deno.serve(async (req) => {
   // 2. Get clients — single or all
   let clients;
   if (singleClientId) {
-    clients = await base44.asServiceRole.entities.Client.filter({ id: singleClientId }, "-updated_date", 1);
+    const rawFiltered = await base44.asServiceRole.entities.Client.filter({ id: singleClientId }, "-updated_date", 1);
+    clients = Array.isArray(rawFiltered) ? rawFiltered : (rawFiltered?.items || rawFiltered?.data || Object.values(rawFiltered || {}));
   } else {
-    clients = await base44.asServiceRole.entities.Client.list("-updated_date", 200);
+    const rawAll = await base44.asServiceRole.entities.Client.list("-updated_date", 200);
+    clients = Array.isArray(rawAll) ? rawAll : (rawAll?.items || rawAll?.data || Object.values(rawAll || {}));
   }
 
   // Wait after channel listing to let Slack rate limits recover before fetching history
@@ -177,7 +179,8 @@ Deno.serve(async (req) => {
     // Fetch all app users (GBV team) to identify staff
     let gbvEmails = new Set();
     try {
-      const appUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
+      const rawUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
+      const appUsers = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.items || rawUsers?.data || Object.values(rawUsers || {}));
       for (const u of appUsers) {
         if (u.email) gbvEmails.add(u.email.toLowerCase());
       }

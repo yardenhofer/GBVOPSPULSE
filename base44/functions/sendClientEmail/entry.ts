@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 const TEMPLATES = {
   weekly_update: (client, amName) => ({
@@ -54,7 +54,8 @@ Deno.serve(async (req) => {
 
     const { client_id, template, to_email, custom_subject, custom_body } = await req.json();
 
-    const clients = await base44.entities.Client.filter({ id: client_id }, '-updated_date', 1);
+    const rawClients = await base44.entities.Client.filter({ id: client_id }, '-updated_date', 1);
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
     const client = clients[0];
     if (!client) return Response.json({ error: 'Client not found' }, { status: 404 });
 

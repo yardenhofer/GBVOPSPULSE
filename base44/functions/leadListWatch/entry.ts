@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 async function sendSlack(webhookUrl, payload) {
   await fetch(webhookUrl, {
@@ -15,7 +15,8 @@ Deno.serve(async (req) => {
     const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
     if (!webhookUrl) return Response.json({ error: 'SLACK_WEBHOOK_URL not set' }, { status: 500 });
 
-    const clients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
+    const rawClients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
     const alerts = [];
 
     for (const client of clients) {
@@ -23,9 +24,10 @@ Deno.serve(async (req) => {
       if (!client.target_leads_per_week || client.target_leads_per_week <= 0) continue;
 
       // Fetch the most recent lead list for this client
-      const leadLists = await base44.asServiceRole.entities.LeadList.filter(
+      const rawLeadLists = await base44.asServiceRole.entities.LeadList.filter(
         { client_id: client.id }, '-updated_date', 1
       );
+      const leadLists = Array.isArray(rawLeadLists) ? rawLeadLists : (rawLeadLists?.items || rawLeadLists?.data || Object.values(rawLeadLists || {}));
       const latestList = leadLists[0];
       if (!latestList) continue;
 

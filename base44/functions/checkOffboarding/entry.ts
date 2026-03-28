@@ -1,12 +1,13 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
   // Get all Off-Boarding clients (filter confirmed ones in code since field may be null)
-  const allOffboarding = await base44.asServiceRole.entities.Client.filter({
+  const rawOffboarding = await base44.asServiceRole.entities.Client.filter({
     status: 'Off-Boarding'
   });
+  const allOffboarding = Array.isArray(rawOffboarding) ? rawOffboarding : (rawOffboarding?.items || rawOffboarding?.data || Object.values(rawOffboarding || {}));
   
   const offboarding = allOffboarding.filter(c => !c.offboarding_confirmed);
 

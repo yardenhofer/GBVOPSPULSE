@@ -2,17 +2,18 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
   try {
+    const clonedReq = req.clone();
     const base44 = createClientFromRequest(req);
-
     let body = {};
-    try { body = await req.clone().json(); } catch(e) { /* no body */ }
+    try { body = await clonedReq.json(); } catch(_) { /* no body */ }
     const BATCH_SIZE = body.batch_size || 4;
 
-    // 1. Load clients + insights in parallel
-    const [clients, allInsights] = await Promise.all([
-      base44.asServiceRole.entities.Client.list("-updated_date", 200),
-      base44.asServiceRole.entities.SlackInsight.list("-analysis_date", 500),
-    ]);
+    // 1. Load clients + insights sequentially to avoid brotli decompression issues with large parallel responses
+    const rawClients = await base44.asServiceRole.entities.Client.list("-updated_date", 200);
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
+    
+    const rawInsights = await base44.asServiceRole.entities.SlackInsight.list("-analysis_date", 200);
+    const allInsights = Array.isArray(rawInsights) ? rawInsights : (rawInsights?.items || rawInsights?.data || Object.values(rawInsights || {}));
 
     const activeClients = clients.filter(c => c.status !== "Terminated" && c.status !== "Off-Boarding");
 
@@ -24,10 +25,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Determine today's date boundary (midnight UTC)
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Separate clients into: not-yet-analyzed-today vs already-done-today
     const needsRefresh = [];
     const alreadyDoneToday = [];
     for (const c of activeClients) {
@@ -41,7 +40,6 @@ Deno.serve(async (req) => {
 
     console.log(`Clients: ${activeClients.length} active, ${needsRefresh.length} need refresh today, ${alreadyDoneToday.length} already done today`);
 
-    // If all clients are already done today, nothing to do
     if (needsRefresh.length === 0) {
       return Response.json({
         success: true,
@@ -61,7 +59,7 @@ Deno.serve(async (req) => {
         const data = await resp.json();
         if (data.ok) return data;
         if (data.error === 'ratelimited') {
-          const wait = (attempt + 1) * 5; // 5s, 10s, 15s — max 30s total
+          const wait = (attempt + 1) * 5;
           console.log(`Rate limited (attempt ${attempt + 1}/3), waiting ${wait}s...`);
           await new Promise(r => setTimeout(r, wait * 1000));
           continue;
@@ -71,25 +69,20 @@ Deno.serve(async (req) => {
       return { ok: false, error: 'ratelimited_after_retries' };
     }
 
-    // Prioritize clients with cached slack_channel_id (no channel list fetch needed).
-    // Only fetch the full channel list if we still have batch slots AND there are unmatched clients.
     const clientsWithCachedId = needsRefresh.filter(c => c.slack_channel_id);
     const clientsNeedingMatch = needsRefresh.filter(c => !c.slack_channel_id && (c.slack_channel_name || c.name));
 
-    // 3. Build eligible list — start with cached-ID clients (cheapest)
     const matchable = [];
     for (const c of clientsWithCachedId) {
       matchable.push({ client: c, channel: { id: c.slack_channel_id, name: c.slack_channel_name || c.name } });
     }
 
-    // Sort cached clients by oldest insight first
     matchable.sort((a, b) => {
       const aDate = latestInsightByClient[a.client.id] || "1970-01-01";
       const bDate = latestInsightByClient[b.client.id] || "1970-01-01";
       return aDate.localeCompare(bDate);
     });
 
-    // Only fetch channel list if we need more clients to fill the batch
     if (matchable.length < BATCH_SIZE && clientsNeedingMatch.length > 0) {
       let allChannels = [];
       let cursor = "";
@@ -129,13 +122,13 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, message: "No matchable clients to analyze", processed: 0 });
     }
 
-    // Pause after channel listing to let rate limits recover
     await new Promise(r => setTimeout(r, 8000));
 
     // 4. Fetch GBV staff emails once
     let gbvEmails = new Set();
     try {
-      const appUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
+      const rawUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
+      const appUsers = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.items || rawUsers?.data || Object.values(rawUsers || {}));
       for (const u of appUsers) {
         if (u.email) gbvEmails.add(u.email.toLowerCase());
       }
@@ -143,14 +136,13 @@ Deno.serve(async (req) => {
       console.error("Could not fetch app users:", e.message);
     }
 
-    // Global user cache across all clients in this batch
     const globalUserMap = {};
     const globalUserIsGbv = {};
 
     const results = [];
     const errors = [];
     const startTime = Date.now();
-    const MAX_RUNTIME_MS = 140000; // ~2.3 min safety margin (function timeout is 180s)
+    const MAX_RUNTIME_MS = 140000;
 
     for (const { client, channel } of eligible) {
       if (Date.now() - startTime > MAX_RUNTIME_MS) {
@@ -159,14 +151,12 @@ Deno.serve(async (req) => {
       }
 
       try {
-        console.log(`[ANALYZE] ${client.name} → #${channel.name}`);
+        console.log(`[ANALYZE] ${client.name} -> #${channel.name}`);
 
-        // Save channel ID if needed
         if (client.slack_channel_id !== channel.id) {
           await base44.asServiceRole.entities.Client.update(client.id, { slack_channel_id: channel.id });
         }
 
-        // Fetch messages (last 30 days)
         const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
         let allMessages = [];
         let histCursor = "";
@@ -183,14 +173,12 @@ Deno.serve(async (req) => {
           histCursor = histData.response_metadata?.next_cursor || "";
         } while (histCursor);
 
-        // If history fetch failed entirely, skip this client — don't analyze with partial data
         if (historyFailed && allMessages.length === 0) {
           console.error(`Skipping ${client.name}: could not fetch any history (rate limited)`);
           errors.push({ client: client.name, error: 'Could not fetch history (rate limited)' });
           continue;
         }
 
-        // Fetch thread replies for any threaded messages
         const threadParents = allMessages.filter(m => m.reply_count && m.reply_count > 0 && m.ts);
         for (const parent of threadParents) {
           const repliesData = await slackFetch(
@@ -202,7 +190,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Deduplicate and filter
         const seenTs = new Set();
         const messages = allMessages
           .filter(m => {
@@ -217,7 +204,6 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Resolve users (cached globally)
         const uniqueUsers = [...new Set(messages.map(m => m.user).filter(Boolean))];
         for (const uid of uniqueUsers) {
           if (globalUserMap[uid] !== undefined) continue;
@@ -232,7 +218,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Compute touchpoint dates
         let lastGbvDate = null;
         let lastClientDate = null;
         for (const m of messages) {
@@ -258,7 +243,6 @@ Deno.serve(async (req) => {
 
         console.log(`#${channel.name}: ${messages.length} msgs, sending ${Math.min(messages.length, 100)} to LLM`);
 
-        // LLM analysis
         const analysis = await base44.asServiceRole.integrations.Core.InvokeLLM({
           prompt: `You are an AI analyst for a B2B lead generation agency called GBV. Analyze the following Slack messages from a client channel for "${client.name}".
 
@@ -270,8 +254,7 @@ CLIENT CONTEXT:
 
 IMPORTANT: Messages are labeled [GBV STAFF] or [CLIENT]. ${gbvNames.length > 0 ? `Known GBV team members: ${gbvNames.join(', ')}.` : ''} Focus sentiment analysis on CLIENT messages, not agency updates.
 
-CRITICAL — RECENCY-WEIGHTED SENTIMENT:
-Base sentiment on the client's MOST RECENT messages. Later messages override earlier ones. If no client activity for 14+ days, note silence in risk_signals but base sentiment on last client messages.
+CRITICAL: Base sentiment on the client's MOST RECENT messages. Later messages override earlier ones. If no client activity for 14+ days, note silence in risk_signals but base sentiment on last client messages.
 
 RISK KEYWORDS TO WATCH: cancellation, cancel, not renewing, not working, disappointed, frustrated, waste of money, pausing, competitor, alternative, reconsidering. If these appear in recent client messages, sentiment MUST be "Unhappy" or "Slightly Concerned".
 
@@ -299,7 +282,6 @@ ${messageText}`,
           }
         });
 
-        // Save insight
         await base44.asServiceRole.entities.SlackInsight.create({
           client_id: client.id,
           client_name: client.name,
@@ -314,7 +296,6 @@ ${messageText}`,
           analysis_date: new Date().toISOString()
         });
 
-        // Update client
         const updateData = {};
         if (analysis.sentiment && analysis.sentiment !== client.client_sentiment) {
           updateData.client_sentiment = analysis.sentiment;
@@ -327,7 +308,6 @@ ${messageText}`,
             updateData.unhappy_since = null;
           }
         }
-        // Only update touchpoint dates if newer than existing (don't overwrite with stale data from incomplete fetches)
         if (lastGbvDate && (!client.last_am_touchpoint || lastGbvDate > client.last_am_touchpoint)) {
           updateData.last_am_touchpoint = lastGbvDate;
         }
@@ -348,7 +328,6 @@ ${messageText}`,
         errors.push({ client: client.name, error: errMsg });
       }
 
-      // Delay between clients to let Slack rate limits recover
       await new Promise(r => setTimeout(r, 8000));
     }
 

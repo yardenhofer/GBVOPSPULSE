@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 const INSTANTLY_API = 'https://api.instantly.ai/api/v2';
 
@@ -39,7 +39,8 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const clients = await base44.entities.Client.filter({});
+    const rawClients = await base44.entities.Client.filter({});
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
     const clientsWithKey = clients.filter(c => c.instantly_api_key);
 
     const results = [];
