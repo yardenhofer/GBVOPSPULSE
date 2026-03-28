@@ -1,13 +1,20 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 const INSTANTLY_API = 'https://api.instantly.ai/api/v2';
 
 async function fetchInstantly(path, apiKey) {
-  const res = await fetch(`${INSTANTLY_API}${path}`, {
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) throw new Error(`Instantly API error ${res.status}: ${await res.text()}`);
-  return res.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(`${INSTANTLY_API}${path}`, {
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Instantly API error ${res.status}: ${await res.text()}`);
+    return res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function sendSlack(webhookUrl, payload) {
@@ -25,7 +32,8 @@ Deno.serve(async (req) => {
     const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
     if (!webhookUrl) return Response.json({ error: 'SLACK_WEBHOOK_URL not set' }, { status: 500 });
 
-    const clients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
+    const rawClients = await base44.asServiceRole.entities.Client.list('-updated_date', 200);
+    const clients = Array.isArray(rawClients) ? rawClients : (rawClients?.items || rawClients?.data || Object.values(rawClients || {}));
     const clientsWithKey = clients.filter(c => c.instantly_api_key);
 
     const opsAlertsUrl = Deno.env.get('SLACK_WEBHOOK_URL_OPS_ALERTS');
