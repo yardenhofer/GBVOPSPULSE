@@ -31,7 +31,7 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
   return (
     <div
       onClick={onClick}
-      className={`relative rounded-xl border cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10
+      className={`relative rounded-xl border cursor-pointer transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10
         ${client.status === "Terminated"
           ? "bg-red-500/5 dark:bg-red-500/10 border-red-500/30 dark:border-red-500/30 hover:border-red-400/50"
           : `bg-white dark:bg-gray-900 hover:border-blue-400/50 ${isOwn ? "border-blue-400/40 dark:border-blue-500/30 ring-1 ring-blue-400/20" : "border-gray-200 dark:border-gray-800"}`
