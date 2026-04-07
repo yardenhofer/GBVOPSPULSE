@@ -3,15 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import { format } from "date-fns";
-import { ClipboardCheck, ExternalLink, ChevronDown, Save, Check } from "lucide-react";
-
-const TASKS = [
-  { key: "reviewed_lead_performance", label: "Reviewed lead performance" },
-  { key: "checked_lead_list_status", label: "Checked lead list status" },
-  { key: "confirmed_no_issues", label: "Confirmed no client issues" },
-  { key: "logged_touchpoint", label: "Logged touchpoint (if applicable)" },
-  { key: "updated_sentiment", label: "Updated sentiment" },
-];
+import { ClipboardCheck, ExternalLink, ChevronDown, Save, Check, Star } from "lucide-react";
 
 export default function DailyCheckIn() {
   const [myClients, setMyClients] = useState([]);
@@ -22,19 +14,12 @@ export default function DailyCheckIn() {
   const navigate = useNavigate();
   const today = format(new Date(), "yyyy-MM-dd");
 
-  // Form state for selected client
   const [form, setForm] = useState({
-    emails_sent: "",
-    linkedin_messages_sent: "",
     inmails_sent: "",
-    positive_responses: "",
-  });
-  const [checks, setChecks] = useState({
-    reviewed_lead_performance: false,
-    checked_lead_list_status: false,
-    confirmed_no_issues: false,
-    logged_touchpoint: false,
-    updated_sentiment: false,
+    emails_sent: "",
+    leads_generated: "",
+    satisfaction_rate: "",
+    notes: "",
   });
   const [checkInId, setCheckInId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -49,7 +34,7 @@ export default function DailyCheckIn() {
         base44.entities.Client.list("-name", 200),
         base44.entities.DailyCheckIn.filter({ am_email: u.email, date: today }),
       ]);
-      const mine = allClients.filter(c => c.assigned_am === u.email);
+      const mine = allClients.filter(c => c.assigned_am === u.email && c.status !== "Terminated");
       setMyClients(mine);
       setCheckIns(ci);
       if (mine.length > 0) setSelectedClientId(mine[0].id);
@@ -58,62 +43,46 @@ export default function DailyCheckIn() {
     load();
   }, []);
 
-  // When selected client changes, load its check-in data
   useEffect(() => {
     if (!selectedClientId) return;
     const existing = checkIns.find(c => c.client_id === selectedClientId);
     if (existing) {
       setForm({
-        emails_sent: existing.emails_sent ?? "",
-        linkedin_messages_sent: existing.linkedin_messages_sent ?? "",
         inmails_sent: existing.inmails_sent ?? "",
-        positive_responses: existing.positive_responses ?? "",
-      });
-      setChecks({
-        reviewed_lead_performance: existing.reviewed_lead_performance || false,
-        checked_lead_list_status: existing.checked_lead_list_status || false,
-        confirmed_no_issues: existing.confirmed_no_issues || false,
-        logged_touchpoint: existing.logged_touchpoint || false,
-        updated_sentiment: existing.updated_sentiment || false,
+        emails_sent: existing.emails_sent ?? "",
+        leads_generated: existing.leads_generated ?? "",
+        satisfaction_rate: existing.satisfaction_rate ?? "",
+        notes: existing.notes ?? "",
       });
       setCheckInId(existing.id);
     } else {
-      setForm({ emails_sent: "", linkedin_messages_sent: "", inmails_sent: "", positive_responses: "" });
-      setChecks({
-        reviewed_lead_performance: false,
-        checked_lead_list_status: false,
-        confirmed_no_issues: false,
-        logged_touchpoint: false,
-        updated_sentiment: false,
-      });
+      setForm({ inmails_sent: "", emails_sent: "", leads_generated: "", satisfaction_rate: "", notes: "" });
       setCheckInId(null);
     }
     setSaved(false);
   }, [selectedClientId, checkIns]);
 
   const selectedClient = myClients.find(c => c.id === selectedClientId);
-  const isHybrid = selectedClient?.package_type === "Hybrid";
-  const isLinkedIn = selectedClient?.package_type === "LinkedIn";
-  const showLinkedIn = isHybrid || isLinkedIn;
 
   async function handleSave() {
     if (!selectedClientId || !user) return;
     setSaving(true);
-    const allDone = Object.values(checks).every(Boolean);
     const payload = {
       client_id: selectedClientId,
+      client_name: selectedClient?.name || "",
       am_email: user.email,
       date: today,
+      inmails_sent: form.inmails_sent !== "" ? Number(form.inmails_sent) : 0,
       emails_sent: form.emails_sent !== "" ? Number(form.emails_sent) : 0,
-      linkedin_messages_sent: showLinkedIn && form.linkedin_messages_sent !== "" ? Number(form.linkedin_messages_sent) : 0,
-      inmails_sent: showLinkedIn && form.inmails_sent !== "" ? Number(form.inmails_sent) : 0,
-      positive_responses: form.positive_responses !== "" ? Number(form.positive_responses) : 0,
-      ...checks,
-      completed: allDone,
+      leads_generated: form.leads_generated !== "" ? Number(form.leads_generated) : 0,
+      satisfaction_rate: form.satisfaction_rate !== "" ? Number(form.satisfaction_rate) : null,
+      notes: form.notes || "",
+      completed: true,
     };
 
     if (checkInId) {
       await base44.entities.DailyCheckIn.update(checkInId, payload);
+      setCheckIns(prev => prev.map(c => c.id === checkInId ? { ...c, ...payload } : c));
     } else {
       const created = await base44.entities.DailyCheckIn.create(payload);
       setCheckInId(created.id);
@@ -123,7 +92,7 @@ export default function DailyCheckIn() {
       user_email: user.email,
       user_name: user.full_name || user.email,
       action: "daily_checkin",
-      detail: `Submitted daily check-in${allDone ? " (completed)" : " (partial)"}`,
+      detail: `Daily check-in for ${selectedClient?.name || "client"}`,
       client_name: selectedClient?.name || "",
     });
     setSaving(false);
@@ -131,16 +100,41 @@ export default function DailyCheckIn() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  function toggleCheck(key) {
-    setChecks(prev => ({ ...prev, [key]: !prev[key] }));
-    setSaved(false);
-  }
-
-  const completed = checkIns.filter(c => c.completed).length;
+  const completedCount = checkIns.filter(c => c.completed).length;
   const total = myClients.length;
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
 
-  const inputCls = "w-full text-sm px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputCls = "w-full text-sm px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+  // Satisfaction rating component
+  const SatisfactionPicker = () => {
+    const rating = form.satisfaction_rate !== "" ? Number(form.satisfaction_rate) : 0;
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => { setForm(f => ({ ...f, satisfaction_rate: n })); setSaved(false); }}
+            className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all ${
+              n <= rating
+                ? n <= 3 ? "bg-red-500 text-white" : n <= 6 ? "bg-yellow-500 text-white" : "bg-green-500 text-white"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  // Client status badges in selector
+  const getStatusDot = (clientId) => {
+    const ci = checkIns.find(c => c.client_id === clientId);
+    if (ci?.completed) return "bg-green-500";
+    return "bg-gray-300 dark:bg-gray-600";
+  };
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -151,7 +145,7 @@ export default function DailyCheckIn() {
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{pct}%</p>
-          <p className="text-xs text-gray-500">{completed}/{total} clients done</p>
+          <p className="text-xs text-gray-500">{completedCount}/{total} clients done</p>
         </div>
       </div>
 
@@ -179,35 +173,59 @@ export default function DailyCheckIn() {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-5">
-          {/* Client Selector + Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Client</label>
-              <div className="relative">
-                <select
-                  value={selectedClientId}
-                  onChange={e => setSelectedClientId(e.target.value)}
-                  className="appearance-none w-full text-sm pl-3 pr-8 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  {myClients.map(c => (
+          {/* Client Selector */}
+          <div>
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">Account / Client</label>
+            <div className="relative">
+              <select
+                value={selectedClientId}
+                onChange={e => setSelectedClientId(e.target.value)}
+                className="appearance-none w-full text-sm pl-3 pr-8 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                {myClients.map(c => {
+                  const done = checkIns.find(ci => ci.client_id === c.id)?.completed;
+                  return (
                     <option key={c.id} value={c.id}>
-                      {c.name} {c.group ? `(G${c.group})` : ""} — {c.package_type || "No pkg"}
+                      {done ? "✅ " : "⬜ "}{c.name} {c.group ? `(G${c.group})` : ""} — {c.package_type || "No pkg"}
                     </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Date</label>
-              <input type="date" value={today} readOnly className={inputCls + " opacity-70 cursor-not-allowed"} />
+                  );
+                })}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             </div>
           </div>
 
-          {/* Metrics */}
+          {selectedClient && (
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{selectedClient.name}</p>
+                <p className="text-xs text-gray-500">{selectedClient.package_type || "No package"} · Group {selectedClient.group || "—"}</p>
+              </div>
+              <button
+                onClick={() => navigate(createPageUrl(`ClientDetail?id=${selectedClientId}`))}
+                className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-400 transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />
+                View
+              </button>
+            </div>
+          )}
+
+          {/* Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Emails Sent</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">InMails Sent</label>
+              <input
+                type="number"
+                min="0"
+                className={inputCls}
+                placeholder="0"
+                value={form.inmails_sent}
+                onChange={e => { setForm(f => ({ ...f, inmails_sent: e.target.value })); setSaved(false); }}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">Emails Sent</label>
               <input
                 type="number"
                 min="0"
@@ -217,84 +235,53 @@ export default function DailyCheckIn() {
                 onChange={e => { setForm(f => ({ ...f, emails_sent: e.target.value })); setSaved(false); }}
               />
             </div>
-            {showLinkedIn && (
-              <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">LinkedIn Messages Sent</label>
-                <input
-                  type="number"
-                  min="0"
-                  className={inputCls}
-                  placeholder="0"
-                  value={form.linkedin_messages_sent}
-                  onChange={e => { setForm(f => ({ ...f, linkedin_messages_sent: e.target.value })); setSaved(false); }}
-                />
-              </div>
-            )}
-            {showLinkedIn && (
-              <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">InMails Sent</label>
-                <input
-                  type="number"
-                  min="0"
-                  className={inputCls}
-                  placeholder="0"
-                  value={form.inmails_sent}
-                  onChange={e => { setForm(f => ({ ...f, inmails_sent: e.target.value })); setSaved(false); }}
-                />
-              </div>
-            )}
             <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Positive Responses (Email)</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">Leads Generated</label>
               <input
                 type="number"
                 min="0"
                 className={inputCls}
                 placeholder="0"
-                value={form.positive_responses}
-                onChange={e => { setForm(f => ({ ...f, positive_responses: e.target.value })); setSaved(false); }}
+                value={form.leads_generated}
+                onChange={e => { setForm(f => ({ ...f, leads_generated: e.target.value })); setSaved(false); }}
               />
             </div>
           </div>
 
-          {/* Checklist */}
+          {/* Satisfaction Rate */}
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Checklist</p>
-            <div className="space-y-1.5">
-              {TASKS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => toggleCheck(key)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-sm
-                    ${checks[key]
-                      ? "bg-green-500/10 text-green-400"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                    }`}
-                >
-                  {checks[key]
-                    ? <Check className="w-4 h-4 shrink-0" />
-                    : <div className="w-4 h-4 shrink-0 rounded-full border border-gray-300 dark:border-gray-600" />
-                  }
-                  {label}
-                </button>
-              ))}
-            </div>
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-2">
+              Satisfaction Rate
+              {form.satisfaction_rate !== "" && (
+                <span className={`ml-2 font-semibold ${
+                  Number(form.satisfaction_rate) <= 3 ? "text-red-500" : Number(form.satisfaction_rate) <= 6 ? "text-yellow-500" : "text-green-500"
+                }`}>
+                  {form.satisfaction_rate}/10
+                </span>
+              )}
+            </label>
+            <SatisfactionPicker />
           </div>
 
-          {/* Save + Navigate */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
-            <button
-              onClick={() => navigate(createPageUrl(`ClientDetail?id=${selectedClientId}`))}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-400 transition-colors"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              View Client
-            </button>
+          {/* Notes */}
+          <div>
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">Notes</label>
+            <textarea
+              className={inputCls + " h-24 resize-none"}
+              placeholder="Any updates, blockers, or context for this client today..."
+              value={form.notes}
+              onChange={e => { setForm(f => ({ ...f, notes: e.target.value })); setSaved(false); }}
+            />
+          </div>
+
+          {/* Save */}
+          <div className="flex items-center justify-end pt-3 border-t border-gray-100 dark:border-gray-800">
             <div className="flex items-center gap-2">
-              {saved && <span className="text-xs text-green-400">Saved ✓</span>}
+              {saved && <span className="text-xs text-green-400 font-medium">Saved ✓</span>}
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50"
               >
                 <Save className="w-3.5 h-3.5" />
                 {saving ? "Saving…" : "Save Check-In"}

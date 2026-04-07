@@ -1,0 +1,82 @@
+{
+  "name": "DailyCheckIn",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Client company name for quick reference"
+    },
+    "am_email": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "inmails_sent": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of InMails sent"
+    },
+    "emails_sent": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of emails sent"
+    },
+    "leads_generated": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of leads generated"
+    },
+    "satisfaction_rate": {
+      "type": "number",
+      "description": "Client satisfaction rate (1-10)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes or comments"
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false
+    },
+    "linkedin_messages_sent": {
+      "type": "number",
+      "default": 0,
+      "description": "Legacy - LinkedIn messages sent"
+    },
+    "positive_responses": {
+      "type": "number",
+      "default": 0,
+      "description": "Legacy - positive email responses"
+    },
+    "reviewed_lead_performance": {
+      "type": "boolean",
+      "default": false
+    },
+    "checked_lead_list_status": {
+      "type": "boolean",
+      "default": false
+    },
+    "confirmed_no_issues": {
+      "type": "boolean",
+      "default": false
+    },
+    "logged_touchpoint": {
+      "type": "boolean",
+      "default": false
+    },
+    "updated_sentiment": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "client_id",
+    "am_email",
+    "date"
+  ]
+}
