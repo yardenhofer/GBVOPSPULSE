@@ -263,12 +263,36 @@ export default function DailyCheckIn() {
             <SatisfactionPicker />
           </div>
 
+          {/* KPI Status */}
+          {(() => {
+            const leadsThisWeek = (selectedClient?.leads_this_week || 0) + (form.leads_generated !== "" ? Number(form.leads_generated) : 0);
+            const kpiMin = selectedClient?.target_leads_per_week || 5;
+            const belowKpi = leadsThisWeek < kpiMin;
+            return (
+              <div className={`rounded-lg p-3 border ${belowKpi ? "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30" : "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-lg ${belowKpi ? "" : ""}`}>{belowKpi ? "🔴" : "🟢"}</span>
+                    <span className={`text-sm font-semibold ${belowKpi ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                      {belowKpi ? "Below KPI" : "Above KPI"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {leadsThisWeek} / {kpiMin} leads this week
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Notes */}
           <div>
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">Notes</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">
+              Notes / Reason for Being Below KPI
+            </label>
             <textarea
               className={inputCls + " h-24 resize-none"}
-              placeholder="Any updates, blockers, or context for this client today..."
+              placeholder="If below KPI, explain why. Any blockers, updates, or context..."
               value={form.notes}
               onChange={e => { setForm(f => ({ ...f, notes: e.target.value })); setSaved(false); }}
             />
