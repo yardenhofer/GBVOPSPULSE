@@ -1,15 +1,12 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { format, subDays } from "date-fns";
-import { ClipboardList, ChevronDown, Check, X, Mail, MessageSquare, Send, ThumbsUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { ClipboardList, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Table } from "lucide-react";
 
-const CHECKLIST_KEYS = [
-  { key: "reviewed_lead_performance", short: "Leads" },
-  { key: "checked_lead_list_status", short: "List" },
-  { key: "confirmed_no_issues", short: "Issues" },
-  { key: "logged_touchpoint", short: "Touch" },
-  { key: "updated_sentiment", short: "Sent." },
-];
+import OpsMetricCards from "../components/dailyentries/OpsMetricCards";
+import KpiAlertsBanner from "../components/dailyentries/KpiAlertsBanner";
+import AmPerformanceGrid from "../components/dailyentries/AmPerformanceGrid";
+import ClientEntryCards from "../components/dailyentries/ClientEntryCards";
 
 export default function DailyEntries() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -18,6 +15,7 @@ export default function DailyEntries() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterAm, setFilterAm] = useState("all");
+  const [viewFilter, setViewFilter] = useState("all"); // all | missing | below_kpi | low_sat
 
   useEffect(() => {
     Promise.all([
@@ -43,47 +41,53 @@ export default function DailyEntries() {
   const userMap = {};
   users.forEach(u => { userMap[u.email] = u.full_name || u.email; });
 
-  // Get unique AMs who have clients
   const amEmails = [...new Set(clients.map(c => c.assigned_am).filter(Boolean))];
 
-  // Build rows: all clients with assigned AMs, merged with check-in data
   const rows = clients
-    .filter(c => c.assigned_am)
+    .filter(c => c.assigned_am && c.status !== "Terminated")
     .filter(c => filterAm === "all" || c.assigned_am === filterAm)
     .map(c => {
       const ci = checkIns.find(x => x.client_id === c.id);
       return { client: c, checkIn: ci || null };
     })
     .sort((a, b) => {
-      // Sort: incomplete first, then by AM, then client name
-      const aComplete = a.checkIn?.completed ? 1 : 0;
-      const bComplete = b.checkIn?.completed ? 1 : 0;
-      if (aComplete !== bComplete) return aComplete - bComplete;
-      if (a.client.assigned_am !== b.client.assigned_am) return (a.client.assigned_am || "").localeCompare(b.client.assigned_am || "");
+      // Missing first, then below KPI, then by name
+      if (!a.checkIn && b.checkIn) return -1;
+      if (a.checkIn && !b.checkIn) return 1;
+      const aTarget = a.client.target_leads_per_week || 5;
+      const bTarget = b.client.target_leads_per_week || 5;
+      const aLeads = (a.client.leads_this_week || 0) + (a.checkIn?.leads_generated || 0);
+      const bLeads = (b.client.leads_this_week || 0) + (b.checkIn?.leads_generated || 0);
+      const aPct = aLeads / aTarget;
+      const bPct = bLeads / bTarget;
+      if (aPct !== bPct) return aPct - bPct;
       return a.client.name.localeCompare(b.client.name);
     });
-
-  const totalClients = rows.length;
-  const completedCount = rows.filter(r => r.checkIn?.completed).length;
-  const submittedCount = rows.filter(r => r.checkIn).length;
-  const pct = totalClients > 0 ? Math.round((completedCount / totalClients) * 100) : 0;
 
   function shiftDate(days) {
     setDate(format(subDays(new Date(date + "T12:00:00"), -days), "yyyy-MM-dd"));
   }
 
-  const BoolBadge = ({ value }) => (
-    value
-      ? <Check className="w-3.5 h-3.5 text-green-400" />
-      : <X className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
-  );
+  const isToday = date === format(new Date(), "yyyy-MM-dd");
+
+  // Counts for filter tabs
+  const missingCount = rows.filter(r => !r.checkIn).length;
+  const belowKpiCount = rows.filter(r => {
+    const target = r.client?.target_leads_per_week || 5;
+    const leads = (r.client?.leads_this_week || 0) + (r.checkIn?.leads_generated || 0);
+    return leads < target;
+  }).length;
+  const lowSatCount = rows.filter(r => r.checkIn?.satisfaction_rate != null && r.checkIn.satisfaction_rate <= 4).length;
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Daily Entries</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Admin overview of all daily check-ins</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Ops Center — Daily Entries</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Quick-glance operations overview based on AM input
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Date nav */}
@@ -101,6 +105,7 @@ export default function DailyEntries() {
               <ChevronRight className="w-4 h-4 text-gray-500" />
             </button>
           </div>
+          {isToday && <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">TODAY</span>}
           {/* AM filter */}
           <div className="relative">
             <select
@@ -118,26 +123,15 @@ export default function DailyEntries() {
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryCard label="Total Clients" value={totalClients} />
-        <SummaryCard label="Submitted" value={submittedCount} sub={`of ${totalClients}`} />
-        <SummaryCard label="Completed" value={completedCount} sub={`of ${totalClients}`} color={completedCount === totalClients && totalClients > 0 ? "text-green-400" : undefined} />
-        <SummaryCard label="Completion" value={`${pct}%`} color={pct === 100 ? "text-green-400" : pct >= 50 ? "text-blue-400" : "text-orange-400"} />
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? "bg-green-500" : "bg-blue-500"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-
-      {/* Table */}
       {loading ? (
-        <div className="space-y-2">
-          {[1,2,3,4].map(i => <div key={i} className="h-12 rounded-lg bg-gray-200 dark:bg-gray-800 animate-pulse" />)}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            {Array(7).fill(0).map((_, i) => <div key={i} className="h-24 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />)}
+          </div>
+          <div className="h-16 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {Array(6).fill(0).map((_, i) => <div key={i} className="h-40 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />)}
+          </div>
         </div>
       ) : rows.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
@@ -145,84 +139,48 @@ export default function DailyEntries() {
           <p>No clients with assigned AMs found.</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">
-                  <th className="text-left px-4 py-3 font-medium">Status</th>
-                  <th className="text-left px-4 py-3 font-medium">Client</th>
-                  <th className="text-left px-4 py-3 font-medium">AM</th>
-                  <th className="text-center px-3 py-3 font-medium"><Mail className="w-3.5 h-3.5 mx-auto" /></th>
-                  <th className="text-center px-3 py-3 font-medium"><MessageSquare className="w-3.5 h-3.5 mx-auto" /></th>
-                  <th className="text-center px-3 py-3 font-medium"><Send className="w-3.5 h-3.5 mx-auto" /></th>
-                  <th className="text-center px-3 py-3 font-medium"><ThumbsUp className="w-3.5 h-3.5 mx-auto" /></th>
-                  {CHECKLIST_KEYS.map(({ key, short }) => (
-                    <th key={key} className="text-center px-2 py-3 font-medium whitespace-nowrap">{short}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ client, checkIn }) => (
-                  <tr key={client.id} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                    <td className="px-4 py-2.5">
-                      {checkIn?.completed ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">
-                          <Check className="w-3 h-3" /> Done
-                        </span>
-                      ) : checkIn ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-full">
-                          Partial
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-500/10 px-2 py-0.5 rounded-full">
-                          Missing
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                      {client.name}
-                      <span className="text-xs text-gray-400 ml-1.5">{client.package_type}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      {userMap[client.assigned_am] || client.assigned_am}
-                    </td>
-                    <td className="text-center px-3 py-2.5 text-gray-900 dark:text-gray-100">
-                      {checkIn ? checkIn.emails_sent : "—"}
-                    </td>
-                    <td className="text-center px-3 py-2.5 text-gray-900 dark:text-gray-100">
-                      {(client.package_type === "Hybrid" || client.package_type === "LinkedIn") ? (checkIn ? checkIn.linkedin_messages_sent : "—") : <span className="text-gray-300 dark:text-gray-600">n/a</span>}
-                    </td>
-                    <td className="text-center px-3 py-2.5 text-gray-900 dark:text-gray-100">
-                      {(client.package_type === "Hybrid" || client.package_type === "LinkedIn") ? (checkIn ? (checkIn.inmails_sent || 0) : "—") : <span className="text-gray-300 dark:text-gray-600">n/a</span>}
-                    </td>
-                    <td className="text-center px-3 py-2.5 text-gray-900 dark:text-gray-100">
-                      {checkIn ? checkIn.positive_responses : "—"}
-                    </td>
-                    {CHECKLIST_KEYS.map(({ key }) => (
-                      <td key={key} className="text-center px-2 py-2.5">
-                        <BoolBadge value={checkIn?.[key]} />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/* Metric Cards */}
+          <OpsMetricCards rows={rows} checkIns={checkIns} />
+
+          {/* Alerts Banner */}
+          <KpiAlertsBanner rows={rows} userMap={userMap} />
+
+          {/* AM Performance */}
+          <AmPerformanceGrid rows={rows} userMap={userMap} />
+
+          {/* View Filter Tabs */}
+          <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800 overflow-x-auto">
+            <FilterTab active={viewFilter === "all"} onClick={() => setViewFilter("all")} label="All Clients" count={rows.length} />
+            <FilterTab active={viewFilter === "missing"} onClick={() => setViewFilter("missing")} label="Missing Entry" count={missingCount} color="text-red-500" badgeColor="bg-red-500" />
+            <FilterTab active={viewFilter === "below_kpi"} onClick={() => setViewFilter("below_kpi")} label="Below KPI" count={belowKpiCount} color="text-orange-500" badgeColor="bg-orange-500" />
+            <FilterTab active={viewFilter === "low_sat"} onClick={() => setViewFilter("low_sat")} label="Low Satisfaction" count={lowSatCount} color="text-yellow-500" badgeColor="bg-yellow-500" />
           </div>
-        </div>
+
+          {/* Client Cards */}
+          <ClientEntryCards rows={rows} userMap={userMap} filter={viewFilter} />
+        </>
       )}
     </div>
   );
 }
 
-function SummaryCard({ label, value, sub, color }) {
+function FilterTab({ active, onClick, label, count, color, badgeColor }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-      <p className={`text-2xl font-bold mt-1 ${color || "text-gray-900 dark:text-white"}`}>
-        {value}
-        {sub && <span className="text-xs font-normal text-gray-400 ml-1">{sub}</span>}
-      </p>
-    </div>
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+        active
+          ? `${color || "text-blue-600"} border-current`
+          : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+      }`}
+    >
+      {label}
+      {count > 0 && (
+        <span className={`${active ? (badgeColor || "bg-blue-500") : "bg-gray-400"} text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1`}>
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
