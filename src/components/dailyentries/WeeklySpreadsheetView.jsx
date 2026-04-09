@@ -124,16 +124,41 @@ export default function WeeklySpreadsheetView({ clients, weekCheckIns, weekStart
               </td>
               <td className="px-2 py-2.5 text-gray-500">{activeClients.length}</td>
               {dayTotals.map((t, i) => (
-                <td key={i} className={`px-1.5 py-2 text-center ${days[i].date === today ? "bg-blue-50 dark:bg-blue-500/10" : ""}`}>
-                  <div className="text-gray-900 dark:text-white">{t.leads}L</div>
-                  <div className="text-[10px] text-gray-400">{t.emails}E · {t.inmails}I</div>
-                  <div className="text-[10px] text-gray-400">{t.entries}/{activeClients.length}</div>
+                <td key={i} className={`px-1.5 py-2 ${days[i].date === today ? "bg-blue-50 dark:bg-blue-500/10" : ""}`}>
+                  <div className="text-left space-y-0.5 px-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400">Leads</span>
+                      <span className="text-[11px] font-bold text-gray-900 dark:text-white">{t.leads}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400">Emails</span>
+                      <span className="text-[11px] text-gray-600 dark:text-gray-300">{t.emails}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400">InMails</span>
+                      <span className="text-[11px] text-gray-600 dark:text-gray-300">{t.inmails}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400">Entries</span>
+                      <span className="text-[11px] text-gray-500">{t.entries}/{activeClients.length}</span>
+                    </div>
+                  </div>
                 </td>
               ))}
-              <td className="px-2 py-2 text-center bg-gray-100 dark:bg-gray-800">
-                <div className="text-gray-900 dark:text-white">{dayTotals.reduce((s, t) => s + t.leads, 0)}L</div>
-                <div className="text-[10px] text-gray-400">
-                  {dayTotals.reduce((s, t) => s + t.emails, 0)}E · {dayTotals.reduce((s, t) => s + t.inmails, 0)}I
+              <td className="px-2 py-2 bg-gray-100 dark:bg-gray-800">
+                <div className="text-left space-y-0.5 px-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-gray-400">Leads</span>
+                    <span className="text-[11px] font-bold text-gray-900 dark:text-white">{dayTotals.reduce((s, t) => s + t.leads, 0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-gray-400">Emails</span>
+                    <span className="text-[11px] text-gray-600 dark:text-gray-300">{dayTotals.reduce((s, t) => s + t.emails, 0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-gray-400">InMails</span>
+                    <span className="text-[11px] text-gray-600 dark:text-gray-300">{dayTotals.reduce((s, t) => s + t.inmails, 0)}</span>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -144,21 +169,32 @@ export default function WeeklySpreadsheetView({ clients, weekCheckIns, weekStart
   );
 }
 
-function DayCell({ ci, target, weekLeads }) {
+function DayCell({ ci }) {
   const leads = ci.leads_generated || 0;
+  const emails = ci.emails_sent || 0;
+  const inmails = ci.inmails_sent || 0;
   const sat = ci.satisfaction_rate;
-  const satColor = sat && sat >= 7 ? "text-green-600" : sat && sat >= 4 ? "text-yellow-600" : sat ? "text-red-600" : "";
+  const satColor = sat && sat >= 7 ? "text-green-600 dark:text-green-400" : sat && sat >= 4 ? "text-yellow-600 dark:text-yellow-400" : sat ? "text-red-600 dark:text-red-400" : "";
 
   return (
-    <div className="space-y-0.5">
-      <div className={`font-bold ${leads > 0 ? "text-gray-900 dark:text-white" : "text-gray-400"}`}>
-        {leads}L
+    <div className="text-left space-y-0.5 px-1">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-gray-400">Leads</span>
+        <span className={`text-[11px] font-bold ${leads > 0 ? "text-gray-900 dark:text-white" : "text-gray-400"}`}>{leads}</span>
       </div>
-      <div className="text-[10px] text-gray-400">
-        {ci.emails_sent || 0}E · {ci.inmails_sent || 0}I
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-gray-400">Emails</span>
+        <span className="text-[11px] text-gray-600 dark:text-gray-300">{emails}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-gray-400">InMails</span>
+        <span className="text-[11px] text-gray-600 dark:text-gray-300">{inmails}</span>
       </div>
       {sat != null && sat > 0 && (
-        <div className={`text-[10px] font-semibold ${satColor}`}>★{sat}</div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-gray-400">Sat.</span>
+          <span className={`text-[11px] font-semibold ${satColor}`}>{sat}/10</span>
+        </div>
       )}
     </div>
   );
@@ -166,13 +202,26 @@ function DayCell({ ci, target, weekLeads }) {
 
 function WeekTotalCell({ totals }) {
   return (
-    <div className="space-y-0.5">
-      <div className="font-bold text-gray-900 dark:text-white">{totals.leads}L</div>
-      <div className="text-[10px] text-gray-400">{totals.emails}E · {totals.inmails}I</div>
+    <div className="text-left space-y-0.5 px-1">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-gray-400">Leads</span>
+        <span className="text-[11px] font-bold text-gray-900 dark:text-white">{totals.leads}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-gray-400">Emails</span>
+        <span className="text-[11px] text-gray-600 dark:text-gray-300">{totals.emails}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-gray-400">InMails</span>
+        <span className="text-[11px] text-gray-600 dark:text-gray-300">{totals.inmails}</span>
+      </div>
       {totals.avgSat && (
-        <div className={`text-[10px] font-semibold ${
-          Number(totals.avgSat) >= 7 ? "text-green-600" : Number(totals.avgSat) >= 4 ? "text-yellow-600" : "text-red-600"
-        }`}>★{totals.avgSat}</div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-gray-400">Avg Sat.</span>
+          <span className={`text-[11px] font-semibold ${
+            Number(totals.avgSat) >= 7 ? "text-green-600 dark:text-green-400" : Number(totals.avgSat) >= 4 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"
+          }`}>{totals.avgSat}/10</span>
+        </div>
       )}
     </div>
   );
