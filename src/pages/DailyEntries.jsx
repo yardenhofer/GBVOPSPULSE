@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { format, subDays } from "date-fns";
+import { format, subDays, startOfWeek, endOfWeek, addDays } from "date-fns";
 import { ClipboardList, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Table } from "lucide-react";
 
 import OpsMetricCards from "../components/dailyentries/OpsMetricCards";
 import KpiAlertsBanner from "../components/dailyentries/KpiAlertsBanner";
 import AmPerformanceGrid from "../components/dailyentries/AmPerformanceGrid";
 import ClientEntryCards from "../components/dailyentries/ClientEntryCards";
+import WeeklySpreadsheetView from "../components/dailyentries/WeeklySpreadsheetView";
 
 export default function DailyEntries() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -16,6 +17,9 @@ export default function DailyEntries() {
   const [loading, setLoading] = useState(true);
   const [filterAm, setFilterAm] = useState("all");
   const [viewFilter, setViewFilter] = useState("all"); // all | missing | below_kpi | low_sat
+  const [viewMode, setViewMode] = useState("cards"); // cards | spreadsheet
+  const [weekCheckIns, setWeekCheckIns] = useState([]);
+  const [weekLoading, setWeekLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -34,6 +38,21 @@ export default function DailyEntries() {
       setLoading(false);
     });
   }, [date]);
+
+  // Compute the week start (Monday) for the selected date
+  const weekStart = startOfWeek(new Date(date + "T12:00:00"), { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(new Date(date + "T12:00:00"), { weekStartsOn: 1 });
+
+  // Fetch week check-ins when switching to spreadsheet view or when date changes
+  useEffect(() => {
+    if (viewMode !== "spreadsheet") return;
+    setWeekLoading(true);
+    const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
+    Promise.all(weekDates.map(d => base44.entities.DailyCheckIn.filter({ date: d }))).then(results => {
+      setWeekCheckIns(results.flat());
+      setWeekLoading(false);
+    });
+  }, [viewMode, format(weekStart, "yyyy-MM-dd")]);
 
   const clientMap = {};
   clients.forEach(c => { clientMap[c.id] = c; });
@@ -90,6 +109,25 @@ export default function DailyEntries() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* View mode toggle */}
+          <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode("cards")}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                viewMode === "cards" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" /> Cards
+            </button>
+            <button
+              onClick={() => setViewMode("spreadsheet")}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                viewMode === "spreadsheet" ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+              }`}
+            >
+              <Table className="w-3.5 h-3.5" /> Weekly
+            </button>
+          </div>
           {/* Date nav */}
           <div className="flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-1">
             <button onClick={() => shiftDate(-1)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
@@ -157,8 +195,22 @@ export default function DailyEntries() {
             <FilterTab active={viewFilter === "low_sat"} onClick={() => setViewFilter("low_sat")} label="Low Satisfaction" count={lowSatCount} color="text-yellow-500" badgeColor="bg-yellow-500" />
           </div>
 
-          {/* Client Cards */}
-          <ClientEntryCards rows={rows} userMap={userMap} filter={viewFilter} />
+          {/* Client Cards or Spreadsheet */}
+          {viewMode === "spreadsheet" ? (
+            weekLoading ? (
+              <div className="h-64 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
+            ) : (
+              <WeeklySpreadsheetView
+                clients={clients}
+                weekCheckIns={weekCheckIns}
+                weekStart={weekStart}
+                userMap={userMap}
+                filterAm={filterAm}
+              />
+            )
+          ) : (
+            <ClientEntryCards rows={rows} userMap={userMap} filter={viewFilter} />
+          )}
         </>
       )}
     </div>
