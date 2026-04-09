@@ -85,6 +85,11 @@ Deno.serve(async (req) => {
         const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
         const data = await resp.json();
         if (data.ok) return data;
+        // Non-retryable errors — bail immediately
+        if (data.error === 'token_expired' || data.error === 'invalid_auth' || data.error === 'token_revoked' || data.error === 'not_authed') {
+          console.error(`Slack auth error: ${data.error} — token needs re-authorization`);
+          return data;
+        }
         if (data.error === 'ratelimited') {
           const wait = (attempt + 1) * 5;
           console.log(`Rate limited (attempt ${attempt + 1}/3), waiting ${wait}s...`);
