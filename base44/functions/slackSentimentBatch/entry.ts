@@ -79,6 +79,7 @@ Deno.serve(async (req) => {
 
     // 2. Get Slack connection
     const { accessToken } = await base44.asServiceRole.connectors.getConnection("slackbot");
+    console.log(`Slack token obtained: ${accessToken ? accessToken.substring(0, 10) + '...' : 'MISSING'}`);
 
     async function slackFetch(url) {
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -154,8 +155,6 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, message: "No matchable clients to analyze", processed: 0 });
     }
 
-    await new Promise(r => setTimeout(r, 8000));
-
     // 4. Fetch GBV staff emails once
     let gbvEmails = new Set();
     try {
@@ -193,11 +192,13 @@ Deno.serve(async (req) => {
         let allMessages = [];
         let histCursor = "";
         let historyFailed = false;
+        let historyError = '';
         do {
           const histUrl = `https://slack.com/api/conversations.history?channel=${channel.id}&oldest=${since}&limit=200${histCursor ? `&cursor=${histCursor}` : ""}`;
           const histData = await slackFetch(histUrl);
           if (!histData.ok) {
-            console.error(`History error for #${channel.name}:`, histData.error);
+            historyError = histData.error || 'unknown';
+            console.error(`History error for #${channel.name} (${channel.id}): ${historyError}`);
             historyFailed = true;
             break;
           }
@@ -206,8 +207,8 @@ Deno.serve(async (req) => {
         } while (histCursor);
 
         if (historyFailed && allMessages.length === 0) {
-          console.error(`Skipping ${client.name}: could not fetch any history (rate limited)`);
-          errors.push({ client: client.name, error: 'Could not fetch history (rate limited)' });
+          console.error(`Skipping ${client.name}: could not fetch any history (${historyError})`);
+          errors.push({ client: client.name, error: `Could not fetch history: ${historyError} (channel ${channel.id})` });
           continue;
         }
 
@@ -360,7 +361,7 @@ ${messageText}`,
         errors.push({ client: client.name, error: errMsg });
       }
 
-      await new Promise(r => setTimeout(r, 8000));
+      await new Promise(r => setTimeout(r, 2000));
     }
 
     const remaining = needsRefresh.length - results.length;
