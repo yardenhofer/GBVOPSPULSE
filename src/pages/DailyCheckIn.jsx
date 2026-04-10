@@ -120,6 +120,16 @@ export default function DailyCheckIn() {
       detail: `Daily check-in for ${selectedClient?.name || "client"}${selectedAm !== user.email ? ` (on behalf of ${selectedAm})` : ""}`,
       client_name: selectedClient?.name || "",
     });
+    base44.functions.invoke('notifyDailyEntry', {
+      client_name: selectedClient?.name || '',
+      am_name: amUsers.find(a => a.email === selectedAm)?.name || selectedAm,
+      am_email: selectedAm,
+      date: today,
+      leads_generated: payload.leads_generated,
+      emails_sent: payload.emails_sent,
+      inmails_sent: payload.inmails_sent,
+      on_behalf: selectedAm !== user.email,
+    }).catch(() => {});
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
