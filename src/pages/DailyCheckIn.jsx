@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import { format } from "date-fns";
-import { ClipboardCheck, ExternalLink, ChevronDown, Save, Check, Star, Users } from "lucide-react";
+import { ClipboardCheck, ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Save, Check, Star, Users, Calendar } from "lucide-react";
 
 export default function DailyCheckIn() {
   const [allClients, setAllClients] = useState([]);
@@ -15,7 +15,10 @@ export default function DailyCheckIn() {
   const [amUsers, setAmUsers] = useState([]);
   const [selectedAm, setSelectedAm] = useState("");
   const navigate = useNavigate();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const [selectedDate, setSelectedDate] = useState(format(yesterday, "yyyy-MM-dd"));
+  const today = selectedDate;
 
   const [form, setForm] = useState({
     inmails_sent: "",
@@ -54,7 +57,7 @@ export default function DailyCheckIn() {
     load();
   }, []);
 
-  // When selectedAm changes, reload their clients + check-ins
+  // When selectedAm or date changes, reload their clients + check-ins
   useEffect(() => {
     if (!selectedAm || allClients.length === 0) return;
     const amClients = allClients.filter(c => c.assigned_am === selectedAm && c.status !== "Terminated");
@@ -63,7 +66,7 @@ export default function DailyCheckIn() {
     base44.entities.DailyCheckIn.filter({ am_email: selectedAm, date: today }).then(ci => {
       setCheckIns(ci);
     });
-  }, [selectedAm, allClients]);
+  }, [selectedAm, allClients, selectedDate]);
 
   useEffect(() => {
     if (!selectedClientId) return;
@@ -155,7 +158,51 @@ export default function DailyCheckIn() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Daily Check-In</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{format(new Date(), "EEEE, MMMM d")}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <button
+              onClick={() => {
+                const d = new Date(selectedDate + "T12:00:00");
+                d.setDate(d.getDate() - 1);
+                setSelectedDate(format(d, "yyyy-MM-dd"));
+              }}
+              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4 text-gray-500" />
+            </button>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              <input
+                type="date"
+                value={selectedDate}
+                max={format(new Date(), "yyyy-MM-dd")}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="text-sm text-gray-700 dark:text-gray-300 bg-transparent border-none outline-none cursor-pointer"
+              />
+            </div>
+            <button
+              onClick={() => {
+                const d = new Date(selectedDate + "T12:00:00");
+                d.setDate(d.getDate() + 1);
+                const maxDate = new Date();
+                if (d <= maxDate) setSelectedDate(format(d, "yyyy-MM-dd"));
+              }}
+              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              <ChevronRight className="w-4 h-4 text-gray-500" />
+            </button>
+            {selectedDate !== format(new Date(new Date().setDate(new Date().getDate() - 1)), "yyyy-MM-dd") && (
+              <button
+                onClick={() => {
+                  const y = new Date();
+                  y.setDate(y.getDate() - 1);
+                  setSelectedDate(format(y, "yyyy-MM-dd"));
+                }}
+                className="text-[11px] text-blue-500 hover:text-blue-400 ml-1"
+              >
+                Reset to yesterday
+              </button>
+            )}
+          </div>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{pct}%</p>
