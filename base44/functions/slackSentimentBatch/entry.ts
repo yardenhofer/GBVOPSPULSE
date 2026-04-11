@@ -6,7 +6,8 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     let body = {};
     try { body = await clonedReq.json(); } catch(_) { /* no body */ }
-    const BATCH_SIZE = body.batch_size || 200;
+    const BATCH_SIZE = body.batch_size || 4;
+    const autoChain = body.auto_chain !== false; // default true
 
     // Helper to safely unwrap SDK list responses
     function unwrapList(raw) {
@@ -366,6 +367,15 @@ ${messageText}`,
 
     const remaining = needsRefresh.length - results.length;
     console.log(`Done: ${results.length} ok, ${errors.length} failed, ${remaining} still pending today`);
+
+    // Auto-chain: if there are remaining clients, invoke self again
+    if (autoChain && remaining > 0) {
+      console.log(`Auto-chaining: ${remaining} clients remaining, scheduling next batch...`);
+      base44.asServiceRole.functions.invoke('slackSentimentBatch', { batch_size: BATCH_SIZE, auto_chain: true }).catch(e => {
+        console.error('Auto-chain invoke failed:', e.message);
+      });
+    }
+
     return Response.json({
       success: true,
       processed: results.length,
@@ -373,6 +383,7 @@ ${messageText}`,
       remaining_today: remaining,
       done_today_before: alreadyDoneToday.length,
       total_active: activeClients.length,
+      chained: autoChain && remaining > 0,
       results,
       errors
     });
