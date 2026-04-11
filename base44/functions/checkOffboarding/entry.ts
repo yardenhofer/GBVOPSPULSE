@@ -1,9 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
+  try {
   const base44 = createClientFromRequest(req);
 
-  // Get all Off-Boarding clients (filter confirmed ones in code since field may be null)
+  // Get all Off-Boarding clients
   const rawOffboarding = await base44.asServiceRole.entities.Client.filter({
     status: 'Off-Boarding'
   });
@@ -11,16 +12,18 @@ Deno.serve(async (req) => {
   
   const offboarding = allOffboarding.filter(c => !c.offboarding_confirmed);
 
-  if (offboarding.length === 0) {
-    return Response.json({ ok: true, message: 'No pending offboarding clients', checked: 0 });
+  // Filter to only clients that have Slack thread info
+  const actionable = offboarding.filter(c => c.offboarding_slack_ts && c.offboarding_slack_channel);
+
+  if (actionable.length === 0) {
+    return Response.json({ ok: true, message: 'No actionable offboarding clients', total_offboarding: offboarding.length, checked: 0 });
   }
 
   const { accessToken } = await base44.asServiceRole.connectors.getConnection('slackbot');
   let confirmed = 0;
   let reminded = 0;
 
-  for (const client of offboarding) {
-    if (!client.offboarding_slack_ts || !client.offboarding_slack_channel) continue;
+  for (const client of actionable) {
 
     const repliesRes = await fetch(
       `https://slack.com/api/conversations.replies?channel=${client.offboarding_slack_channel}&ts=${client.offboarding_slack_ts}`,
@@ -74,5 +77,9 @@ Deno.serve(async (req) => {
     }
   }
 
-  return Response.json({ ok: true, checked: offboarding.length, confirmed, reminded });
+  return Response.json({ ok: true, checked: actionable.length, confirmed, reminded });
+  } catch (error) {
+    console.error('checkOffboarding error:', error.message);
+    return Response.json({ error: error.message }, { status: 500 });
+  }
 });
