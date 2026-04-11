@@ -6,7 +6,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     let body = {};
     try { body = await clonedReq.json(); } catch(_) { /* no body */ }
-    const BATCH_SIZE = body.batch_size || 4;
+    const BATCH_SIZE = body.batch_size || 200;
 
     // Helper to safely unwrap SDK list responses
     function unwrapList(raw) {
