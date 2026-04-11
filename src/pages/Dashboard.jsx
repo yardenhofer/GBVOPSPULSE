@@ -6,6 +6,7 @@ import { RefreshCw, Plus } from "lucide-react";
 import { differenceInDays } from "date-fns";
 
 import SummaryBar from "../components/dashboard/SummaryBar";
+import SlackAuthBanner from "../components/dashboard/SlackAuthBanner";
 import ClientFilters from "../components/dashboard/ClientFilters";
 import ClientRow from "../components/dashboard/ClientRow";
 import ClientTableHeader from "../components/dashboard/ClientTableHeader";
@@ -123,6 +124,9 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Slack auth warning (admin only) */}
+      {user?.role === "admin" && <SlackAuthBanner />}
 
       {/* Summary */}
       <SummaryBar clients={activeClients} computeAutoStatus={computeAutoStatus} />
