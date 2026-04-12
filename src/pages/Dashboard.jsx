@@ -24,7 +24,7 @@ function getCachedInstantlyResult(client) {
   return null; // not yet synced
 }
 
-const DEFAULT_FILTERS = { search: "", sort: "sentiment", package: "All", status: "All", group: "All", sequence: "All" };
+const DEFAULT_FILTERS = { search: "", sort: "sequence", package: "All", status: "All", group: "All", sequence: "All" };
 
 const STATUS_ORDER = { Critical: 0, "At Risk": 1, Monitor: 2, Healthy: 3, "Off-Boarding": 4 };
 
@@ -95,6 +95,11 @@ export default function Dashboard() {
         const diff = (SENT_ORDER[a.client_sentiment] ?? 1) - (SENT_ORDER[b.client_sentiment] ?? 1);
         if (diff !== 0) return diff;
         return (STATUS_ORDER[sa] ?? 4) - (STATUS_ORDER[sb] ?? 4);
+      }
+      if (filters.sort === "sequence") {
+        const pa = getCachedInstantlyResult(a)?.pct ?? -1;
+        const pb = getCachedInstantlyResult(b)?.pct ?? -1;
+        return pb - pa;
       }
       if (filters.sort === "am") return (a.assigned_am || "").localeCompare(b.assigned_am || "");
       if (filters.sort === "leads_drop") {
