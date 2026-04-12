@@ -1,6 +1,7 @@
 import { Search, ChevronDown, ArrowUpDown } from "lucide-react";
 
 const SORT_OPTIONS = [
+  { value: "sentiment", label: "Sentiment" },
   { value: "risk", label: "Risk Level" },
   { value: "am", label: "Account Manager" },
   { value: "leads_drop", label: "Lead Volume Drop" },

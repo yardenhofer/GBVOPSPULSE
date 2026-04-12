@@ -24,7 +24,7 @@ function getCachedInstantlyResult(client) {
   return null; // not yet synced
 }
 
-const DEFAULT_FILTERS = { search: "", sort: "risk", package: "All", status: "All", group: "All", sequence: "All" };
+const DEFAULT_FILTERS = { search: "", sort: "sentiment", package: "All", status: "All", group: "All", sequence: "All" };
 
 const STATUS_ORDER = { Critical: 0, "At Risk": 1, Monitor: 2, Healthy: 3, "Off-Boarding": 4 };
 
@@ -90,6 +90,12 @@ export default function Dashboard() {
     .sort((a, b) => {
       const sa = computeAutoStatus(a), sb = computeAutoStatus(b);
       if (filters.sort === "risk") return (STATUS_ORDER[sa] ?? 4) - (STATUS_ORDER[sb] ?? 4);
+      if (filters.sort === "sentiment") {
+        const SENT_ORDER = { Happy: 0, Neutral: 1, "Slightly Concerned": 2, Unhappy: 3 };
+        const diff = (SENT_ORDER[a.client_sentiment] ?? 1) - (SENT_ORDER[b.client_sentiment] ?? 1);
+        if (diff !== 0) return diff;
+        return (STATUS_ORDER[sa] ?? 4) - (STATUS_ORDER[sb] ?? 4);
+      }
       if (filters.sort === "am") return (a.assigned_am || "").localeCompare(b.assigned_am || "");
       if (filters.sort === "leads_drop") {
         const da = (a.target_leads_per_week || 1) > 0
