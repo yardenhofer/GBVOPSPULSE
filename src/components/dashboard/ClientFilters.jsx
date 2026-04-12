@@ -26,7 +26,7 @@ const STATUS_OPTIONS = [
 
 const NEW_CLIENT_OPTIONS = [
   { value: "All", label: "All Clients" },
-  { value: "new", label: "✨ New Only" },
+  { value: "new", label: "New Only" },
   { value: "existing", label: "Existing Only" },
 ];
 
