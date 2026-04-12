@@ -133,21 +133,30 @@ Deno.serve(async (req) => {
         if (cursor) await new Promise(r => setTimeout(r, 1500));
       } while (cursor);
       console.log(`Fetched ${allChannels.length} channels for ${clientsNeedingMatch.length} clients needing match`);
+      const channelNames = allChannels.map(ch => ch.name).sort();
+      console.log(`Available channels: ${channelNames.join(', ')}`);
 
       for (const c of clientsNeedingMatch) {
         let channel = null;
+        // 1. Try exact match on slack_channel_name field
         if (c.slack_channel_name) {
           const manualName = c.slack_channel_name.toLowerCase().replace(/^#/, '').trim();
           channel = allChannels.find(ch => ch.name.toLowerCase() === manualName);
+          if (!channel) console.log(`No exact channel match for "${c.name}" with slack_channel_name="${c.slack_channel_name}"`);
         }
+        // 2. Fuzzy match on client name
         if (!channel) {
           const normalizedName = c.name.toLowerCase().replace(/[^a-z0-9]/g, '');
           channel = allChannels.find(ch => {
             const chNameStripped = ch.name.toLowerCase().replace(/[^a-z0-9]/g, '');
             return chNameStripped.includes(normalizedName) || normalizedName.includes(chNameStripped);
           });
+          if (!channel) console.log(`No fuzzy channel match for "${c.name}" (normalized: "${normalizedName}")`);
         }
-        if (channel) matchable.push({ client: c, channel });
+        if (channel) {
+          console.log(`Matched "${c.name}" -> #${channel.name}`);
+          matchable.push({ client: c, channel });
+        }
       }
     } else {
       console.log(`${matchable.length} cached-ID clients available, skipping channel list fetch`);
