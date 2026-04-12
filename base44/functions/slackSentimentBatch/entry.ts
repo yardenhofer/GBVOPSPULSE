@@ -170,13 +170,19 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, message: "No matchable clients to analyze", processed: 0 });
     }
 
-    // 4. Fetch GBV staff emails once
+    // 4. Fetch GBV staff emails + names once
     let gbvEmails = new Set();
+    let gbvNormalizedNames = new Set();
     try {
       const rawUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
       const appUsers = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.items || rawUsers?.data || rawUsers?.results || []);
       for (const u of appUsers) {
         if (u.email) gbvEmails.add(u.email.toLowerCase());
+        if (u.full_name) {
+          gbvNormalizedNames.add(u.full_name.toLowerCase().trim());
+          const firstName = u.full_name.split(' ')[0].toLowerCase().trim();
+          if (firstName.length >= 3) gbvNormalizedNames.add(firstName);
+        }
       }
     } catch (e) {
       console.error("Could not fetch app users:", e.message);
@@ -257,9 +263,18 @@ Deno.serve(async (req) => {
           if (globalUserMap[uid] !== undefined) continue;
           const uData = await slackFetch(`https://slack.com/api/users.info?user=${uid}`);
           if (uData.ok && uData.user) {
-            globalUserMap[uid] = uData.user.real_name || uData.user.profile?.display_name || uData.user.name || uid;
+            const realName = uData.user.real_name || uData.user.profile?.display_name || uData.user.name || uid;
+            globalUserMap[uid] = realName;
             const slackEmail = (uData.user.profile?.email || "").toLowerCase();
-            globalUserIsGbv[uid] = slackEmail ? gbvEmails.has(slackEmail) : false;
+            // Match by email first, then fall back to name matching
+            let isGbv = slackEmail ? gbvEmails.has(slackEmail) : false;
+            if (!isGbv) {
+              const slackNameNorm = realName.toLowerCase().trim();
+              const slackFirstName = slackNameNorm.split(' ')[0];
+              isGbv = gbvNormalizedNames.has(slackNameNorm) || (slackFirstName.length >= 3 && gbvNormalizedNames.has(slackFirstName));
+              if (isGbv) console.log(`Matched "${realName}" as GBV staff via name (email "${slackEmail}" didn't match)`);
+            }
+            globalUserIsGbv[uid] = isGbv;
           } else {
             globalUserMap[uid] = uid;
             globalUserIsGbv[uid] = false;

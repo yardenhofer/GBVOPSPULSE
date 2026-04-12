@@ -178,11 +178,18 @@ Deno.serve(async (req) => {
     
     // Fetch all app users (GBV team) to identify staff
     let gbvEmails = new Set();
+    let gbvNormalizedNames = new Set();
     try {
       const rawUsers = await base44.asServiceRole.entities.User.list("-created_date", 200);
       const appUsers = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.items || rawUsers?.data || rawUsers?.results || []);
       for (const u of appUsers) {
         if (u.email) gbvEmails.add(u.email.toLowerCase());
+        if (u.full_name) {
+          gbvNormalizedNames.add(u.full_name.toLowerCase().trim());
+          // Also add first name for matching Slack display names like "Yarden"
+          const firstName = u.full_name.split(' ')[0].toLowerCase().trim();
+          if (firstName.length >= 3) gbvNormalizedNames.add(firstName);
+        }
       }
     } catch (e) {
       console.error("Could not fetch app users for GBV identification:", e.message);
@@ -193,9 +200,18 @@ Deno.serve(async (req) => {
     for (const uid of uniqueUsers) {
       const uData = await slackFetch(`https://slack.com/api/users.info?user=${uid}`);
       if (uData.ok && uData.user) {
-        userMap[uid] = uData.user.real_name || uData.user.profile?.display_name || uData.user.name || uid;
+        const realName = uData.user.real_name || uData.user.profile?.display_name || uData.user.name || uid;
+        userMap[uid] = realName;
         const slackEmail = (uData.user.profile?.email || "").toLowerCase();
-        userIsGbv[uid] = slackEmail ? gbvEmails.has(slackEmail) : false;
+        // Match by email first, then fall back to name matching
+        let isGbv = slackEmail ? gbvEmails.has(slackEmail) : false;
+        if (!isGbv) {
+          const slackNameNorm = realName.toLowerCase().trim();
+          const slackFirstName = slackNameNorm.split(' ')[0];
+          isGbv = gbvNormalizedNames.has(slackNameNorm) || (slackFirstName.length >= 3 && gbvNormalizedNames.has(slackFirstName));
+          if (isGbv) console.log(`Matched "${realName}" as GBV staff via name (email "${slackEmail}" didn't match)`);
+        }
+        userIsGbv[uid] = isGbv;
       } else {
         userMap[uid] = uid;
         userIsGbv[uid] = false;
