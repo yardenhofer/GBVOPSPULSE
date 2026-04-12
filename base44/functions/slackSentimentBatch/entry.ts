@@ -6,8 +6,6 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     let body = {};
     try { body = await clonedReq.json(); } catch(_) { /* no body */ }
-    const BATCH_SIZE = body.batch_size || 4;
-    const autoChain = body.auto_chain !== false; // default true
 
     // Helper to safely unwrap SDK list responses
     function unwrapList(raw) {
@@ -93,7 +91,13 @@ Deno.serve(async (req) => {
           return data;
         }
         if (data.error === 'ratelimited') {
-          const wait = (attempt + 1) * 5;
+          const retryAfter = parseInt(resp.headers.get('Retry-After') || '0', 10);
+          // If Slack wants us to wait more than 15s, skip this call to avoid timeout
+          if (retryAfter > 15) {
+            console.log(`Rate limited, Retry-After=${retryAfter}s too long, skipping`);
+            return { ok: false, error: 'ratelimited_skip' };
+          }
+          const wait = retryAfter > 0 ? retryAfter + 1 : (attempt + 1) * 5;
           console.log(`Rate limited (attempt ${attempt + 1}/3), waiting ${wait}s...`);
           await new Promise(r => setTimeout(r, wait * 1000));
           continue;
@@ -117,7 +121,7 @@ Deno.serve(async (req) => {
       return aDate.localeCompare(bDate);
     });
 
-    if (matchable.length < BATCH_SIZE && clientsNeedingMatch.length > 0) {
+    if (clientsNeedingMatch.length > 0) {
       let allChannels = [];
       let cursor = "";
       do {
@@ -149,6 +153,7 @@ Deno.serve(async (req) => {
       console.log(`${matchable.length} cached-ID clients available, skipping channel list fetch`);
     }
 
+    const BATCH_SIZE = body.batch_size || 8;
     const eligible = matchable.slice(0, BATCH_SIZE);
     console.log(`Batch: processing ${eligible.length} of ${matchable.length} matchable (${clientsNeedingMatch.length} without cached channel ID)`);
 
@@ -174,7 +179,7 @@ Deno.serve(async (req) => {
     const results = [];
     const errors = [];
     const startTime = Date.now();
-    const MAX_RUNTIME_MS = 140000;
+    const MAX_RUNTIME_MS = 150000; // 2.5 minutes safe limit
 
     for (const { client, channel } of eligible) {
       if (Date.now() - startTime > MAX_RUNTIME_MS) {
@@ -362,18 +367,21 @@ ${messageText}`,
         errors.push({ client: client.name, error: errMsg });
       }
 
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 3000));
     }
 
-    const remaining = needsRefresh.length - results.length;
+    const remaining = needsRefresh.length - results.length - errors.length;
     console.log(`Done: ${results.length} ok, ${errors.length} failed, ${remaining} still pending today`);
 
-    // Auto-chain: if there are remaining clients, invoke self again
-    if (autoChain && remaining > 0) {
-      console.log(`Auto-chaining: ${remaining} clients remaining, scheduling next batch...`);
-      base44.asServiceRole.functions.invoke('slackSentimentBatch', { batch_size: BATCH_SIZE, auto_chain: true }).catch(e => {
+    // Auto-chain: if there are remaining clients, invoke self with the user's own auth
+    if (remaining > 0) {
+      console.log(`Auto-chaining: ${remaining} clients remaining...`);
+      try {
+        await base44.functions.invoke('slackSentimentBatch', { batch_size: BATCH_SIZE });
+        console.log('Auto-chain invoked successfully');
+      } catch (e) {
         console.error('Auto-chain invoke failed:', e.message);
-      });
+      }
     }
 
     return Response.json({
@@ -383,7 +391,7 @@ ${messageText}`,
       remaining_today: remaining,
       done_today_before: alreadyDoneToday.length,
       total_active: activeClients.length,
-      chained: autoChain && remaining > 0,
+      chained: remaining > 0,
       results,
       errors
     });
