@@ -67,8 +67,9 @@ export function computeRedFlags(client) {
   }
 
   // 7. New client onboarding incomplete
-  if (client.start_date) {
-    const daysSinceStart = differenceInDays(now, parseDate(client.start_date));
+  const onboardRef = client.start_date ? parseDate(client.start_date) : parseDate(client.created_date);
+  if (onboardRef) {
+    const daysSinceStart = differenceInDays(now, onboardRef);
     if (daysSinceStart >= 10) {
       const steps = [
         client.onboarding_contract_signed,

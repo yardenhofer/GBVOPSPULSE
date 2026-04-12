@@ -50,7 +50,12 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
-            {client.start_date && differenceInDays(today, new Date(client.start_date + "T00:00:00")) <= 10 && (
+            {(() => {
+              const ref = client.start_date
+                ? new Date(client.start_date + "T00:00:00")
+                : client.created_date ? new Date(client.created_date) : null;
+              return ref && differenceInDays(today, ref) <= 10;
+            })() && (
               <span className="shrink-0 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                 <Sparkles className="w-2.5 h-2.5" />NEW
               </span>
