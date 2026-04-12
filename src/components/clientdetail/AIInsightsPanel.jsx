@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Brain, TrendingUp, TrendingDown, Minus, AlertTriangle, MessageSquare, Sparkles, RefreshCw } from "lucide-react";
+import { Brain, TrendingUp, TrendingDown, Minus, AlertTriangle, MessageSquare, Sparkles, RefreshCw, X, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 
 const SENTIMENT_STYLES = {
@@ -20,6 +20,7 @@ export default function AIInsightsPanel({ client }) {
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     loadInsights();
@@ -73,12 +74,43 @@ export default function AIInsightsPanel({ client }) {
           ))}
         </div>
       ) : !latest ? (
-        <div className="text-center py-8">
-          <Sparkles className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">No AI insights yet</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {client.slack_channel_id ? "Insights will appear after the next scheduled analysis" : "No Slack channel matched for this client"}
-          </p>
+        <div className="space-y-3">
+          {!dismissed ? (
+            <div className="relative bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+              <button
+                onClick={() => setDismissed(true)}
+                className="absolute top-2 right-2 p-1 rounded-md text-red-400 hover:bg-red-500/20 transition-colors"
+                title="Dismiss — Client is not using Slack"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex items-start gap-2.5 pr-6">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-400">No AI Insights Available</p>
+                  <p className="text-xs text-red-300/80 mt-1">
+                    {client.slack_channel_id
+                      ? "A Slack channel is matched but no insights have been generated yet. They will appear after the next scheduled analysis."
+                      : "No Slack channel matched for this client. Make sure the client has a Slack channel and the name matches."}
+                  </p>
+                  <div className="mt-2.5 bg-red-500/10 rounded-md px-3 py-2 border border-red-500/20">
+                    <p className="text-xs font-medium text-red-300">📋 Setup Instructions:</p>
+                    <ol className="text-xs text-red-300/80 mt-1 space-y-1 list-decimal list-inside">
+                      <li>Open the client's Slack channel</li>
+                      <li>Type <code className="bg-red-500/20 px-1 py-0.5 rounded text-red-300 font-mono">/invite @Base44</code> and press Enter</li>
+                      <li>Select the <strong>Base44</strong> bot and invite it</li>
+                      <li>Set the correct channel name in client settings if auto-match fails</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <Sparkles className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">Client is not using Slack communication</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
