@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { format, subDays, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { format, subDays, startOfWeek, endOfWeek, addDays, getDay } from "date-fns";
 import { ClipboardList, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Table } from "lucide-react";
 
 import OpsMetricCards from "../components/dailyentries/OpsMetricCards";
@@ -88,9 +88,11 @@ export default function DailyEntries() {
   }
 
   const isToday = date === format(new Date(), "yyyy-MM-dd");
+  const selectedDayOfWeek = getDay(new Date(date + "T12:00:00")); // 0=Sun, 6=Sat
+  const isWeekend = selectedDayOfWeek === 0 || selectedDayOfWeek === 6;
 
-  // Counts for filter tabs
-  const missingCount = rows.filter(r => !r.checkIn).length;
+  // Counts for filter tabs — no entries expected on weekends
+  const missingCount = isWeekend ? 0 : rows.filter(r => !r.checkIn).length;
   const belowKpiCount = rows.filter(r => {
     const target = r.client?.target_leads_per_week || 5;
     const leads = (r.client?.leads_this_week || 0) + (r.checkIn?.leads_generated || 0);
@@ -179,13 +181,13 @@ export default function DailyEntries() {
       ) : (
         <>
           {/* Metric Cards */}
-          <OpsMetricCards rows={rows} checkIns={checkIns} />
+          <OpsMetricCards rows={rows} checkIns={checkIns} isWeekend={isWeekend} />
 
           {/* Alerts Banner */}
-          <KpiAlertsBanner rows={rows} userMap={userMap} />
+          <KpiAlertsBanner rows={rows} userMap={userMap} isWeekend={isWeekend} />
 
           {/* AM Performance */}
-          <AmPerformanceGrid rows={rows} userMap={userMap} />
+          <AmPerformanceGrid rows={rows} userMap={userMap} isWeekend={isWeekend} />
 
           {/* View Filter Tabs */}
           <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800 overflow-x-auto">
@@ -209,7 +211,7 @@ export default function DailyEntries() {
               />
             )
           ) : (
-            <ClientEntryCards rows={rows} userMap={userMap} filter={viewFilter} />
+            <ClientEntryCards rows={rows} userMap={userMap} filter={viewFilter} isWeekend={isWeekend} />
           )}
         </>
       )}

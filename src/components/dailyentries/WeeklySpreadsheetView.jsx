@@ -1,13 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { format, addDays, startOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, getDay } from "date-fns";
 
 export default function WeeklySpreadsheetView({ clients, weekCheckIns, weekStart, userMap, filterAm }) {
   const navigate = useNavigate();
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(weekStart, i);
-    return { date: format(d, "yyyy-MM-dd"), label: format(d, "EEE"), dayNum: format(d, "d"), full: format(d, "MMM d") };
+    const dow = getDay(d);
+    return { date: format(d, "yyyy-MM-dd"), label: format(d, "EEE"), dayNum: format(d, "d"), full: format(d, "MMM d"), isWeekend: dow === 0 || dow === 6 };
   });
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -70,9 +71,9 @@ export default function WeeklySpreadsheetView({ clients, weekCheckIns, weekStart
               <th className="text-left px-2 py-2.5 font-medium text-gray-500 min-w-[80px]">AM</th>
               {days.map(d => (
                 <th key={d.date} className={`text-center px-2 py-2.5 font-semibold min-w-[90px] ${
-                  d.date === today ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"
+                  d.date === today ? "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400" : d.isWeekend ? "text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/20" : "text-gray-700 dark:text-gray-300"
                 }`}>
-                  <div>{d.label}</div>
+                  <div>{d.label}{d.isWeekend ? " 🔒" : ""}</div>
                   <div className="text-[10px] font-normal text-gray-400">{d.full}</div>
                 </th>
               ))}
@@ -100,9 +101,11 @@ export default function WeeklySpreadsheetView({ clients, weekCheckIns, weekStart
                     const ci = checkInMap[`${client.id}_${d.date}`];
                     const isToday = d.date === today;
                     return (
-                      <td key={d.date} className={`px-1.5 py-1.5 text-center ${isToday ? "bg-blue-50/50 dark:bg-blue-500/5" : ""}`}>
+                      <td key={d.date} className={`px-1.5 py-1.5 text-center ${isToday ? "bg-blue-50/50 dark:bg-blue-500/5" : ""} ${d.isWeekend ? "bg-gray-50 dark:bg-gray-800/20" : ""}`}>
                         {ci ? (
                           <DayCell ci={ci} target={client.target_leads_per_week || 5} weekLeads={client.leads_this_week || 0} />
+                        ) : d.isWeekend ? (
+                          <span className="text-[10px] text-gray-300 dark:text-gray-600">Off</span>
                         ) : (
                           <span className="text-gray-300 dark:text-gray-700">—</span>
                         )}

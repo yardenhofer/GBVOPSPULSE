@@ -1,6 +1,6 @@
 import { AlertTriangle, Clock, XCircle } from "lucide-react";
 
-export default function KpiAlertsBanner({ rows, userMap }) {
+export default function KpiAlertsBanner({ rows, userMap, isWeekend }) {
   const alerts = [];
 
   // Clients below KPI
@@ -10,14 +10,16 @@ export default function KpiAlertsBanner({ rows, userMap }) {
     return leads < target;
   });
 
-  // AMs who haven't submitted
+  // AMs who haven't submitted (skip on weekends)
   const missingAms = {};
-  rows.filter(r => !r.checkIn).forEach(r => {
-    const am = r.client?.assigned_am;
-    if (!am) return;
-    if (!missingAms[am]) missingAms[am] = [];
-    missingAms[am].push(r.client.name);
-  });
+  if (!isWeekend) {
+    rows.filter(r => !r.checkIn).forEach(r => {
+      const am = r.client?.assigned_am;
+      if (!am) return;
+      if (!missingAms[am]) missingAms[am] = [];
+      missingAms[am].push(r.client.name);
+    });
+  }
 
   // Low satisfaction
   const lowSat = rows.filter(r => r.checkIn?.satisfaction_rate != null && r.checkIn.satisfaction_rate <= 4);

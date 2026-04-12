@@ -2,11 +2,11 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { ExternalLink, Mail, Send, Target, Star, MessageSquare } from "lucide-react";
 
-export default function ClientEntryCards({ rows, userMap, filter }) {
+export default function ClientEntryCards({ rows, userMap, filter, isWeekend }) {
   const navigate = useNavigate();
 
   const filteredRows = rows.filter(r => {
-    if (filter === "missing") return !r.checkIn;
+    if (filter === "missing") return !isWeekend && !r.checkIn;
     if (filter === "below_kpi") {
       const target = r.client?.target_leads_per_week || 5;
       const leads = (r.client?.leads_this_week || 0) + (r.checkIn?.leads_generated || 0);
@@ -36,7 +36,7 @@ export default function ClientEntryCards({ rows, userMap, filter }) {
           <div
             key={client.id}
             className={`rounded-xl border p-4 transition-all hover:shadow-md cursor-pointer ${
-              !checkIn
+              !checkIn && !isWeekend
                 ? "bg-red-500/5 border-red-200 dark:border-red-500/20"
                 : belowKpi
                   ? "bg-orange-500/5 border-orange-200 dark:border-orange-500/20"
@@ -53,7 +53,9 @@ export default function ClientEntryCards({ rows, userMap, filter }) {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {!checkIn ? (
+                {!checkIn && isWeekend ? (
+                  <span className="text-[10px] font-bold text-gray-400 bg-gray-500/10 px-2 py-0.5 rounded-full">WEEKEND</span>
+                ) : !checkIn ? (
                   <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">NO ENTRY</span>
                 ) : belowKpi ? (
                   <span className="text-[10px] font-bold text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">BELOW KPI</span>

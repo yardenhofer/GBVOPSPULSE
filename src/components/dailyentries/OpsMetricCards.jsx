@@ -1,8 +1,9 @@
 import { Mail, Send, Target, AlertTriangle, CheckCircle, XCircle, Users } from "lucide-react";
 
-export default function OpsMetricCards({ rows, checkIns }) {
+export default function OpsMetricCards({ rows, checkIns, isWeekend }) {
   const submitted = rows.filter(r => r.checkIn);
-  const missing = rows.filter(r => !r.checkIn);
+  const missing = isWeekend ? [] : rows.filter(r => !r.checkIn);
+  const expectedTotal = isWeekend ? submitted.length : rows.length;
   
   const totalEmails = checkIns.reduce((s, c) => s + (c.emails_sent || 0), 0);
   const totalInmails = checkIns.reduce((s, c) => s + (c.inmails_sent || 0), 0);
@@ -21,7 +22,7 @@ export default function OpsMetricCards({ rows, checkIns }) {
   })();
 
   const cards = [
-    { label: "Check-Ins", value: `${submitted.length}/${rows.length}`, icon: CheckCircle, color: submitted.length === rows.length && rows.length > 0 ? "text-green-500" : "text-blue-500", bg: submitted.length === rows.length && rows.length > 0 ? "bg-green-500/10" : "bg-blue-500/10" },
+    { label: "Check-Ins", value: `${submitted.length}/${expectedTotal}`, icon: CheckCircle, color: submitted.length === expectedTotal && expectedTotal > 0 ? "text-green-500" : "text-blue-500", bg: submitted.length === expectedTotal && expectedTotal > 0 ? "bg-green-500/10" : "bg-blue-500/10" },
     { label: "Missing", value: missing.length, icon: XCircle, color: missing.length > 0 ? "text-red-500" : "text-green-500", bg: missing.length > 0 ? "bg-red-500/10" : "bg-green-500/10" },
     { label: "Below KPI", value: belowKpi.length, icon: AlertTriangle, color: belowKpi.length > 0 ? "text-orange-500" : "text-green-500", bg: belowKpi.length > 0 ? "bg-orange-500/10" : "bg-green-500/10" },
     { label: "Emails Sent", value: totalEmails, icon: Mail, color: "text-blue-500", bg: "bg-blue-500/10" },

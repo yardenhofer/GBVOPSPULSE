@@ -1,6 +1,6 @@
 import { CheckCircle, XCircle } from "lucide-react";
 
-export default function AmPerformanceGrid({ rows, userMap }) {
+export default function AmPerformanceGrid({ rows, userMap, isWeekend }) {
   // Group by AM
   const amData = {};
   rows.forEach(({ client, checkIn }) => {
@@ -41,7 +41,7 @@ export default function AmPerformanceGrid({ rows, userMap }) {
           const avgSat = d.satCount > 0 ? (d.satSum / d.satCount).toFixed(1) : null;
           return (
             <div key={email} className={`rounded-xl border p-4 ${
-              allDone 
+              (allDone || isWeekend)
                 ? "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800" 
                 : "bg-red-500/5 border-red-200 dark:border-red-500/20"
             }`}>
@@ -50,7 +50,7 @@ export default function AmPerformanceGrid({ rows, userMap }) {
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{userMap[email] || email}</p>
                   <p className="text-[11px] text-gray-500">{email}</p>
                 </div>
-                {allDone ? (
+                {(allDone || isWeekend) ? (
                   <CheckCircle className="w-5 h-5 text-green-500" />
                 ) : (
                   <span className="text-xs font-semibold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
