@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import { format } from "date-fns";
+import { format, getDay } from "date-fns";
 import { ClipboardCheck, ExternalLink, ChevronDown, ChevronLeft, ChevronRight, Save, Check, Star, Users, Calendar } from "lucide-react";
 
 export default function DailyCheckIn() {
@@ -15,9 +15,16 @@ export default function DailyCheckIn() {
   const [amUsers, setAmUsers] = useState([]);
   const [selectedAm, setSelectedAm] = useState("");
   const navigate = useNavigate();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const [selectedDate, setSelectedDate] = useState(format(yesterday, "yyyy-MM-dd"));
+  // Default to last working day (skip weekends)
+  const getLastWorkingDay = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1); // start with yesterday
+    const dow = getDay(d); // 0=Sun, 6=Sat
+    if (dow === 0) d.setDate(d.getDate() - 2); // Sunday -> Friday
+    else if (dow === 6) d.setDate(d.getDate() - 1); // Saturday -> Friday
+    return format(d, "yyyy-MM-dd");
+  };
+  const [selectedDate, setSelectedDate] = useState(getLastWorkingDay());
   const today = selectedDate;
 
   const [form, setForm] = useState({
