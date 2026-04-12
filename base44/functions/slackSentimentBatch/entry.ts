@@ -373,8 +373,9 @@ ${messageText}`,
     const remaining = needsRefresh.length - results.length - errors.length;
     console.log(`Done: ${results.length} ok, ${errors.length} failed, ${remaining} still pending today`);
 
-    // Auto-chain: if there are remaining clients, invoke self with the user's own auth
-    if (remaining > 0) {
+    // Auto-chain: only if we actually processed at least 1 client successfully
+    // (avoids infinite loop when all clients are rate-limited)
+    if (remaining > 0 && results.length > 0) {
       console.log(`Auto-chaining: ${remaining} clients remaining...`);
       try {
         await base44.functions.invoke('slackSentimentBatch', { batch_size: BATCH_SIZE });
@@ -382,6 +383,8 @@ ${messageText}`,
       } catch (e) {
         console.error('Auto-chain invoke failed:', e.message);
       }
+    } else if (remaining > 0 && results.length === 0) {
+      console.log(`Skipping auto-chain: 0 processed (likely rate-limited). ${remaining} clients still pending. Try again later.`);
     }
 
     return Response.json({

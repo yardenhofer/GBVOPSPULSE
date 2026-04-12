@@ -11,7 +11,12 @@ function BatchRunButton() {
     setResult(null);
     try {
       const res = await base44.functions.invoke("slackSentimentBatch", {});
-      setResult({ type: "success", text: `Done — ${res.data.processed} clients analyzed, ${res.data.failed} failed` });
+      const d = res.data || {};
+      const parts = [`${d.processed || 0} analyzed`];
+      if (d.failed) parts.push(`${d.failed} failed`);
+      if (d.chained) parts.push(`chaining for ${d.remaining_today} more`);
+      if (d.remaining_today && !d.chained) parts.push(`${d.remaining_today} remaining (rate-limited, retry later)`);
+      setResult({ type: d.processed > 0 ? "success" : "warning", text: parts.join(" · ") });
     } catch (e) {
       setResult({ type: "error", text: e.message || "Batch run failed" });
     }
