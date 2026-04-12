@@ -24,7 +24,7 @@ function getCachedInstantlyResult(client) {
   return null; // not yet synced
 }
 
-const DEFAULT_FILTERS = { search: "", sort: "sequence", package: "All", status: "All", group: "All", sequence: "All" };
+const DEFAULT_FILTERS = { search: "", sort: "sequence", package: "All", status: "All", group: "All", sequence: "All", newClient: "All" };
 
 const STATUS_ORDER = { Critical: 0, "At Risk": 1, Monitor: 2, Healthy: 3, "Off-Boarding": 4 };
 
@@ -84,6 +84,16 @@ export default function Dashboard() {
         if (filters.sequence === "orange" && !(pct != null && pct >= 60 && pct < 80)) return false;
         if (filters.sequence === "red_orange" && !(pct != null && pct >= 60)) return false;
         if (filters.sequence === "green" && !(pct != null && pct < 60)) return false;
+      }
+      if (filters.newClient && filters.newClient !== "All") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const ref = c.start_date
+          ? new Date(c.start_date + "T00:00:00")
+          : c.created_date ? new Date(c.created_date) : null;
+        const isNew = ref && differenceInDays(today, ref) <= 10;
+        if (filters.newClient === "new" && !isNew) return false;
+        if (filters.newClient === "existing" && isNew) return false;
       }
       return true;
     })

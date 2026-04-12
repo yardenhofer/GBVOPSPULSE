@@ -24,6 +24,12 @@ const STATUS_OPTIONS = [
   { value: "Critical", label: "Critical" },
 ];
 
+const NEW_CLIENT_OPTIONS = [
+  { value: "All", label: "All Clients" },
+  { value: "new", label: "✨ New Only" },
+  { value: "existing", label: "Existing Only" },
+];
+
 const SEQUENCE_OPTIONS = [
   { value: "All", label: "All Sequence %" },
   { value: "red", label: "🔴 High (≥80%)" },
@@ -97,6 +103,13 @@ export default function ClientFilters({ filters, onFiltersChange, groups = [] })
         value={filters.status}
         options={STATUS_OPTIONS}
         onChange={v => onFiltersChange({ ...filters, status: v })}
+      />
+
+      {/* New */}
+      <FilterPill
+        value={filters.newClient || "All"}
+        options={NEW_CLIENT_OPTIONS}
+        onChange={v => onFiltersChange({ ...filters, newClient: v })}
       />
 
       {/* Sequence % */}
