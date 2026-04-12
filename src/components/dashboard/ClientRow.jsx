@@ -1,4 +1,5 @@
 import { differenceInDays, format } from "date-fns";
+import { Sparkles } from "lucide-react";
 import { Zap, Pause, AlertTriangle } from "lucide-react";
 import { STATUS_CONFIG, SENTIMENT_CONFIG, PACKAGE_CONFIG } from "../utils/redFlagEngine";
 
@@ -49,6 +50,11 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
+            {client.created_date && differenceInDays(today, new Date(client.created_date)) <= 10 && (
+              <span className="shrink-0 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                <Sparkles className="w-2.5 h-2.5" />NEW
+              </span>
+            )}
             {client.group != null && (
               <span className="shrink-0 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full">G{client.group}</span>
             )}

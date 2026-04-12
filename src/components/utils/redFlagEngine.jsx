@@ -66,6 +66,24 @@ export function computeRedFlags(client) {
     }
   }
 
+  // 7. New client onboarding incomplete
+  if (client.created_date) {
+    const daysSinceCreated = differenceInDays(now, parseDate(client.created_date));
+    if (daysSinceCreated >= 10) {
+      const steps = [
+        client.onboarding_contract_signed,
+        client.onboarding_lead_list_received,
+        client.onboarding_campaign_live,
+        client.onboarding_kickoff_done,
+        client.onboarding_crm_connected,
+      ];
+      const completed = steps.filter(Boolean).length;
+      if (completed < steps.length) {
+        flags.push({ type: 'onboarding_overdue', severity: 'red', message: `Onboarding incomplete (${completed}/${steps.length} steps) after ${daysSinceCreated}d`, emoji: '🚧' });
+      }
+    }
+  }
+
   return flags;
 }
 
