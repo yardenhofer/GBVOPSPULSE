@@ -97,6 +97,17 @@ export default function Dashboard() {
         return (STATUS_ORDER[sa] ?? 4) - (STATUS_ORDER[sb] ?? 4);
       }
       if (filters.sort === "sequence") {
+        function seqRank(c) {
+          const ir = getCachedInstantlyResult(c);
+          if (!ir || ir.error) return 4; // no data
+          if (ir.noActive) return 1; // paused/no active campaigns
+          const pct = ir.pct ?? 0;
+          if (pct >= 80) return 0; // red
+          if (pct >= 60) return 2; // orange
+          return 3; // green
+        }
+        const diff = seqRank(a) - seqRank(b);
+        if (diff !== 0) return diff;
         const pa = getCachedInstantlyResult(a)?.pct ?? -1;
         const pb = getCachedInstantlyResult(b)?.pct ?? -1;
         return pb - pa;
