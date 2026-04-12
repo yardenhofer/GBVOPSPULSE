@@ -24,9 +24,9 @@ export function computeRedFlags(client) {
   // 2. No AM touchpoint
   if (client.last_am_touchpoint) {
     const days = differenceInDays(now, parseDate(client.last_am_touchpoint));
-    if (days >= 10) {
+    if (days >= 7) {
       flags.push({ type: 'no_touchpoint', severity: 'red', message: `No AM touchpoint for ${days} days`, emoji: '🕒', days });
-    } else if (days >= 3) {
+    } else if (days >= 4) {
       flags.push({ type: 'no_touchpoint', severity: 'yellow', message: `No AM touchpoint for ${days} days`, emoji: '🕒', days });
     }
   }
