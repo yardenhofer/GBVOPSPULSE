@@ -31,7 +31,7 @@ export default function Pax8Orders() {
   const [mockLoading, setMockLoading] = useState(false);
 
   // Order quantity
-  const [orderQty, setOrderQty] = useState(3);
+  const [orderQty, setOrderQty] = useState(1);
 
   // Live run state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
