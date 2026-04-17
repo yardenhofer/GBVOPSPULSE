@@ -304,5 +304,72 @@ Deno.serve(async (req) => {
     return Response.json({ error: "Provide step: provisionDetails | fetchSubscription | findExistingSubscription" });
   }
 
+  // ── Action: investigate — test provisioningDetails format variants ──
+  if (action === "investigate") {
+    const { productId, companyId, variant } = body;
+    if (!productId || !companyId || !variant) {
+      return Response.json({ error: "productId, companyId, and variant (1-4) required" });
+    }
+
+    const token = await getPax8Token();
+
+    let provisioningDetails;
+    let variantLabel;
+
+    if (variant === 1) {
+      variantLabel = "Single-property objects";
+      provisioningDetails = [
+        { msDomain: "GrowBig3" },
+        { msMPNidval: "7100033" },
+        { mca2020FirstName: "Leon" },
+      ];
+    } else if (variant === 2) {
+      variantLabel = "name/selection";
+      provisioningDetails = [
+        { name: "msDomain", selection: "GrowBig3" },
+      ];
+    } else if (variant === 3) {
+      variantLabel = "attribute/answer";
+      provisioningDetails = [
+        { attribute: "msDomain", answer: "GrowBig3" },
+      ];
+    } else if (variant === 4) {
+      variantLabel = "id/value";
+      provisioningDetails = [
+        { id: "msDomain", value: "GrowBig3" },
+      ];
+    } else {
+      return Response.json({ error: "variant must be 1, 2, 3, or 4" });
+    }
+
+    const orderPayload = {
+      companyId,
+      orderedBy: "Pax8 Partner",
+      orderedByUserEmail: user.email,
+      lineItems: [{
+        productId,
+        lineItemNumber: 1,
+        quantity: 1,
+        billingTerm: "Monthly",
+        provisioningDetails,
+      }],
+    };
+
+    const startMs = Date.now();
+    const res = await pax8Post(token, "/orders", orderPayload, { isMock: "true" });
+    const elapsedMs = Date.now() - startMs;
+
+    return Response.json({
+      variant,
+      variantLabel,
+      elapsedMs,
+      httpStatus: res.status,
+      ok: res.ok,
+      payloadSent: { provisioningDetails },
+      fullResponse: res.data,
+      rawText: res.text,
+    });
+  }
+
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
 });
