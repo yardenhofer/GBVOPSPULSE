@@ -232,5 +232,48 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ── Action: debug (temporary) ──
+  if (action === "debug") {
+    const { productId, companyId } = body;
+    if (!productId) return Response.json({ error: "productId required" });
+    const token = await getPax8Token();
+    
+    // Fetch pricing (with optional companyId for company-specific pricing)
+    const pricingParams = companyId ? { companyId } : {};
+    const pricing = await pax8Get(token, `/products/${productId}/pricing`, pricingParams);
+    // Fetch provision details
+    const provDetails = await pax8Get(token, `/products/${productId}/provision-details`);
+    // Fetch product dependencies
+    let deps = null;
+    try { deps = await pax8Get(token, `/products/${productId}/dependencies`); } catch (e) { deps = e.message; }
+    // Try commitment-terms endpoint
+    let commitTerms = null;
+    try { commitTerms = await pax8Get(token, `/products/${productId}/commitment-terms`); } catch (e) { commitTerms = e.message; }
+    
+    // Get first active company for testing
+    let testCompanyId = companyId;
+    if (!testCompanyId) {
+      const companies = await pax8Get(token, "/companies", { status: "Active", size: 1 });
+      testCompanyId = companies.content?.[0]?.id;
+    }
+    if (testCompanyId) {
+      const orderPayload = {
+        companyId: testCompanyId,
+        orderedBy: "Pax8 Partner",
+        orderedByUserEmail: user.email,
+        lineItems: [{
+          productId,
+          lineItemNumber: 1,
+          quantity: 1,
+          billingTerm: "Monthly",
+          provisioningDetails: [],
+        }],
+      };
+      const mockRes = await pax8Post(token, "/orders", orderPayload, { isMock: "true" });
+      return Response.json({ mockOrder: { ok: mockRes.ok, status: mockRes.status, data: mockRes.data, text: mockRes.text } });
+    }
+    return Response.json({ note: "pass companyId to test mock order" });
+  }
+
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
 });
