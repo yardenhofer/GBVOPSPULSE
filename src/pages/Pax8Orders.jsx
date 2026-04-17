@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { ShieldAlert, Play, Zap, RefreshCw } from "lucide-react";
 
-import Pax8PasswordGate from "../components/pax8/Pax8PasswordGate";
-import ProductVerification from "../components/pax8/ProductVerification";
-import PreflightResults from "../components/pax8/PreflightResults";
-import LiveConfirmationModal from "../components/pax8/LiveConfirmationModal";
-import LiveRunProgress from "../components/pax8/LiveRunProgress";
+import Pax8PasswordGate from "../components/pax8/Pax8PasswordGate.jsx";
+import ProductVerification from "../components/pax8/ProductVerification.jsx";
+import PreflightResults from "../components/pax8/PreflightResults.jsx";
+import LiveConfirmationModal from "../components/pax8/LiveConfirmationModal.jsx";
+import LiveRunProgress from "../components/pax8/LiveRunProgress.jsx";
 
 const SPEND_CAP = 250; // $250/month spend cap per run
 const ESTIMATED_MONTHLY_COST_PER_LICENSE = 23; // fallback estimate if Pax8 doesn't return price
