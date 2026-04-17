@@ -8,24 +8,28 @@ import PreflightResults from "../components/pax8/PreflightResults";
 import LiveConfirmationModal from "../components/pax8/LiveConfirmationModal";
 import LiveRunProgress from "../components/pax8/LiveRunProgress";
 
-const SPEND_CAP = 10000;
-const ESTIMATED_MONTHLY_COST_PER_LICENSE = 23;
+const SPEND_CAP = 250; // $250/month spend cap per run
+const ESTIMATED_MONTHLY_COST_PER_LICENSE = 23; // fallback estimate if Pax8 doesn't return price
 
 export default function Pax8Orders() {
   const [unlocked, setUnlocked] = useState(false);
   const [user, setUser] = useState(null);
 
+  // Product state
   const [product, setProduct] = useState(null);
   const [productLoading, setProductLoading] = useState(false);
   const [productError, setProductError] = useState(null);
 
+  // Preflight state
   const [preflightData, setPreflightData] = useState(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflightError, setPreflightError] = useState(null);
 
+  // Mock state
   const [mockResults, setMockResults] = useState(null);
   const [mockLoading, setMockLoading] = useState(false);
 
+  // Live run state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [liveResults, setLiveResults] = useState([]);
   const [liveRunning, setLiveRunning] = useState(false);
@@ -38,6 +42,7 @@ export default function Pax8Orders() {
     base44.auth.me().then(u => setUser(u)).catch(() => {});
   }, []);
 
+  // ── Step 1: Resolve Product ──
   async function resolveProduct() {
     setProductLoading(true);
     setProductError(null);
@@ -50,6 +55,7 @@ export default function Pax8Orders() {
     setProductLoading(false);
   }
 
+  // ── Step 2: Pre-flight ──
   async function runPreflight() {
     if (!product?.productId) return;
     setPreflightLoading(true);
@@ -67,6 +73,7 @@ export default function Pax8Orders() {
     setPreflightLoading(false);
   }
 
+  // ── Step 3: Mock Orders ──
   async function runMockOrders() {
     if (!product?.productId || !preflightData?.eligible) return;
     setMockLoading(true);
@@ -81,6 +88,7 @@ export default function Pax8Orders() {
     setMockLoading(false);
   }
 
+  // ── Step 4+5: Live Orders ──
   async function startLiveRun(amountTyped, confirmWord) {
     setShowConfirmModal(false);
     setLiveRunning(true);
@@ -92,6 +100,7 @@ export default function Pax8Orders() {
     const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const eligible = preflightData.eligible;
 
+    // Create audit log entry
     await base44.entities.Pax8AuditLog.create({
       run_id: runId,
       triggered_by: user?.email || "unknown",
@@ -118,6 +127,7 @@ export default function Pax8Orders() {
       const client = eligible[i];
       setCurrentClient(client.companyName);
 
+      // Spend guard
       if (totalSpend >= SPEND_CAP) {
         setHalted(true);
         break;
@@ -146,6 +156,7 @@ export default function Pax8Orders() {
         setCumulativeCost(totalSpend);
       }
 
+      // 2-second pause between orders
       if (i < eligible.length - 1 && !haltRef.current) {
         await new Promise(r => setTimeout(r, 2000));
       }
@@ -156,6 +167,7 @@ export default function Pax8Orders() {
 
     const finalStatus = haltRef.current ? "halted" : "completed";
 
+    // Update audit log
     const logs = await base44.entities.Pax8AuditLog.filter({ run_id: runId });
     if (logs[0]) {
       await base44.entities.Pax8AuditLog.update(logs[0].id, {
@@ -177,12 +189,14 @@ export default function Pax8Orders() {
         <h2>Pax8 License Order Run — ${finalStatus.toUpperCase()}</h2>
         <p><strong>Triggered by:</strong> ${user?.full_name || user?.email}</p>
         <p><strong>Product:</strong> ${product.name} (${product.sku})</p>
+        <p><strong>Results:</strong></p>
         <ul>
           <li>✅ Successful: ${successCount}</li>
           <li>❌ Failed: ${failCount}</li>
           <li>⏭ Skipped: ${skipCount}</li>
         </ul>
         <p><strong>Total monthly spend:</strong> $${totalSpend}</p>
+        ${failCount > 0 ? `<h3>Failed Orders:</h3><ul>${results.filter(r => r.status === "failed").map(r => `<li>${r.companyName}: ${r.error}</li>`).join("")}</ul>` : ""}
       `,
     }).catch(() => {});
   }
@@ -201,6 +215,7 @@ export default function Pax8Orders() {
 
   return (
     <div className="space-y-5 max-w-4xl">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
@@ -213,6 +228,7 @@ export default function Pax8Orders() {
         </div>
       </div>
 
+      {/* Warning banner */}
       <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
         <ShieldAlert className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
         <div>
@@ -225,6 +241,7 @@ export default function Pax8Orders() {
         </div>
       </div>
 
+      {/* Step 1: Product Verification */}
       <ProductVerification
         product={product}
         loading={productLoading}
@@ -232,6 +249,7 @@ export default function Pax8Orders() {
         onResolve={resolveProduct}
       />
 
+      {/* Step 2: Pre-flight */}
       {product && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
           <div className="flex items-center justify-between mb-3">
@@ -251,8 +269,10 @@ export default function Pax8Orders() {
         </div>
       )}
 
+      {/* Preflight Results */}
       {preflightData && <PreflightResults data={preflightData} mockResults={mockResults} />}
 
+      {/* Step 3: Mock Orders */}
       {preflightData && preflightData.eligible.length > 0 && !mockResults && (
         <div className="flex justify-center">
           <button
@@ -266,6 +286,7 @@ export default function Pax8Orders() {
         </div>
       )}
 
+      {/* Step 4: Live Order Button (only after mock, only for admins) */}
       {mockResults && !liveRunning && liveResults.length === 0 && isAdmin && (
         <div className="flex flex-col items-center gap-3">
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-center">
@@ -289,6 +310,7 @@ export default function Pax8Orders() {
         </div>
       )}
 
+      {/* Step 5: Live Run Progress */}
       {(liveRunning || liveResults.length > 0) && (
         <LiveRunProgress
           results={liveResults}
@@ -301,6 +323,7 @@ export default function Pax8Orders() {
         />
       )}
 
+      {/* Confirmation Modal */}
       {showConfirmModal && (
         <LiveConfirmationModal
           eligibleCount={preflightData.eligible.length}
