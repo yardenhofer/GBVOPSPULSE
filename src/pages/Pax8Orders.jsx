@@ -9,7 +9,7 @@ import LiveConfirmationModal from "../components/pax8/LiveConfirmationModal.jsx"
 import LiveRunProgress from "../components/pax8/LiveRunProgress.jsx";
 
 const SPEND_CAP = 20; // $20/month spend cap for test run (normally 250)
-const ESTIMATED_MONTHLY_COST_PER_LICENSE = 23; // fallback estimate if Pax8 doesn't return price
+const ESTIMATED_MONTHLY_COST_PER_LICENSE = 4.2; // Exchange Online Plan 1 actual cost
 const MAX_DOMAIN_RETRIES = 1; // No retries for test run (normally 5)
 
 export default function Pax8Orders() {
