@@ -3,8 +3,25 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const PAX8_TOKEN_URL = "https://api.pax8.com/v1/token";
 const PAX8_API_BASE = "https://api.pax8.com/v1";
 const TARGET_SKU = "MST-NCE-179-C100";
+const PRODUCT_ID = "b2286d6e-4d50-40b5-b60b-b7dce26bf423";
+const COMMITMENT_TERM_ID = "c5bab94b-9eb4-4646-a737-bcf0f0ea8f87";
 const SPEND_CAP = 250;
 const BATCH_CAP = 100;
+const DOMAIN_RETRY_LIMIT = 5;
+const ORDERED_BY_EMAIL = "leon@growbigvirtual.com";
+const CANCEL_POLICY_ACK = "I understand, and acknowledge that I will have a 7 calendar day window to cancel my subscription, or make quantity decrements before I am no longer able to make these changes. Once a subscription is locked, I will be required fulfill my elected commitment term of my subscription.";
+
+const STATIC_PROVISIONING = [
+  { key: "msCustExists", values: ["No, the customer does not have a Microsoft account"] },
+  { key: "msMPNidval", values: ["7100033"] },
+  { key: "mca2020FirstName", values: ["Leon"] },
+  { key: "mca2020LastName", values: ["Blom"] },
+  { key: "mca2020Email", values: ["leon@growbigvirtual.com"] },
+  { key: "msftContactFirstName", values: ["Leon"] },
+  { key: "msftContactLastName", values: ["Blom"] },
+  { key: "msftContactEmail", values: ["leon@growbigvirtual.com"] },
+  { key: "microsoftCancelPolicyAcknowledgement", values: [CANCEL_POLICY_ACK] },
+];
 
 async function getPax8Token() {
   const clientId = Deno.env.get("PAX8_CLIENT_ID");
@@ -13,7 +30,7 @@ async function getPax8Token() {
 
   const res = await fetch(PAX8_TOKEN_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
       client_id: clientId,
       client_secret: clientSecret,
@@ -60,7 +77,6 @@ async function pax8Post(token, path, body, queryParams = {}) {
   return { ok: res.ok, status: res.status, data: json, text };
 }
 
-// Paginate through all results
 async function pax8GetAll(token, path, params = {}, maxPages = 50) {
   const all = [];
   let page = 0;
@@ -74,6 +90,42 @@ async function pax8GetAll(token, path, params = {}, maxPages = 50) {
   return all;
 }
 
+// ── Domain counter helpers ──
+async function getDomainCounter(base44) {
+  const settings = await base44.asServiceRole.entities.AppSettings.filter({ key: "pax8_domain_counter" });
+  if (settings.length > 0) return parseInt(settings[0].value, 10);
+  return 3; // default
+}
+
+async function setDomainCounter(base44, newVal) {
+  const settings = await base44.asServiceRole.entities.AppSettings.filter({ key: "pax8_domain_counter" });
+  if (settings.length > 0) {
+    await base44.asServiceRole.entities.AppSettings.update(settings[0].id, { value: String(newVal) });
+  } else {
+    await base44.asServiceRole.entities.AppSettings.create({ key: "pax8_domain_counter", value: String(newVal) });
+  }
+}
+
+// ── Build order payload ──
+function buildOrderPayload(companyId, domainN) {
+  return {
+    companyId,
+    orderedBy: "Pax8 Partner",
+    orderedByUserEmail: ORDERED_BY_EMAIL,
+    lineItems: [{
+      productId: PRODUCT_ID,
+      quantity: 1,
+      billingTerm: "Monthly",
+      commitmentTermId: COMMITMENT_TERM_ID,
+      provisioningDetails: [
+        { key: "msCustExists", values: ["No, the customer does not have a Microsoft account"] },
+        { key: "msDomain", values: [`GrowBig${domainN}`] },
+        ...STATIC_PROVISIONING.filter(p => p.key !== "msCustExists"),
+      ],
+    }],
+  };
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -84,61 +136,43 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const { action } = body;
 
-  // ── Action: resolveProduct ──
+  // ── resolveProduct ──
   if (action === "resolveProduct") {
     const token = await getPax8Token();
-    // Search products by SKU
     const data = await pax8Get(token, "/products", { search: TARGET_SKU, size: 10 });
     const products = data.content || [];
     const match = products.find(p => p.sku === TARGET_SKU);
-    if (!match) {
-      return Response.json({ error: `Product with SKU ${TARGET_SKU} not found in Pax8 catalog.` });
-    }
+    if (!match) return Response.json({ error: `Product with SKU ${TARGET_SKU} not found.` });
     return Response.json({
       productId: match.id,
       name: match.name,
       sku: match.sku,
       vendorName: match.vendorName,
-      requiresCommitment: match.requiresCommitment,
+      commitmentTermId: COMMITMENT_TERM_ID,
     });
   }
 
-  // ── Action: preflight ──
+  // ── preflight ──
   if (action === "preflight") {
-    const { productId } = body;
-    if (!productId) return Response.json({ error: "productId required" });
-
     const token = await getPax8Token();
-
-    // Get all active companies
     const companies = await pax8GetAll(token, "/companies", { status: "Active" });
-
     const eligible = [];
     const skipped = [];
     let alreadyHave = 0;
 
-    // For each company, check if they already have a subscription for this product
     for (const company of companies) {
       if (eligible.length >= BATCH_CAP) {
         skipped.push({ companyId: company.id, companyName: company.name, reason: "Batch cap reached" });
         continue;
       }
-
-      // Check existing subscriptions for this company+product
       let subs = [];
       try {
-        const subData = await pax8Get(token, "/subscriptions", {
-          companyId: company.id,
-          productId: productId,
-          size: 5,
-        });
+        const subData = await pax8Get(token, "/subscriptions", { companyId: company.id, productId: PRODUCT_ID, size: 5 });
         subs = subData.content || [];
       } catch {
-        // If subscriptions endpoint fails, skip
         skipped.push({ companyId: company.id, companyName: company.name, reason: "Could not check subscriptions" });
         continue;
       }
-
       const activeSubs = subs.filter(s => s.status === "Active" || s.status === "PendingActivation");
       if (activeSubs.length > 0) {
         alreadyHave++;
@@ -148,257 +182,182 @@ Deno.serve(async (req) => {
       }
     }
 
+    const currentCounter = await getDomainCounter(base44);
+    return Response.json({ totalCompanies: companies.length, eligible, skipped, alreadyHave, currentDomainCounter: currentCounter });
+  }
+
+  // ── mockOrder (single client test) ──
+  if (action === "mockOrder") {
+    const { companyId, companyName } = body;
+    if (!companyId) return Response.json({ error: "companyId required" });
+
+    const token = await getPax8Token();
+    const currentN = await getDomainCounter(base44);
+    const payload = buildOrderPayload(companyId, currentN);
+
+    console.log("[MOCK] Sending payload:", JSON.stringify(payload, null, 2));
+
+    const startMs = Date.now();
+    const res = await pax8Post(token, "/orders", payload, { isMock: "true" });
+    const elapsedMs = Date.now() - startMs;
+
+    // Log full untruncated response to audit
+    await base44.asServiceRole.entities.Pax8AuditLog.create({
+      run_id: `mock_${Date.now()}`,
+      triggered_by: user.email,
+      mode: "mock",
+      status: res.ok ? "completed" : "error",
+      product_id: PRODUCT_ID,
+      product_name: "Exchange Online (Plan 1) [NCE]",
+      product_sku: TARGET_SKU,
+      eligible_count: 1,
+      success_count: res.ok ? 1 : 0,
+      failed_count: res.ok ? 0 : 1,
+      eligible_clients: JSON.stringify([{ companyId, companyName }]),
+      results: JSON.stringify([{
+        companyId,
+        companyName,
+        status: res.ok ? "mock_success" : "mock_failed",
+        httpStatus: res.status,
+        elapsedMs,
+        domainUsed: `GrowBig${currentN}`,
+      }]),
+      api_log: JSON.stringify([{
+        request: { ...payload, _note: "credentials redacted" },
+        response: res.data,
+        rawText: res.text,
+        httpStatus: res.status,
+        elapsedMs,
+      }]),
+      error_message: res.ok ? null : (res.data?.message || res.text),
+    });
+
     return Response.json({
-      totalCompanies: companies.length,
-      eligible,
-      skipped,
-      alreadyHave,
+      ok: res.ok,
+      httpStatus: res.status,
+      elapsedMs,
+      domainUsed: `GrowBig${currentN}`,
+      payloadSent: payload,
+      fullResponse: res.data,
+      rawText: res.text,
     });
   }
 
-  // ── Action: mockOrders ──
+  // ── mockOrders (batch mock) ──
   if (action === "mockOrders") {
-    const { productId, eligible } = body;
-    if (!productId || !eligible) return Response.json({ error: "productId and eligible required" });
+    const { eligible } = body;
+    if (!eligible) return Response.json({ error: "eligible required" });
 
     const token = await getPax8Token();
+    let currentN = await getDomainCounter(base44);
     const mockResults = [];
 
     for (const client of eligible) {
-      const orderPayload = {
-        companyId: client.companyId,
-        orderedBy: "Pax8 Partner",
-        orderedByUserEmail: user.email,
-        lineItems: [{
-          productId,
-          lineItemNumber: 1,
-          quantity: 1,
-          billingTerm: "Monthly",
-          provisioningDetails: [],
-        }],
-      };
-
-      const res = await pax8Post(token, "/orders", orderPayload, { isMock: "true" });
+      const payload = buildOrderPayload(client.companyId, currentN);
+      const res = await pax8Post(token, "/orders", payload, { isMock: "true" });
 
       mockResults.push({
         companyId: client.companyId,
         companyName: client.companyName,
         status: res.ok ? "mock_success" : "mock_failed",
+        domainUsed: `GrowBig${currentN}`,
         error: res.ok ? null : (res.data?.message || res.text || `HTTP ${res.status}`),
         response: res.data,
       });
+
+      // In mock mode, increment counter to simulate unique domains
+      currentN++;
     }
 
     return Response.json({ mockResults });
   }
 
-  // ── Action: placeOrder (LIVE — single client) ──
+  // ── placeOrder (LIVE — single client with domain retry) ──
   if (action === "placeOrder") {
-    const { productId, companyId, companyName, runId } = body;
-    if (!productId || !companyId) return Response.json({ error: "productId and companyId required" });
+    const { companyId, companyName, runId } = body;
+    if (!companyId) return Response.json({ error: "companyId required" });
 
     const token = await getPax8Token();
+    let currentN = await getDomainCounter(base44);
 
-    const orderPayload = {
-      companyId,
-      orderedBy: "Pax8 Partner",
-      orderedByUserEmail: user.email,
-      lineItems: [{
-        productId,
-        lineItemNumber: 1,
-        quantity: 1,
-        billingTerm: "Monthly",
-        provisioningDetails: [],
-      }],
-    };
+    for (let attempt = 0; attempt < DOMAIN_RETRY_LIMIT; attempt++) {
+      const domainN = currentN + attempt;
+      const payload = buildOrderPayload(companyId, domainN);
 
-    // LIVE order — no isMock flag
-    const res = await pax8Post(token, "/orders", orderPayload);
+      console.log(`[LIVE ORDER] Attempt ${attempt + 1} for ${companyName} with GrowBig${domainN}`);
+      const res = await pax8Post(token, "/orders", payload);
 
-    if (res.ok) {
-      console.log(`[LIVE ORDER] Success for ${companyName} (${companyId}), order ID: ${res.data?.id}`);
-      return Response.json({
-        status: "success",
-        orderId: res.data?.id,
-        response: res.data,
-      });
-    } else {
-      console.error(`[LIVE ORDER] Failed for ${companyName} (${companyId}): ${res.text}`);
+      if (res.ok) {
+        // Success — increment counter past this domain
+        await setDomainCounter(base44, domainN + 1);
+        console.log(`[LIVE ORDER] Success for ${companyName}, order ID: ${res.data?.id}, domain: GrowBig${domainN}`);
+        return Response.json({
+          status: "success",
+          orderId: res.data?.id,
+          domainUsed: `GrowBig${domainN}`,
+          response: res.data,
+        });
+      }
+
+      // Check if it's a domain collision error — retry with next number
+      const errMsg = (res.data?.message || res.text || "").toLowerCase();
+      const isDomainCollision = errMsg.includes("domain") && (errMsg.includes("taken") || errMsg.includes("exists") || errMsg.includes("already") || errMsg.includes("unavailable"));
+
+      if (isDomainCollision) {
+        console.log(`[LIVE ORDER] Domain GrowBig${domainN} collision, retrying...`);
+        continue;
+      }
+
+      // Non-domain error — fail immediately
+      console.error(`[LIVE ORDER] Failed for ${companyName}: ${res.text}`);
       return Response.json({
         status: "failed",
         reason: res.data?.message || res.text || `HTTP ${res.status}`,
+        domainAttempted: `GrowBig${domainN}`,
         response: res.data,
       });
     }
+
+    // Exhausted retries
+    await setDomainCounter(base44, currentN + DOMAIN_RETRY_LIMIT);
+    return Response.json({
+      status: "failed",
+      reason: `Domain collision: exhausted ${DOMAIN_RETRY_LIMIT} attempts (GrowBig${currentN} through GrowBig${currentN + DOMAIN_RETRY_LIMIT - 1})`,
+    });
   }
 
-  // ── Action: debug — structured investigation, no trial-and-error ──
+  // ── debug (kept for investigation) ──
   if (action === "debug") {
     const { productId, step, subscriptionId } = body;
-    if (!productId && step !== "fetchSubscription") return Response.json({ error: "productId required" });
     const token = await getPax8Token();
 
-    // Step 1: GET /v1/products/{productId}/provision-details
     if (step === "provisionDetails") {
-      const url = `${PAX8_API_BASE}/products/${productId}/provision-details`;
+      const url = `${PAX8_API_BASE}/products/${productId || PRODUCT_ID}/provision-details`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       });
       const data = await res.json();
       const items = data.content || [];
       const pg = body.pg || 0;
-      // Return 3 items at a time to avoid truncation
       const chunk = items.slice(pg * 3, (pg + 1) * 3);
-      return Response.json({
-        total: items.length,
-        pg,
-        showing: `${pg * 3}-${Math.min((pg + 1) * 3, items.length)} of ${items.length}`,
-        keys: items.map(i => i.key),
-        chunk,
-      });
+      return Response.json({ total: items.length, pg, keys: items.map(i => i.key), chunk });
     }
 
-    // Step 3: GET /v1/subscriptions/{subscriptionId} — fetch a single subscription's full detail
     if (step === "fetchSubscription") {
       if (!subscriptionId) return Response.json({ error: "subscriptionId required" });
-      const url = `${PAX8_API_BASE}/subscriptions/${subscriptionId}`;
-      const res = await fetch(url, {
+      const res = await fetch(`${PAX8_API_BASE}/subscriptions/${subscriptionId}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       });
       const rawText = await res.text();
-      return new Response(rawText, {
-        status: res.status,
-        headers: { "Content-Type": res.headers.get("Content-Type") || "application/json" },
-      });
+      return new Response(rawText, { status: res.status, headers: { "Content-Type": "application/json" } });
     }
 
-    // Step 3 helper: find an existing NCE subscription to inspect
-    if (step === "findExistingSubscription") {
-      // Look across active companies for any subscription to this product (or similar NCE)
-      const companies = await pax8GetAll(token, "/companies", { status: "Active" });
-      for (const company of companies) {
-        let subData;
-        try {
-          subData = await pax8Get(token, "/subscriptions", {
-            companyId: company.id,
-            productId: productId,
-            size: 5,
-          });
-        } catch { continue; }
-        const subs = subData.content || [];
-        if (subs.length > 0) {
-          // Return the first subscription ID we find + its list-level data
-          return Response.json({
-            found: true,
-            companyId: company.id,
-            companyName: company.name,
-            subscriptionSummary: subs[0],
-            subscriptionId: subs[0].id,
-            allSubIds: subs.map(s => ({ id: s.id, status: s.status })),
-          });
-        }
-      }
-      return Response.json({ found: false, companiesSearched: companies.length });
+    if (step === "domainCounter") {
+      const val = await getDomainCounter(base44);
+      return Response.json({ currentDomainCounter: val });
     }
 
-    return Response.json({ error: "Provide step: provisionDetails | fetchSubscription | findExistingSubscription" });
-  }
-
-  // ── Action: investigate — test provisioningDetails format variants ──
-  if (action === "investigate") {
-    const { productId, companyId, variant } = body;
-    if (!productId || !companyId || !variant) {
-      return Response.json({ error: "productId, companyId, and variant (1-4) required" });
-    }
-
-    const token = await getPax8Token();
-
-    let provisioningDetails;
-    let variantLabel;
-
-    if (variant === 1) {
-      variantLabel = "Single-property objects";
-      provisioningDetails = [
-        { msDomain: "GrowBig3" },
-        { msMPNidval: "7100033" },
-        { mca2020FirstName: "Leon" },
-      ];
-    } else if (variant === 2) {
-      variantLabel = "name/selection";
-      provisioningDetails = [
-        { name: "msDomain", selection: "GrowBig3" },
-      ];
-    } else if (variant === 3) {
-      variantLabel = "attribute/answer";
-      provisioningDetails = [
-        { attribute: "msDomain", answer: "GrowBig3" },
-      ];
-    } else if (variant === 4) {
-      variantLabel = "id/value";
-      provisioningDetails = [
-        { id: "msDomain", value: "GrowBig3" },
-      ];
-    } else if (variant === 5) {
-      variantLabel = "key/values (array)";
-      provisioningDetails = [
-        { key: "msDomain", values: ["GrowBig3"] },
-      ];
-    } else if (variant === 6) {
-      variantLabel = "key/values (string)";
-      provisioningDetails = [
-        { key: "msDomain", values: "GrowBig3" },
-      ];
-    } else if (variant === 7) {
-      variantLabel = "key/selectedValue";
-      provisioningDetails = [
-        { key: "msDomain", selectedValue: "GrowBig3" },
-      ];
-    } else if (variant === 8) {
-      variantLabel = "key/response";
-      provisioningDetails = [
-        { key: "msDomain", response: "GrowBig3" },
-      ];
-    } else if (variant === 9) {
-      variantLabel = "key/answer";
-      provisioningDetails = [
-        { key: "msDomain", answer: "GrowBig3" },
-      ];
-    } else if (variant === 10) {
-      variantLabel = "key/input";
-      provisioningDetails = [
-        { key: "msDomain", input: "GrowBig3" },
-      ];
-    } else {
-      return Response.json({ error: "variant must be 1-10" });
-    }
-
-    const orderPayload = {
-      companyId,
-      orderedBy: "Pax8 Partner",
-      orderedByUserEmail: user.email,
-      lineItems: [{
-        productId,
-        lineItemNumber: 1,
-        quantity: 1,
-        billingTerm: "Monthly",
-        provisioningDetails,
-      }],
-    };
-
-    const startMs = Date.now();
-    const res = await pax8Post(token, "/orders", orderPayload, { isMock: "true" });
-    const elapsedMs = Date.now() - startMs;
-
-    return Response.json({
-      variant,
-      variantLabel,
-      elapsedMs,
-      httpStatus: res.status,
-      ok: res.ok,
-      payloadSent: { provisioningDetails },
-      fullResponse: res.data,
-      rawText: res.text,
-    });
+    return Response.json({ error: "Provide step: provisionDetails | fetchSubscription | domainCounter" });
   }
 
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
