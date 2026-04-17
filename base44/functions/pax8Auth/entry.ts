@@ -274,13 +274,14 @@ Deno.serve(async (req) => {
 
   // ── placeOrder (LIVE — single client with domain retry) ──
   if (action === "placeOrder") {
-    const { companyId, companyName, runId } = body;
+    const { companyId, companyName, runId, maxDomainRetries } = body;
     if (!companyId) return Response.json({ error: "companyId required" });
 
     const token = await getPax8Token();
     let currentN = await getDomainCounter(base44);
+    const retryLimit = maxDomainRetries || DOMAIN_RETRY_LIMIT;
 
-    for (let attempt = 0; attempt < DOMAIN_RETRY_LIMIT; attempt++) {
+    for (let attempt = 0; attempt < retryLimit; attempt++) {
       const domainN = currentN + attempt;
       const payload = buildOrderPayload(companyId, domainN);
 
@@ -319,10 +320,10 @@ Deno.serve(async (req) => {
     }
 
     // Exhausted retries
-    await setDomainCounter(base44, currentN + DOMAIN_RETRY_LIMIT);
+    await setDomainCounter(base44, currentN + retryLimit);
     return Response.json({
       status: "failed",
-      reason: `Domain collision: exhausted ${DOMAIN_RETRY_LIMIT} attempts (GrowBig${currentN} through GrowBig${currentN + DOMAIN_RETRY_LIMIT - 1})`,
+      reason: `Domain collision: exhausted ${retryLimit} attempts (GrowBig${currentN} through GrowBig${currentN + retryLimit - 1})`,
     });
   }
 

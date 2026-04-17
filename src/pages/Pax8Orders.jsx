@@ -8,8 +8,9 @@ import PreflightResults from "../components/pax8/PreflightResults.jsx";
 import LiveConfirmationModal from "../components/pax8/LiveConfirmationModal.jsx";
 import LiveRunProgress from "../components/pax8/LiveRunProgress.jsx";
 
-const SPEND_CAP = 250; // $250/month spend cap per run
+const SPEND_CAP = 20; // $20/month spend cap for test run (normally 250)
 const ESTIMATED_MONTHLY_COST_PER_LICENSE = 23; // fallback estimate if Pax8 doesn't return price
+const MAX_DOMAIN_RETRIES = 1; // No retries for test run (normally 5)
 
 export default function Pax8Orders() {
   const [unlocked, setUnlocked] = useState(false);
@@ -135,10 +136,10 @@ export default function Pax8Orders() {
 
       const res = await base44.functions.invoke("pax8Auth", {
         action: "placeOrder",
-        productId: product.productId,
         companyId: client.companyId,
         companyName: client.companyName,
         runId,
+        maxDomainRetries: MAX_DOMAIN_RETRIES,
       });
 
       const result = {
