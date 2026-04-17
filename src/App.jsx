@@ -8,7 +8,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import LeadListApprovals from './pages/LeadListApprovals';
-import Pax8Orders from './pages/Pax8Orders.jsx';
+import Pax8Orders from './pages/Pax8Orders';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
