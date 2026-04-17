@@ -232,47 +232,76 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ── Action: debug (temporary) ──
+  // ── Action: debug — structured investigation, no trial-and-error ──
   if (action === "debug") {
-    const { productId, companyId } = body;
-    if (!productId) return Response.json({ error: "productId required" });
+    const { productId, step, subscriptionId } = body;
+    if (!productId && step !== "fetchSubscription") return Response.json({ error: "productId required" });
     const token = await getPax8Token();
-    
-    // Fetch pricing (with optional companyId for company-specific pricing)
-    const pricingParams = companyId ? { companyId } : {};
-    const pricing = await pax8Get(token, `/products/${productId}/pricing`, pricingParams);
-    // Fetch provision details
-    const provDetails = await pax8Get(token, `/products/${productId}/provision-details`);
-    // Fetch product dependencies
-    let deps = null;
-    try { deps = await pax8Get(token, `/products/${productId}/dependencies`); } catch (e) { deps = e.message; }
-    // Try commitment-terms endpoint
-    let commitTerms = null;
-    try { commitTerms = await pax8Get(token, `/products/${productId}/commitment-terms`); } catch (e) { commitTerms = e.message; }
-    
-    // Get first active company for testing
-    let testCompanyId = companyId;
-    if (!testCompanyId) {
-      const companies = await pax8Get(token, "/companies", { status: "Active", size: 1 });
-      testCompanyId = companies.content?.[0]?.id;
+
+    // Step 1: GET /v1/products/{productId}/provision-details
+    if (step === "provisionDetails") {
+      const url = `${PAX8_API_BASE}/products/${productId}/provision-details`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      const data = await res.json();
+      const items = data.content || [];
+      const pg = body.pg || 0;
+      // Return 3 items at a time to avoid truncation
+      const chunk = items.slice(pg * 3, (pg + 1) * 3);
+      return Response.json({
+        total: items.length,
+        pg,
+        showing: `${pg * 3}-${Math.min((pg + 1) * 3, items.length)} of ${items.length}`,
+        keys: items.map(i => i.key),
+        chunk,
+      });
     }
-    if (testCompanyId) {
-      const orderPayload = {
-        companyId: testCompanyId,
-        orderedBy: "Pax8 Partner",
-        orderedByUserEmail: user.email,
-        lineItems: [{
-          productId,
-          lineItemNumber: 1,
-          quantity: 1,
-          billingTerm: "Monthly",
-          provisioningDetails: [],
-        }],
-      };
-      const mockRes = await pax8Post(token, "/orders", orderPayload, { isMock: "true" });
-      return Response.json({ mockOrder: { ok: mockRes.ok, status: mockRes.status, data: mockRes.data, text: mockRes.text } });
+
+    // Step 3: GET /v1/subscriptions/{subscriptionId} — fetch a single subscription's full detail
+    if (step === "fetchSubscription") {
+      if (!subscriptionId) return Response.json({ error: "subscriptionId required" });
+      const url = `${PAX8_API_BASE}/subscriptions/${subscriptionId}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      const rawText = await res.text();
+      return new Response(rawText, {
+        status: res.status,
+        headers: { "Content-Type": res.headers.get("Content-Type") || "application/json" },
+      });
     }
-    return Response.json({ note: "pass companyId to test mock order" });
+
+    // Step 3 helper: find an existing NCE subscription to inspect
+    if (step === "findExistingSubscription") {
+      // Look across active companies for any subscription to this product (or similar NCE)
+      const companies = await pax8GetAll(token, "/companies", { status: "Active" });
+      for (const company of companies) {
+        let subData;
+        try {
+          subData = await pax8Get(token, "/subscriptions", {
+            companyId: company.id,
+            productId: productId,
+            size: 5,
+          });
+        } catch { continue; }
+        const subs = subData.content || [];
+        if (subs.length > 0) {
+          // Return the first subscription ID we find + its list-level data
+          return Response.json({
+            found: true,
+            companyId: company.id,
+            companyName: company.name,
+            subscriptionSummary: subs[0],
+            subscriptionId: subs[0].id,
+            allSubIds: subs.map(s => ({ id: s.id, status: s.status })),
+          });
+        }
+      }
+      return Response.json({ found: false, companiesSearched: companies.length });
+    }
+
+    return Response.json({ error: "Provide step: provisionDetails | fetchSubscription | findExistingSubscription" });
   }
 
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
