@@ -30,6 +30,9 @@ export default function Pax8Orders() {
   const [mockResults, setMockResults] = useState(null);
   const [mockLoading, setMockLoading] = useState(false);
 
+  // Order quantity
+  const [orderQty, setOrderQty] = useState(3);
+
   // Live run state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [liveResults, setLiveResults] = useState([]);
@@ -74,14 +77,16 @@ export default function Pax8Orders() {
     setPreflightLoading(false);
   }
 
+  const cappedEligible = preflightData?.eligible?.slice(0, orderQty) || [];
+
   // ── Step 3: Mock Orders ──
   async function runMockOrders() {
-    if (!product?.productId || !preflightData?.eligible) return;
+    if (!product?.productId || !cappedEligible.length) return;
     setMockLoading(true);
     const res = await base44.functions.invoke("pax8Auth", {
       action: "mockOrders",
       productId: product.productId,
-      eligible: preflightData.eligible,
+      eligible: cappedEligible,
     });
     if (res.data.mockResults) {
       setMockResults(res.data.mockResults);
@@ -99,7 +104,7 @@ export default function Pax8Orders() {
     setHalted(false);
 
     const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const eligible = preflightData.eligible;
+    const eligible = cappedEligible;
 
     // Create audit log entry
     await base44.entities.Pax8AuditLog.create({
@@ -211,7 +216,7 @@ export default function Pax8Orders() {
     return <Pax8PasswordGate onUnlock={() => setUnlocked(true)} />;
   }
 
-  const totalEstimatedCost = (preflightData?.eligible?.length || 0) * ESTIMATED_MONTHLY_COST_PER_LICENSE;
+  const totalEstimatedCost = cappedEligible.length * ESTIMATED_MONTHLY_COST_PER_LICENSE;
   const isAdmin = user?.role === "admin";
 
   return (
@@ -273,8 +278,37 @@ export default function Pax8Orders() {
       {/* Preflight Results */}
       {preflightData && <PreflightResults data={preflightData} mockResults={mockResults} />}
 
+      {/* Order Quantity Selector */}
+      {preflightData && preflightData.eligible.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+          <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+            Order Tenant (License) Quantity
+          </label>
+          <p className="text-xs text-gray-500 mb-3">
+            How many tenants to process? Max eligible: {preflightData.eligible.length}
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={1}
+              max={preflightData.eligible.length}
+              value={orderQty}
+              onChange={e => {
+                const v = Math.max(1, Math.min(preflightData.eligible.length, parseInt(e.target.value) || 1));
+                setOrderQty(v);
+                setMockResults(null); // reset mock when quantity changes
+              }}
+              className="w-24 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-500">
+              tenants · Est. cost: ${(orderQty * ESTIMATED_MONTHLY_COST_PER_LICENSE).toFixed(2)}/mo
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Step 3: Mock Orders */}
-      {preflightData && preflightData.eligible.length > 0 && !mockResults && (
+      {preflightData && cappedEligible.length > 0 && !mockResults && (
         <div className="flex justify-center">
           <button
             onClick={runMockOrders}
@@ -300,7 +334,7 @@ export default function Pax8Orders() {
             className="flex items-center gap-2 px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors"
           >
             <Zap className="w-4 h-4" />
-            Place Live Orders ({preflightData.eligible.length} clients)
+            Place Live Orders ({cappedEligible.length} tenants)
           </button>
         </div>
       )}
@@ -316,7 +350,7 @@ export default function Pax8Orders() {
         <LiveRunProgress
           results={liveResults}
           currentClient={currentClient}
-          totalClients={preflightData?.eligible?.length || 0}
+          totalClients={cappedEligible.length}
           halted={halted}
           cumulativeCost={cumulativeCost}
           spendCap={SPEND_CAP}
@@ -327,7 +361,7 @@ export default function Pax8Orders() {
       {/* Confirmation Modal */}
       {showConfirmModal && (
         <LiveConfirmationModal
-          eligibleCount={preflightData.eligible.length}
+          eligibleCount={cappedEligible.length}
           totalMonthlyCost={totalEstimatedCost}
           onConfirm={startLiveRun}
           onCancel={() => setShowConfirmModal(false)}

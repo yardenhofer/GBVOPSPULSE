@@ -18,13 +18,13 @@ export default function LiveConfirmationModal({ eligibleCount, totalMonthlyCost,
             <ShieldAlert className="w-5 h-5 text-red-500" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900 dark:text-white">Confirm Live Orders</h3>
+            <h3 className="font-bold text-gray-900 dark:text-white">Confirm Live Tenant Orders</h3>
             <p className="text-xs text-red-400">This action cannot be undone.</p>
           </div>
         </div>
 
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-xs text-red-400 space-y-1">
-          <p>You are about to place <strong>{eligibleCount}</strong> real license orders.</p>
+          <p>You are about to order <strong>{eligibleCount}</strong> tenant license(s).</p>
           <p>Estimated monthly cost: <strong>${totalMonthlyCost.toLocaleString()}</strong></p>
           <p>Estimated annual liability: <strong>${(totalMonthlyCost * 12).toLocaleString()}</strong></p>
         </div>
@@ -66,7 +66,7 @@ export default function LiveConfirmationModal({ eligibleCount, totalMonthlyCost,
             disabled={!canConfirm}
             className="flex-1 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            Place {eligibleCount} Live Orders
+            Place {eligibleCount} Tenant Order(s)
           </button>
           <button
             onClick={onCancel}
