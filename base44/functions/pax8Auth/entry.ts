@@ -338,8 +338,38 @@ Deno.serve(async (req) => {
       provisioningDetails = [
         { id: "msDomain", value: "GrowBig3" },
       ];
+    } else if (variant === 5) {
+      variantLabel = "key/values (array)";
+      provisioningDetails = [
+        { key: "msDomain", values: ["GrowBig3"] },
+      ];
+    } else if (variant === 6) {
+      variantLabel = "key/values (string)";
+      provisioningDetails = [
+        { key: "msDomain", values: "GrowBig3" },
+      ];
+    } else if (variant === 7) {
+      variantLabel = "key/selectedValue";
+      provisioningDetails = [
+        { key: "msDomain", selectedValue: "GrowBig3" },
+      ];
+    } else if (variant === 8) {
+      variantLabel = "key/response";
+      provisioningDetails = [
+        { key: "msDomain", response: "GrowBig3" },
+      ];
+    } else if (variant === 9) {
+      variantLabel = "key/answer";
+      provisioningDetails = [
+        { key: "msDomain", answer: "GrowBig3" },
+      ];
+    } else if (variant === 10) {
+      variantLabel = "key/input";
+      provisioningDetails = [
+        { key: "msDomain", input: "GrowBig3" },
+      ];
     } else {
-      return Response.json({ error: "variant must be 1, 2, 3, or 4" });
+      return Response.json({ error: "variant must be 1-10" });
     }
 
     const orderPayload = {
