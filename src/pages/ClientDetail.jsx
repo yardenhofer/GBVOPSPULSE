@@ -13,6 +13,7 @@ import PerformanceSection from "../components/clientdetail/PerformanceSection";
 import ClientSettingsSection from "../components/clientdetail/ClientSettingsSection";
 import RecoveryPlanSection from "../components/clientdetail/RecoveryPlanSection";
 import OnboardingChecklist from "../components/clientdetail/OnboardingChecklist";
+import OnboardingStageTracker from "../components/clientdetail/OnboardingStageTracker";
 
 import LeadVelocityChart from "../components/clientdetail/LeadVelocityChart";
 import InstantlyStatsPanel from "../components/clientdetail/InstantlyStatsPanel";
@@ -49,11 +50,14 @@ export default function ClientDetail() {
   async function confirmNewClient() {
     if (!newName.trim()) return;
     setCreating(true);
+    const today = new Date().toISOString().split("T")[0];
     const created = await base44.entities.Client.create({
       name: newName.trim(),
       status: "Healthy",
       client_sentiment: "Happy",
       package_type: newPackage,
+      onboarding_stage: "Infrastructure Ordered",
+      onboarding_stage_date: today,
     });
     navigate(createPageUrl(`ClientDetail?id=${created.id}`), { replace: true });
   }
@@ -147,6 +151,8 @@ export default function ClientDetail() {
           ))}
         </div>
       )}
+
+      <OnboardingStageTracker client={client} onClientUpdate={handleClientUpdate} />
 
       <ClientHeader
         client={client}

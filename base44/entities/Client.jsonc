@@ -1,0 +1,231 @@
+{
+  "name": "Client",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Client company name"
+    },
+    "group": {
+      "type": "number",
+      "description": "Group number this client belongs to"
+    },
+    "package_type": {
+      "type": "string",
+      "enum": [
+        "Email",
+        "LinkedIn",
+        "Hybrid"
+      ]
+    },
+    "assigned_am": {
+      "type": "string",
+      "description": "Email of assigned Account Manager"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Healthy",
+        "Monitor",
+        "At Risk",
+        "Critical",
+        "Off-Boarding",
+        "Terminated"
+      ],
+      "default": "Healthy"
+    },
+    "status_override": {
+      "type": "string",
+      "enum": [
+        "Healthy",
+        "Monitor"
+      ],
+      "description": "Admin override to suppress auto-calculated At Risk / Critical status"
+    },
+    "client_sentiment": {
+      "type": "string",
+      "enum": [
+        "Happy",
+        "Neutral",
+        "Slightly Concerned",
+        "Unhappy"
+      ],
+      "default": "Happy"
+    },
+    "unhappy_since": {
+      "type": "string",
+      "format": "date"
+    },
+    "revenue": {
+      "type": "number",
+      "description": "Monthly revenue"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "contract_end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Contract renewal / expiry date"
+    },
+    "target_leads_per_week": {
+      "type": "number"
+    },
+    "leads_this_week": {
+      "type": "number",
+      "default": 0
+    },
+    "leads_last_week": {
+      "type": "number",
+      "default": 0
+    },
+    "leads_week_3": {
+      "type": "number",
+      "default": 0,
+      "description": "Leads 3 weeks ago"
+    },
+    "leads_week_4": {
+      "type": "number",
+      "default": 0,
+      "description": "Leads 4 weeks ago"
+    },
+    "meetings_booked": {
+      "type": "number",
+      "default": 0
+    },
+    "close_rate": {
+      "type": "number"
+    },
+    "waiting_on_leads": {
+      "type": "boolean",
+      "default": false
+    },
+    "waiting_since": {
+      "type": "string",
+      "format": "date"
+    },
+    "last_am_touchpoint": {
+      "type": "string",
+      "format": "date"
+    },
+    "last_client_reply_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "is_escalated": {
+      "type": "boolean",
+      "default": false
+    },
+    "client_feedback": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "onboarding_contract_signed": {
+      "type": "boolean",
+      "default": false
+    },
+    "onboarding_lead_list_received": {
+      "type": "boolean",
+      "default": false
+    },
+    "onboarding_campaign_live": {
+      "type": "boolean",
+      "default": false
+    },
+    "onboarding_kickoff_done": {
+      "type": "boolean",
+      "default": false
+    },
+    "onboarding_crm_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "onboarding_stage": {
+      "type": "string",
+      "enum": [
+        "Infrastructure Ordered",
+        "Infrastructure In Process",
+        "Infrastructure Uploaded",
+        "Infrastructure Live"
+      ],
+      "description": "Current onboarding infrastructure stage (temporary, disappears after onboarding)"
+    },
+    "onboarding_stage_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when the current onboarding stage was set (used to auto-hide Infrastructure Live after 2 days)"
+    },
+    "instantly_api_key": {
+      "type": "string",
+      "description": "Client's Instantly.ai API key for their workspace"
+    },
+    "instantly_cache_pct": {
+      "type": "number",
+      "description": "Cached sequence completion % from Instantly (updated every 5 min)"
+    },
+    "instantly_cache_no_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if client has no active campaigns"
+    },
+    "instantly_cache_error": {
+      "type": "string",
+      "description": "Error message if last Instantly sync failed"
+    },
+    "instantly_cache_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the Instantly cache was last refreshed"
+    },
+    "slack_channel_id": {
+      "type": "string",
+      "description": "Auto-matched or manually set Slack channel ID for this client"
+    },
+    "slack_channel_name": {
+      "type": "string",
+      "description": "Manual override for Slack channel name if auto-match fails"
+    },
+    "dq_link": {
+      "type": "string",
+      "description": "Discovery Questionnaire link for this client"
+    },
+    "email_copy": {
+      "type": "string",
+      "description": "Current email sequence copy for reference"
+    },
+    "terminated_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when the client was terminated/archived"
+    },
+    "offboarding_slack_ts": {
+      "type": "string",
+      "description": "Slack message timestamp for offboarding checklist (used to check thread replies)"
+    },
+    "offboarding_slack_channel": {
+      "type": "string",
+      "description": "Slack channel ID where offboarding message was posted"
+    },
+    "offboarding_confirmed": {
+      "type": "boolean",
+      "default": false,
+      "description": "True once a team member replies CONFIRMED in the Slack thread"
+    },
+    "offboarding_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when offboarding was initiated"
+    },
+    "last_offboard_reminder_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when the last offboarding Slack reminder was sent (prevents duplicate daily reminders)"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

@@ -2,6 +2,7 @@ import { differenceInDays, format } from "date-fns";
 import { Sparkles } from "lucide-react";
 import { Zap, Pause, AlertTriangle } from "lucide-react";
 import { STATUS_CONFIG, SENTIMENT_CONFIG, PACKAGE_CONFIG } from "../utils/redFlagEngine";
+import { isOnboardingStageVisible } from "../clientdetail/OnboardingStageTracker";
 
 const STATUS_GLOW = {
   Healthy: "status-glow-healthy",
@@ -66,6 +67,15 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
             {client.instantly_api_key && (
               <span className="shrink-0 text-[10px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                 <Zap className="w-2.5 h-2.5" />Instantly
+              </span>
+            )}
+            {isOnboardingStageVisible(client) && (
+              <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                client.onboarding_stage === "Infrastructure Live"
+                  ? "text-green-400 bg-green-500/10"
+                  : "text-blue-400 bg-blue-500/10"
+              }`}>
+                {client.onboarding_stage?.replace("Infrastructure ", "") || ""}
               </span>
             )}
           </div>
