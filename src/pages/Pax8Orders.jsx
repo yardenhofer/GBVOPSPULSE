@@ -154,6 +154,7 @@ export default function Pax8Orders() {
         status: res.data.status || "failed",
         error: res.data.error || res.data.reason || null,
         response: res.data.response,
+        apiLog: res.data.apiLog || null,
       };
       results.push(result);
       setLiveResults([...results]);
@@ -177,11 +178,13 @@ export default function Pax8Orders() {
     // Update audit log
     const logs = await base44.entities.Pax8AuditLog.filter({ run_id: runId });
     if (logs[0]) {
+      const apiLogs = results.map(r => r.apiLog).filter(Boolean);
       await base44.entities.Pax8AuditLog.update(logs[0].id, {
         status: finalStatus,
         success_count: results.filter(r => r.status === "success").length,
         failed_count: results.filter(r => r.status === "failed").length,
         results: JSON.stringify(results),
+        api_log: apiLogs.length > 0 ? JSON.stringify(apiLogs) : null,
       });
     }
 

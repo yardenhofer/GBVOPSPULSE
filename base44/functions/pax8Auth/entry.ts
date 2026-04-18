@@ -305,6 +305,11 @@ Deno.serve(async (req) => {
           orderId: res.data?.id,
           domainUsed: `GrowBig${domainN}`,
           response: res.data,
+          apiLog: {
+            request: { ...payload, _note: "credentials redacted" },
+            response: res.data,
+            httpStatus: res.status,
+          },
         });
       }
 
@@ -324,6 +329,12 @@ Deno.serve(async (req) => {
         reason: res.data?.message || res.text || `HTTP ${res.status}`,
         domainAttempted: `GrowBig${domainN}`,
         response: res.data,
+        apiLog: {
+          request: { ...payload, _note: "credentials redacted" },
+          response: res.data,
+          rawText: res.text,
+          httpStatus: res.status,
+        },
       });
     }
 
