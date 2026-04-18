@@ -5,6 +5,7 @@ import { ShieldAlert, Play, Zap, RefreshCw } from "lucide-react";
 import Pax8PasswordGate from "../components/pax8/Pax8PasswordGate.jsx";
 import ProductVerification from "../components/pax8/ProductVerification.jsx";
 import PreflightResults from "../components/pax8/PreflightResults.jsx";
+import ClientGroupSelector from "../components/pax8/ClientGroupSelector.jsx";
 import LiveConfirmationModal from "../components/pax8/LiveConfirmationModal.jsx";
 import LiveRunProgress from "../components/pax8/LiveRunProgress.jsx";
 
@@ -30,8 +31,8 @@ export default function Pax8Orders() {
   const [mockResults, setMockResults] = useState(null);
   const [mockLoading, setMockLoading] = useState(false);
 
-  // Order quantity
-  const [orderQty, setOrderQty] = useState(1);
+  // Client selection
+  const [selectedClientIds, setSelectedClientIds] = useState(new Set());
 
   // Live run state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -77,7 +78,7 @@ export default function Pax8Orders() {
     setPreflightLoading(false);
   }
 
-  const cappedEligible = preflightData?.eligible?.slice(0, orderQty) || [];
+  const cappedEligible = preflightData?.eligible?.filter(c => selectedClientIds.has(c.companyId)) || [];
 
   // ── Step 3: Mock Orders ──
   async function runMockOrders() {
@@ -278,32 +279,24 @@ export default function Pax8Orders() {
       {/* Preflight Results */}
       {preflightData && <PreflightResults data={preflightData} mockResults={mockResults} />}
 
-      {/* Order Quantity Selector */}
+      {/* Client Selection by Domain Group */}
       {preflightData && preflightData.eligible.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-          <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-            Order Tenant (License) Quantity
-          </label>
-          <p className="text-xs text-gray-500 mb-3">
-            How many tenants to process? Max eligible: {preflightData.eligible.length}
+        <ClientGroupSelector
+          eligible={preflightData.eligible}
+          selectedIds={selectedClientIds}
+          onSelectionChange={(ids) => {
+            setSelectedClientIds(ids);
+            setMockResults(null); // reset mock when selection changes
+          }}
+        />
+      )}
+
+      {/* Selection summary */}
+      {preflightData && cappedEligible.length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 text-center">
+          <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+            {cappedEligible.length} tenant{cappedEligible.length !== 1 ? "s" : ""} selected · Est. cost: ${(cappedEligible.length * ESTIMATED_MONTHLY_COST_PER_LICENSE).toFixed(2)}/mo
           </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
-              min={1}
-              max={preflightData.eligible.length}
-              value={orderQty}
-              onChange={e => {
-                const v = Math.max(1, Math.min(preflightData.eligible.length, parseInt(e.target.value) || 1));
-                setOrderQty(v);
-                setMockResults(null); // reset mock when quantity changes
-              }}
-              className="w-24 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-xs text-gray-500">
-              tenants · Est. cost: ${(orderQty * ESTIMATED_MONTHLY_COST_PER_LICENSE).toFixed(2)}/mo
-            </span>
-          </div>
         </div>
       )}
 

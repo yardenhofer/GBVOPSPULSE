@@ -174,11 +174,19 @@ Deno.serve(async (req) => {
         continue;
       }
       const activeSubs = subs.filter(s => s.status === "Active" || s.status === "PendingActivation");
+      // Extract domain from company website, email, or fall back to name
+      let domain = "";
+      if (company.website) {
+        domain = company.website.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      } else if (company.email) {
+        domain = company.email.split("@")[1] || "";
+      }
+      if (!domain) domain = company.name || "unknown";
       if (activeSubs.length > 0) {
         alreadyHave++;
-        skipped.push({ companyId: company.id, companyName: company.name, reason: "Already has active subscription" });
+        skipped.push({ companyId: company.id, companyName: company.name, domain, reason: "Already has active subscription" });
       } else {
-        eligible.push({ companyId: company.id, companyName: company.name });
+        eligible.push({ companyId: company.id, companyName: company.name, domain });
       }
     }
 
