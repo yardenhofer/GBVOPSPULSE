@@ -10,6 +10,7 @@ const BATCH_CAP = 100;
 const DOMAIN_RETRY_LIMIT = 5;
 const ORDERED_BY_EMAIL = "leon@nitroclosing.com";
 const CANCEL_POLICY_ACK = "I understand, and acknowledge that I will have a 7 calendar day window to cancel my subscription, or make quantity decrements before I am no longer able to make these changes. Once a subscription is locked, I will be required fulfill my elected commitment term of my subscription.";
+const SKIP_DOMAINS = ["growbigventures.com", "nitroclosing.com"];
 
 const STATIC_PROVISIONING = [
   { key: "msCustExists", values: ["No, the customer does not have a Microsoft account"] },
@@ -182,6 +183,10 @@ Deno.serve(async (req) => {
         domain = company.email.split("@")[1] || "";
       }
       if (!domain) domain = company.name || "unknown";
+      if (SKIP_DOMAINS.some(d => domain.toLowerCase().includes(d))) {
+        skipped.push({ companyId: company.id, companyName: company.name, domain, reason: "Protected domain (always skipped)" });
+        continue;
+      }
       if (activeSubs.length > 0) {
         alreadyHave++;
         skipped.push({ companyId: company.id, companyName: company.name, domain, reason: "Already has active subscription" });
