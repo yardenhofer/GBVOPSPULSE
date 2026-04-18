@@ -1,0 +1,41 @@
+{
+  "name": "GmailEmailLog",
+  "type": "object",
+  "properties": {
+    "gmail_message_id": {
+      "type": "string",
+      "description": "Gmail message ID"
+    },
+    "from": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "matched": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this email matched the sender/subject filter"
+    },
+    "processed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this email was processed (parsed and linked)"
+    },
+    "tenant_lifecycle_id": {
+      "type": "string",
+      "description": "Linked TenantLifecycle record ID"
+    },
+    "processing_notes": {
+      "type": "string",
+      "description": "Notes about processing result"
+    }
+  },
+  "required": [
+    "gmail_message_id"
+  ]
+}

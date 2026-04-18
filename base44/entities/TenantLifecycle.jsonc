@@ -1,0 +1,81 @@
+{
+  "name": "TenantLifecycle",
+  "type": "object",
+  "properties": {
+    "pax8_company_id": {
+      "type": "string",
+      "description": "Pax8 company ID this tenant belongs to"
+    },
+    "pax8_company_name": {
+      "type": "string",
+      "description": "Pax8 company name for display"
+    },
+    "ms_domain": {
+      "type": "string",
+      "description": "Domain used during ordering (e.g. GrowBig3)"
+    },
+    "ms_tenant_id": {
+      "type": "string",
+      "description": "Microsoft tenant ID (UUID)"
+    },
+    "ms_tenant_domain": {
+      "type": "string",
+      "description": "Full onmicrosoft.com domain (e.g. GrowBig3.onmicrosoft.com)"
+    },
+    "ms_admin_username": {
+      "type": "string",
+      "description": "Admin username (e.g. admin@GrowBig3.onmicrosoft.com)"
+    },
+    "ms_admin_password_encrypted": {
+      "type": "string",
+      "description": "AES-encrypted initial admin password"
+    },
+    "provisioning_email_message_id": {
+      "type": "string",
+      "description": "Gmail message ID of the provisioning email"
+    },
+    "provisioning_email_received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the provisioning email was received"
+    },
+    "provisioning_email_raw_body": {
+      "type": "string",
+      "description": "Raw email body for audit/debug"
+    },
+    "overall_status": {
+      "type": "string",
+      "enum": [
+        "ordered",
+        "tenant_provisioning",
+        "tenant_provisioned",
+        "awaiting_parser",
+        "unmatched",
+        "duplicate_tenant",
+        "error"
+      ],
+      "default": "ordered",
+      "description": "Current lifecycle status"
+    },
+    "match_method": {
+      "type": "string",
+      "enum": [
+        "domain",
+        "tenant_id",
+        "manual",
+        "none"
+      ],
+      "description": "How the email was matched to this record"
+    },
+    "flags": {
+      "type": "string",
+      "description": "Comma-separated flags (e.g. awaiting_parser, duplicate_tenant)"
+    },
+    "error_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "overall_status"
+  ]
+}

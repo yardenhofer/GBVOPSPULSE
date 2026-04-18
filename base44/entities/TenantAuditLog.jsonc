@@ -1,0 +1,39 @@
+{
+  "name": "TenantAuditLog",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "email_received",
+        "email_matched",
+        "email_parsed",
+        "email_linked",
+        "email_skipped",
+        "email_duplicate",
+        "password_revealed",
+        "parsing_retry",
+        "rate_limit_triggered",
+        "processing_paused",
+        "processing_resumed",
+        "error"
+      ]
+    },
+    "tenant_lifecycle_id": {
+      "type": "string"
+    },
+    "gmail_message_id": {
+      "type": "string"
+    },
+    "performed_by": {
+      "type": "string",
+      "description": "Email of user who performed the action (for manual actions)"
+    },
+    "detail": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "action"
+  ]
+}
