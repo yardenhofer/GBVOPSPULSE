@@ -346,6 +346,67 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ── createCompanies (bulk from CSV data) ──
+  if (action === "createCompanies") {
+    const { companies } = body;
+    if (!companies || !Array.isArray(companies)) return Response.json({ error: "companies array required" });
+
+    const token = await getPax8Token();
+    const results = [];
+
+    for (const row of companies) {
+      const companyPayload = {
+        name: row.name,
+        address: {
+          street: row.address1 || "",
+          street2: row.address2 || "",
+          city: row.city || "",
+          stateOrProvince: row.state || "",
+          postalCode: row.postal_code || "",
+          country: row.country || "US",
+        },
+        phone: row.phone || "",
+        website: row.url || "",
+        billOnBehalfOfEnabled: true,
+        selfServiceAllowed: false,
+        orderApprovalRequired: false,
+      };
+
+      // Add contact if provided
+      if (row.contact_email && row.contact_first_name && row.contact_last_name) {
+        companyPayload.contacts = [{
+          firstName: row.contact_first_name,
+          lastName: row.contact_last_name,
+          email: row.contact_email,
+          phone: row.contact_phoneNumber || row.phone || "",
+          types: [
+            { type: "Admin", primary: true },
+            { type: "Billing", primary: true },
+            { type: "Technical", primary: true },
+          ],
+        }];
+      }
+
+      console.log(`[CREATE COMPANY] Creating: ${row.name}`);
+      const res = await pax8Post(token, "/companies", companyPayload);
+
+      results.push({
+        name: row.name,
+        status: res.ok ? "success" : "failed",
+        companyId: res.ok ? res.data?.id : null,
+        error: res.ok ? null : (res.data?.message || res.text || `HTTP ${res.status}`),
+        httpStatus: res.status,
+      });
+
+      // Small delay between API calls
+      if (companies.indexOf(row) < companies.length - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    return Response.json({ results });
+  }
+
   // ── debug (kept for investigation) ──
   if (action === "debug") {
     const { productId, step, subscriptionId } = body;

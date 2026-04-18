@@ -8,6 +8,7 @@ import PreflightResults from "../components/pax8/PreflightResults.jsx";
 import ClientGroupSelector from "../components/pax8/ClientGroupSelector.jsx";
 import LiveConfirmationModal from "../components/pax8/LiveConfirmationModal.jsx";
 import LiveRunProgress from "../components/pax8/LiveRunProgress.jsx";
+import CsvCompanyImport from "../components/pax8/CsvCompanyImport.jsx";
 
 const SPEND_CAP = 20; // $20/month spend cap for test run (normally 250)
 const ESTIMATED_MONTHLY_COST_PER_LICENSE = 4.2; // Exchange Online Plan 1 actual cost
@@ -355,6 +356,11 @@ export default function Pax8Orders() {
       )}
 
       {/* Confirmation Modal */}
+      {/* ── Bulk Company Import Section ── */}
+      <div className="border-t border-gray-200 dark:border-gray-800 pt-5 mt-5">
+        <CsvCompanyImport />
+      </div>
+
       {showConfirmModal && (
         <LiveConfirmationModal
           eligibleCount={cappedEligible.length}
