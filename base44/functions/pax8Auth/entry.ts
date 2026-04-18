@@ -8,7 +8,7 @@ const COMMITMENT_TERM_ID = "c5bab94b-9eb4-4646-a737-bcf0f0ea8f87";
 const SPEND_CAP = 250;
 const BATCH_CAP = 100;
 const DOMAIN_RETRY_LIMIT = 5;
-const ORDERED_BY_EMAIL = "leon@growbigvirtual.com";
+const ORDERED_BY_EMAIL = "leon@nitroclosing.com";
 const CANCEL_POLICY_ACK = "I understand, and acknowledge that I will have a 7 calendar day window to cancel my subscription, or make quantity decrements before I am no longer able to make these changes. Once a subscription is locked, I will be required fulfill my elected commitment term of my subscription.";
 
 const STATIC_PROVISIONING = [
@@ -16,10 +16,10 @@ const STATIC_PROVISIONING = [
   { key: "msMPNidval", values: ["7100033"] },
   { key: "mca2020FirstName", values: ["Leon"] },
   { key: "mca2020LastName", values: ["Blom"] },
-  { key: "mca2020Email", values: ["leon@growbigvirtual.com"] },
+  { key: "mca2020Email", values: ["leon@nitroclosing.com"] },
   { key: "msftContactFirstName", values: ["Leon"] },
   { key: "msftContactLastName", values: ["Blom"] },
-  { key: "msftContactEmail", values: ["leon@growbigvirtual.com"] },
+  { key: "msftContactEmail", values: ["leon@nitroclosing.com"] },
   { key: "microsoftCancelPolicyAcknowledgement", values: [CANCEL_POLICY_ACK] },
 ];
 
