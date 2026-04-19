@@ -427,7 +427,7 @@ Deno.serve(async (req) => {
         },
         phone: row.phone || "",
         website: row.url || "",
-        billOnBehalfOfEnabled: true,
+        billOnBehalfOfEnabled: false,
         selfServiceAllowed: false,
         orderApprovalRequired: false,
       };
@@ -465,6 +465,61 @@ Deno.serve(async (req) => {
     }
 
     return Response.json({ results });
+  }
+
+  // ── patchCompanies (update existing companies via PUT) ──
+  if (action === "patchCompanies") {
+    const { companies, updates } = body;
+    if (!companies || !Array.isArray(companies)) return Response.json({ error: "companies array required" });
+    if (!updates || typeof updates !== "object") return Response.json({ error: "updates object required" });
+
+    const token = await getPax8Token();
+    const results = [];
+
+    for (const company of companies) {
+      // Fetch current company data first
+      let current;
+      try {
+        current = await pax8Get(token, `/companies/${company.companyId}`);
+      } catch (e) {
+        results.push({ companyId: company.companyId, companyName: company.companyName, status: "failed", error: `Fetch failed: ${e.message}` });
+        continue;
+      }
+
+      // Merge updates into current data
+      const putBody = { ...current, ...updates };
+      // Remove read-only fields that can't be PUT
+      delete putBody.id;
+      delete putBody.updatedDate;
+      delete putBody.createdDate;
+
+      const url = new URL(`${PAX8_API_BASE}/companies/${company.companyId}`);
+      const patchBody = { ...current, ...updates };
+      delete patchBody.id;
+      delete patchBody.updatedDate;
+      delete patchBody.createdDate;
+      const res = await fetch(url.toString(), {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(patchBody),
+      });
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { json = null; }
+
+      results.push({
+        companyId: company.companyId,
+        companyName: company.companyName,
+        status: res.ok ? "success" : "failed",
+        httpStatus: res.status,
+        error: res.ok ? null : (json?.message || text || `HTTP ${res.status}`),
+        updatedFields: updates,
+      });
+
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    return Response.json({ results, totalPatched: results.filter(r => r.status === "success").length, totalFailed: results.filter(r => r.status === "failed").length });
   }
 
   // ── debug (kept for investigation) ──
