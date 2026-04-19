@@ -199,6 +199,61 @@ Deno.serve(async (req) => {
     return Response.json({ totalCompanies: companies.length, eligible, skipped, alreadyHave, currentDomainCounter: currentCounter });
   }
 
+  // ── validateContacts (check contacts for a list of companies) ──
+  if (action === "validateContacts") {
+    const { companies } = body;
+    if (!companies || !Array.isArray(companies)) return Response.json({ error: "companies array required" });
+
+    const token = await getPax8Token();
+    const results = [];
+
+    for (const company of companies) {
+      let contacts = [];
+      let error = null;
+      try {
+        const data = await pax8Get(token, `/companies/${company.companyId}/contacts`);
+        contacts = data.content || data || [];
+        if (!Array.isArray(contacts)) contacts = [];
+      } catch (e) {
+        error = e.message;
+      }
+
+      const requiredTypes = ["Admin", "Billing", "Technical"];
+      const missing = [];
+      for (const type of requiredTypes) {
+        const hasPrimary = contacts.some(c =>
+          c.types && c.types.some(t => t.type === type && t.primary === true)
+        );
+        if (!hasPrimary) missing.push(type);
+      }
+
+      results.push({
+        companyId: company.companyId,
+        companyName: company.companyName,
+        contactCount: contacts.length,
+        contacts: contacts.map(c => ({
+          firstName: c.firstName,
+          lastName: c.lastName,
+          email: c.email,
+          types: c.types,
+        })),
+        missingPrimaryTypes: missing,
+        valid: missing.length === 0,
+        error,
+      });
+
+      // Small delay to avoid rate limits
+      if (companies.indexOf(company) < companies.length - 1) {
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+
+    const validCount = results.filter(r => r.valid).length;
+    const invalidCount = results.filter(r => !r.valid).length;
+
+    return Response.json({ results, validCount, invalidCount, total: results.length });
+  }
+
   // ── mockOrder (single client test) ──
   if (action === "mockOrder") {
     const { companyId, companyName } = body;
