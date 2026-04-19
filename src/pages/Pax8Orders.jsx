@@ -93,6 +93,9 @@ export default function Pax8Orders() {
   async function runMockOrders() {
     if (!product?.productId || !cappedEligible.length) return;
     setMockLoading(true);
+    setLiveResults([]);
+    setHalted(false);
+    setCumulativeCost(0);
     const res = await base44.functions.invoke("pax8Auth", {
       action: "mockOrders",
       productId: product.productId,
