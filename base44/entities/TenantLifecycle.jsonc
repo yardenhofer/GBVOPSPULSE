@@ -52,6 +52,10 @@
         "awaiting_parser",
         "unmatched",
         "duplicate_tenant",
+        "inboxes_creating",
+        "inboxes_ready",
+        "scalesends_failed",
+        "manually_handled",
         "error"
       ],
       "default": "ordered",
@@ -69,10 +73,66 @@
     },
     "flags": {
       "type": "string",
-      "description": "Comma-separated flags (e.g. awaiting_parser, duplicate_tenant)"
+      "description": "Comma-separated flags"
     },
     "error_message": {
       "type": "string"
+    },
+    "scalesends_job_id": {
+      "type": "string",
+      "description": "Scalesends job ID"
+    },
+    "scalesends_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "complete",
+        "failed",
+        "manual_upload"
+      ],
+      "description": "Scalesends integration status"
+    },
+    "scalesends_submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scalesends_completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scalesends_inbox_count": {
+      "type": "number"
+    },
+    "scalesends_inbox_details": {
+      "type": "string",
+      "description": "JSON-encoded inbox credentials (passwords encrypted)"
+    },
+    "scalesends_failure_reason": {
+      "type": "string"
+    },
+    "scalesends_retry_count": {
+      "type": "number",
+      "default": 0
+    },
+    "scalesends_trigger_type": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "manual"
+      ]
+    },
+    "scalesends_marked_manual_by": {
+      "type": "string",
+      "description": "Admin email who marked as manually uploaded"
+    },
+    "scalesends_marked_manual_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scalesends_manual_notes": {
+      "type": "string",
+      "description": "Notes added when marking as manually uploaded"
     }
   },
   "required": [
