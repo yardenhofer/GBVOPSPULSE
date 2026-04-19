@@ -8,6 +8,7 @@ import PreflightResults from "../components/pax8/PreflightResults.jsx";
 import ClientGroupSelector from "../components/pax8/ClientGroupSelector.jsx";
 import LiveConfirmationModal from "../components/pax8/LiveConfirmationModal.jsx";
 import LiveRunProgress from "../components/pax8/LiveRunProgress.jsx";
+import MockResultsSummary from "../components/pax8/MockResultsSummary.jsx";
 import CsvCompanyImport from "../components/pax8/CsvCompanyImport.jsx";
 import TenantListTab from "../components/pax8/TenantListTab.jsx";
 
@@ -327,25 +328,27 @@ export default function Pax8Orders() {
             </div>
           )}
 
-          {mockResults && !liveRunning && liveResults.length === 0 && isAdmin && (
-            <div className="flex flex-col items-center gap-3">
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-center">
-                <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
-                  Estimated total monthly cost: ${totalEstimatedCost.toLocaleString()} · Annual liability: ${(totalEstimatedCost * 12).toLocaleString()}
-                </p>
-              </div>
-              <button onClick={() => setShowConfirmModal(true)} className="flex items-center gap-2 px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors">
-                <Zap className="w-4 h-4" />
-                Place Live Orders ({cappedEligible.length} tenants)
-              </button>
-            </div>
+          {mockResults && !liveRunning && liveResults.length === 0 && (
+            <>
+              <MockResultsSummary mockResults={mockResults} onRerunMock={() => { setMockResults(null); }} />
+
+              {isAdmin && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-center">
+                    <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
+                      Estimated total monthly cost: ${totalEstimatedCost.toLocaleString()} · Annual liability: ${(totalEstimatedCost * 12).toLocaleString()}
+                    </p>
+                  </div>
+                  <button onClick={() => setShowConfirmModal(true)} className="flex items-center gap-2 px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors">
+                    <Zap className="w-4 h-4" />
+                    Place Live Orders ({cappedEligible.length} tenants)
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
-          {!isAdmin && mockResults && liveResults.length === 0 && (
-            <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 text-center">
-              <p className="text-sm text-gray-500">Live order placement requires admin role.</p>
-            </div>
-          )}
+
 
           {(liveRunning || liveResults.length > 0) && (
             <LiveRunProgress results={liveResults} currentClient={currentClient} totalClients={cappedEligible.length} halted={halted} cumulativeCost={cumulativeCost} spendCap={SPEND_CAP} onHalt={handleHalt} />
