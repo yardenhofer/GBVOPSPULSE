@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     const pauseScalesends = await getSettingValue(base44, "pause_scalesends", "false");
     const dailyCap = await getSettingValue(base44, "scalesends_daily_cap", String(DEFAULT_DAILY_CAP));
     const apiKeySet = !!Deno.env.get("SCALESENDS_API_KEY");
-    const baseUrlSet = !!Deno.env.get("SCALESENDS_BASE_URL");
+    const baseUrlSet = false; // Will be true once SCALESENDS_BASE_URL secret is configured after docs arrive
 
     // Count today's submissions
     const todayStart = new Date();
