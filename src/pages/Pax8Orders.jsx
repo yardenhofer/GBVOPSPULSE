@@ -11,6 +11,7 @@ import LiveRunProgress from "../components/pax8/LiveRunProgress.jsx";
 import MockResultsSummary from "../components/pax8/MockResultsSummary.jsx";
 import CsvCompanyImport from "../components/pax8/CsvCompanyImport.jsx";
 import TenantListTab from "../components/pax8/TenantListTab.jsx";
+import ScalesendsQueueTab from "../components/pax8/ScalesendsQueueTab.jsx";
 
 const SPEND_CAP = 20; // $20/month spend cap for test run (normally 250)
 const ESTIMATED_MONTHLY_COST_PER_LICENSE = 4.2; // Exchange Online Plan 1 actual cost
@@ -20,6 +21,7 @@ const TABS = [
   { id: "orders", label: "License Orders", icon: ShieldAlert },
   { id: "import", label: "Company Import", icon: Upload },
   { id: "tenants", label: "Provisioned Tenants", icon: Shield },
+  { id: "scalesends", label: "Scalesends", icon: Server },
 ];
 
 export default function Pax8Orders() {
@@ -359,6 +361,8 @@ export default function Pax8Orders() {
       {activeTab === "import" && <CsvCompanyImport />}
 
       {activeTab === "tenants" && <TenantListTab />}
+
+      {activeTab === "scalesends" && <ScalesendsQueueTab />}
 
       {showConfirmModal && (
         <LiveConfirmationModal

@@ -9,6 +9,10 @@ const STATUS_COLORS = {
   awaiting_parser: "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400",
   unmatched: "bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400",
   duplicate_tenant: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+  inboxes_creating: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
+  inboxes_ready: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+  scalesends_failed: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+  manually_handled: "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400",
   error: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
 };
 
@@ -150,6 +154,10 @@ export default function TenantListTab() {
           <option value="awaiting_parser">Awaiting Parser</option>
           <option value="unmatched">Unmatched</option>
           <option value="duplicate_tenant">Duplicate</option>
+          <option value="inboxes_creating">Inboxes Creating</option>
+          <option value="inboxes_ready">Inboxes Ready</option>
+          <option value="scalesends_failed">Scalesends Failed</option>
+          <option value="manually_handled">Manually Handled</option>
           <option value="error">Error</option>
         </select>
         <span className="text-xs text-gray-400">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</span>
@@ -274,6 +282,26 @@ function TenantDetail({ tenant: t, revealedPassword, revealing, onReveal, onCopy
             {t.provisioning_email_raw_body}
           </pre>
         </details>
+      )}
+
+      {/* Scalesends section */}
+      {(t.scalesends_status || t.overall_status === "tenant_provisioned" || t.overall_status === "inboxes_creating" || t.overall_status === "inboxes_ready" || t.overall_status === "scalesends_failed" || t.overall_status === "manually_handled") && (
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+          <h5 className="text-xs font-semibold text-gray-500 mb-2">Scalesends Status</h5>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+            <InfoField label="Scalesends Status" value={t.scalesends_status ? t.scalesends_status.replace(/_/g, " ") : "Not started"} />
+            {t.scalesends_job_id && <InfoField label="Job ID" value={t.scalesends_job_id} copiable onCopy={onCopy} />}
+            {t.scalesends_submitted_at && <InfoField label="Submitted" value={new Date(t.scalesends_submitted_at).toLocaleString()} />}
+            {t.scalesends_completed_at && <InfoField label="Completed" value={new Date(t.scalesends_completed_at).toLocaleString()} />}
+            {t.scalesends_inbox_count != null && <InfoField label="Inbox Count" value={String(t.scalesends_inbox_count)} />}
+            {t.scalesends_trigger_type && <InfoField label="Trigger" value={t.scalesends_trigger_type} />}
+            {t.scalesends_failure_reason && <InfoField label="Failure Reason" value={t.scalesends_failure_reason} />}
+            {t.scalesends_marked_manual_by && <InfoField label="Marked Manual By" value={t.scalesends_marked_manual_by} />}
+            {t.scalesends_marked_manual_at && <InfoField label="Marked Manual At" value={new Date(t.scalesends_marked_manual_at).toLocaleString()} />}
+            {t.scalesends_manual_notes && <InfoField label="Manual Notes" value={t.scalesends_manual_notes} />}
+            {t.scalesends_retry_count > 0 && <InfoField label="Retry Count" value={String(t.scalesends_retry_count)} />}
+          </div>
+        </div>
       )}
 
       {t.error_message && (
