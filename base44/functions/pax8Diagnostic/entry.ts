@@ -131,5 +131,61 @@ Deno.serve(async (req) => {
     return Response.json({ results });
   }
 
+  // ── checkOrderStatus (fetch subscriptions for all active companies) ──
+  if (action === "checkOrderStatus") {
+    const token = await getPax8Token();
+
+    // Get all active companies
+    const allCompanies = [];
+    let page = 0;
+    while (page < 10) {
+      const data = await pax8Get(token, "/companies", { status: "Active", page, size: 200 });
+      if (data.content) allCompanies.push(...data.content);
+      if (page + 1 >= (data.page?.totalPages ?? 1)) break;
+      page++;
+    }
+
+    const results = [];
+    for (const company of allCompanies) {
+      let subs = [];
+      try {
+        const sData = await pax8Get(token, "/subscriptions", { companyId: company.id, size: 50 });
+        subs = sData.content || [];
+      } catch {}
+
+      results.push({
+        companyId: company.id,
+        companyName: company.name,
+        companyStatus: company.status,
+        billOnBehalfOfEnabled: company.billOnBehalfOfEnabled,
+        subscriptionCount: subs.length,
+        subscriptions: subs.map(s => ({
+          id: s.id,
+          productId: s.productId,
+          status: s.status,
+          quantity: s.quantity,
+          billingTerm: s.billingTerm,
+          commitmentTermId: s.commitmentTermId,
+          startDate: s.startDate,
+          endDate: s.endDate,
+          createdDate: s.createdDate,
+          price: s.price,
+        })),
+      });
+
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    const withSubs = results.filter(r => r.subscriptionCount > 0);
+    const withoutSubs = results.filter(r => r.subscriptionCount === 0);
+
+    return Response.json({
+      totalCompanies: results.length,
+      companiesWithSubscriptions: withSubs.length,
+      companiesWithoutSubscriptions: withoutSubs.length,
+      companies: results,
+    });
+  }
+
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
 });
