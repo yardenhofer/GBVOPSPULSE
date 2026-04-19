@@ -524,6 +524,40 @@ Deno.serve(async (req) => {
     return Response.json({ results, totalPatched: results.filter(r => r.status === "success").length, totalFailed: results.filter(r => r.status === "failed").length });
   }
 
+  // ── deleteCompanies (remove companies by ID) ──
+  if (action === "deleteCompanies") {
+    const { companies } = body;
+    if (!companies || !Array.isArray(companies)) return Response.json({ error: "companies array required" });
+
+    const token = await getPax8Token();
+    const results = [];
+
+    for (const company of companies) {
+      const url = `${PAX8_API_BASE}/companies/${company.companyId}`;
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { json = null; }
+
+      console.log(`[DELETE] ${company.companyName}: status=${res.status}`);
+
+      results.push({
+        companyId: company.companyId,
+        companyName: company.companyName,
+        status: res.ok || res.status === 204 ? "deleted" : "failed",
+        httpStatus: res.status,
+        error: res.ok || res.status === 204 ? null : (json?.message || text || `HTTP ${res.status}`),
+      });
+
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    return Response.json({ results, totalDeleted: results.filter(r => r.status === "deleted").length, totalFailed: results.filter(r => r.status === "failed").length });
+  }
+
   // ── debug (kept for investigation) ──
   if (action === "debug") {
     const { productId, step, subscriptionId } = body;
