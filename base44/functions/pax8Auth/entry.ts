@@ -443,6 +443,21 @@ Deno.serve(async (req) => {
       return Response.json({ currentDomainCounter: val });
     }
 
+    if (step === "fetchCompany") {
+      const { companyId, companyName } = body;
+      let cid = companyId;
+      if (!cid && companyName) {
+        const search = await pax8Get(token, "/companies", { filter: companyName, size: 1 });
+        cid = search.content?.[0]?.id;
+        if (!cid) return Response.json({ error: "Company not found" });
+      }
+      if (!cid) return Response.json({ error: "Provide companyId or companyName" });
+      const company = await pax8Get(token, `/companies/${cid}`);
+      let contacts = [];
+      try { contacts = (await pax8Get(token, `/companies/${cid}/contacts`)).content || []; } catch {}
+      return Response.json({ company, contacts });
+    }
+
     return Response.json({ error: "Provide step: provisionDetails | fetchSubscription | domainCounter" });
   }
 
