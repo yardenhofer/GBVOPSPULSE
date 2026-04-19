@@ -2,21 +2,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Sender patterns (match ANY)
 const SENDER_PATTERNS = [
-  "@microsoft.com",
-  "@microsoftonline.com",
-  "@pax8.com",
-  "@email.microsoftonline.com",
+  "noreply@pax8.com",
+  "sendgrid.pax8.com",
 ];
 
-// Subject patterns (match ANY)
-const SUBJECT_PATTERNS = [
-  "tenant",
-  "provision",
-  "welcome",
-  "admin account",
-  "microsoft 365",
-  "office 365",
-];
+// Subject must contain this exact phrase
+const SUBJECT_REQUIRED = "microsoft software order fulfilled";
 
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const RATE_LIMIT_MAX = 20;
@@ -28,7 +19,7 @@ function matchesSenderFilter(from) {
 
 function matchesSubjectFilter(subject) {
   const lower = (subject || "").toLowerCase();
-  return SUBJECT_PATTERNS.some(p => lower.includes(p));
+  return lower.includes(SUBJECT_REQUIRED);
 }
 
 function getHeader(headers, name) {
