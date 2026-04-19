@@ -486,26 +486,27 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Merge updates into current data
+      // Merge updates into current data for PUT
       const putBody = { ...current, ...updates };
-      // Remove read-only fields that can't be PUT
       delete putBody.id;
       delete putBody.updatedDate;
       delete putBody.createdDate;
 
+      console.log(`[PATCH] PUT body for ${company.companyName}: billOnBehalfOfEnabled=${putBody.billOnBehalfOfEnabled}`);
+
       const url = new URL(`${PAX8_API_BASE}/companies/${company.companyId}`);
-      const patchBody = { ...current, ...updates };
-      delete patchBody.id;
-      delete patchBody.updatedDate;
-      delete patchBody.createdDate;
       const res = await fetch(url.toString(), {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify(patchBody),
+        body: JSON.stringify(putBody),
       });
       const text = await res.text();
       let json;
       try { json = JSON.parse(text); } catch { json = null; }
+
+      // Log what Pax8 returned so we can verify the field actually changed
+      const returnedValue = json?.billOnBehalfOfEnabled;
+      console.log(`[PATCH] Response for ${company.companyName}: status=${res.status}, billOnBehalfOfEnabled=${returnedValue}`);
 
       results.push({
         companyId: company.companyId,
@@ -514,6 +515,7 @@ Deno.serve(async (req) => {
         httpStatus: res.status,
         error: res.ok ? null : (json?.message || text || `HTTP ${res.status}`),
         updatedFields: updates,
+        returnedBillOnBehalf: returnedValue,
       });
 
       await new Promise(r => setTimeout(r, 300));
