@@ -76,7 +76,6 @@ export function computeRedFlags(client) {
         client.onboarding_lead_list_received,
         client.onboarding_campaign_live,
         client.onboarding_kickoff_done,
-        client.onboarding_crm_connected,
       ];
       const completed = steps.filter(Boolean).length;
       if (completed < steps.length) {
