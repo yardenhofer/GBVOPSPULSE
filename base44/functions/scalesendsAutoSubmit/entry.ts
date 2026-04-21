@@ -162,6 +162,31 @@ Deno.serve(async (req) => {
     const orderId = order?._id || null;
     const mailboxCount = order?.mailboxes?.length || 0;
 
+    // Auto-assign registrar
+    let registrarInfo = "";
+    if (orderId) {
+      const nsUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/nameservers/`;
+      console.log(`[SCALESENDS-AUTO] Fetching registrars for order ${orderId}`);
+      const nsRes = await fetch(nsUrl, { headers });
+      if (nsRes.ok) {
+        const nsData = await nsRes.json();
+        const registrars = (nsData.data || nsData).availableRegistrars || [];
+        if (registrars.length > 0) {
+          const regName = registrars[0].name;
+          const setUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/set-registrar/`;
+          const setRes = await fetch(setUrl, { method: "POST", headers, body: JSON.stringify({ registrarName: regName }) });
+          if (setRes.ok) {
+            registrarInfo = `. Registrar: ${regName}`;
+            console.log(`[SCALESENDS-AUTO] Registrar assigned: ${regName}`);
+          } else {
+            console.log(`[SCALESENDS-AUTO] Set-registrar failed: HTTP ${setRes.status}`);
+          }
+        } else {
+          console.log(`[SCALESENDS-AUTO] No available registrars for order ${orderId}`);
+        }
+      }
+    }
+
     await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
       scalesends_status: "processing",
       scalesends_job_id: orderId,
@@ -174,7 +199,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.TenantAuditLog.create({
       action: "email_parsed",
       tenant_lifecycle_id: tenant.id,
-      detail: `Auto-submitted to Scalesends. Order ID: ${orderId}. Domain: ${order?.domain || "pending"}.`,
+      detail: `Auto-submitted to Scalesends. Order ID: ${orderId}. Domain: ${order?.domain || "pending"}${registrarInfo}.`,
     });
 
     console.log(`[SCALESENDS-AUTO] Success! Order ${orderId} for ${tenant.ms_tenant_domain}`);

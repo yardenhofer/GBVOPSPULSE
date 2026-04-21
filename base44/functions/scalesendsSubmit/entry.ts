@@ -151,6 +151,36 @@ async function createScalesendsOrder(apiKey, customerId, email, password, domain
   };
 }
 
+// ── Auto-assign registrar after order creation ──
+async function autoAssignRegistrar(apiKey, customerId, orderId) {
+  const nsUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/nameservers/`;
+  console.log(`[SCALESENDS] GET ${nsUrl} — fetching available registrars`);
+  const nsRes = await fetch(nsUrl, { headers: getHeaders(apiKey) });
+  if (!nsRes.ok) {
+    console.log(`[SCALESENDS] Nameservers fetch failed: HTTP ${nsRes.status}`);
+    return { success: false, error: `Nameservers fetch failed: HTTP ${nsRes.status}` };
+  }
+  const nsData = await nsRes.json();
+  const info = nsData.data || nsData;
+  const registrars = info.availableRegistrars || [];
+  if (registrars.length === 0) {
+    console.log(`[SCALESENDS] No available registrars for order ${orderId}`);
+    return { success: false, error: "No available registrars" };
+  }
+  const registrarName = registrars[0].name;
+  const setUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/set-registrar/`;
+  console.log(`[SCALESENDS] POST ${setUrl} — assigning registrar: ${registrarName}`);
+  const setRes = await fetch(setUrl, { method: "POST", headers: getHeaders(apiKey), body: JSON.stringify({ registrarName }) });
+  if (!setRes.ok) {
+    const text = await setRes.text();
+    console.log(`[SCALESENDS] Set-registrar failed: HTTP ${setRes.status} — ${text.substring(0, 200)}`);
+    return { success: false, error: `Set-registrar failed: HTTP ${setRes.status}` };
+  }
+  const setData = await setRes.json();
+  console.log(`[SCALESENDS] Registrar assigned: ${JSON.stringify(setData.data?.assignedRegistrar || {})}`);
+  return { success: true, registrar: setData.data?.assignedRegistrar };
+}
+
 // ── List all Scalesends orders (for polling/sync) ──
 async function listScalesendsOrders(apiKey, customerId) {
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
@@ -362,6 +392,12 @@ Deno.serve(async (req) => {
     }
 
     if (result.success) {
+      // Auto-assign registrar
+      let registrarResult = null;
+      if (result.orderId) {
+        registrarResult = await autoAssignRegistrar(apiKey, customerId, result.orderId);
+      }
+
       const updateData = {
         scalesends_status: "processing",
         scalesends_job_id: result.orderId,
@@ -377,11 +413,12 @@ Deno.serve(async (req) => {
       }
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
 
+      const registrarInfo = registrarResult?.success ? `. Registrar: ${registrarResult.registrar?.name}` : "";
       await base44.asServiceRole.entities.TenantAuditLog.create({
         action: "email_parsed",
         tenant_lifecycle_id: tenant.id,
         performed_by: user.email,
-        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}${workspaceName ? `. Workspace: ${workspaceName}` : ""}`,
+        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}${workspaceName ? `. Workspace: ${workspaceName}` : ""}${registrarInfo}`,
       });
 
       return Response.json({
@@ -393,6 +430,7 @@ Deno.serve(async (req) => {
         onboardStatus: result.onboardStatus,
         mailboxCount: result.mailboxCount,
         workspace: workspaceName,
+        registrar: registrarResult?.registrar || null,
       });
     } else {
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
@@ -501,6 +539,11 @@ Deno.serve(async (req) => {
       }
 
       if (result.success) {
+        // Auto-assign registrar
+        if (result.orderId) {
+          await autoAssignRegistrar(apiKey, customerId, result.orderId);
+        }
+
         const bulkUpdate = {
           scalesends_status: "processing",
           scalesends_job_id: result.orderId,
