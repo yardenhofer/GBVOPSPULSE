@@ -593,6 +593,8 @@ Deno.serve(async (req) => {
     }
 
     const synced = [];
+    const registrarsAssigned = [];
+
     for (const order of orders) {
       const tenant = tenantByJobId[order._id];
       if (!tenant) continue;
@@ -643,7 +645,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({ totalOrders: orders.length, synced, syncedCount: synced.length });
+    // ── Auto-assign registrars to orders that don't have one yet ──
+    for (const order of orders) {
+      // Skip orders that already have processing handled above
+      const nsUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${order._id}/nameservers/`;
+      let nsData = null;
+      try {
+        const nsRes = await fetch(nsUrl, { headers: getHeaders(apiKey) });
+        if (nsRes.ok) nsData = (await nsRes.json()).data || {};
+      } catch (e) { continue; }
+
+      // Only assign if: nameservers exist, no registrar assigned, and registrars available
+      if (nsData && nsData.nameserversStatus !== "initial" && !nsData.assignedRegistrar && nsData.availableRegistrars?.length > 0) {
+        const regResult = await autoAssignRegistrar(apiKey, customerId, order._id);
+        if (regResult.success) {
+          registrarsAssigned.push({
+            orderId: order._id,
+            email: order.email,
+            domain: order.domain,
+            registrar: regResult.registrar?.name,
+          });
+          console.log(`[SYNC] Auto-assigned registrar ${regResult.registrar?.name} to order ${order._id} (${order.domain})`);
+        }
+      }
+    }
+
+    return Response.json({ totalOrders: orders.length, synced, syncedCount: synced.length, registrarsAssigned, registrarsAssignedCount: registrarsAssigned.length });
   }
 
   // ── markManual ──
