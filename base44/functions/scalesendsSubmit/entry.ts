@@ -139,9 +139,26 @@ async function createScalesendsOrder(apiKey, customerId, email, password, domain
   }
 
   const order = json?.data || json;
+  let orderId = order?._id || order?.id || null;
+
+  // Fallback: if API didn't return an order ID, look it up by email
+  if (!orderId) {
+    console.log(`[SCALESENDS] Warning: create returned no order ID. Looking up by email: ${email}`);
+    _ordersCache = null;
+    const allOrders = await fetchAllScalesendsOrders(apiKey, customerId);
+    const emailLower = email.toLowerCase().trim();
+    const found = allOrders.find(o => (o.email || "").toLowerCase().trim() === emailLower);
+    if (found) {
+      orderId = found._id;
+      console.log(`[SCALESENDS] Found order ID via lookup: ${orderId}`);
+    } else {
+      console.log(`[SCALESENDS] Could not find order by email after creation`);
+    }
+  }
+
   return {
     success: true,
-    orderId: order?._id || null,
+    orderId,
     domain: order?.domain || null,
     onboardStatus: order?.onboardStatus || null,
     mailboxCount: order?.mailboxes?.length || 0,

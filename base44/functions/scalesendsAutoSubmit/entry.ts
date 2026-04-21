@@ -158,8 +158,26 @@ Deno.serve(async (req) => {
 
   if (res.ok) {
     const order = json?.data || json;
-    const orderId = order?._id || null;
+    let orderId = order?._id || order?.id || null;
     const mailboxCount = order?.mailboxes?.length || 0;
+
+    // Fallback: if API didn't return an order ID, look it up by email
+    if (!orderId) {
+      console.log(`[SCALESENDS-AUTO] Warning: create returned no order ID. Looking up by email: ${tenant.ms_admin_username}`);
+      const lookupRes = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, { headers });
+      if (lookupRes.ok) {
+        const lookupData = await lookupRes.json();
+        const allOrders = Array.isArray(lookupData.data) ? lookupData.data : (Array.isArray(lookupData) ? lookupData : []);
+        const emailLower = tenant.ms_admin_username.toLowerCase().trim();
+        const found = allOrders.find(o => (o.email || "").toLowerCase().trim() === emailLower);
+        if (found) {
+          orderId = found._id;
+          console.log(`[SCALESENDS-AUTO] Found order ID via lookup: ${orderId}`);
+        } else {
+          console.log(`[SCALESENDS-AUTO] Could not find order by email after creation`);
+        }
+      }
+    }
 
     // Step 2: Assign inbox provider (separate API call)
     let providerInfo = "";
