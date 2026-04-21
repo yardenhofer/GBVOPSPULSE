@@ -362,9 +362,12 @@ Deno.serve(async (req) => {
         console.log(`[LIVE ORDER] Success for ${companyName}, order ID: ${res.data?.id}, domain: GrowBig${domainN}`);
 
         // Create TenantLifecycle record with workspace assignment
+        // Derive sending domain from company name: lowercase, remove spaces/special chars, add .info
+        const sendingDomain = companyName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info";
         const tenantData = {
           pax8_company_id: companyId,
           pax8_company_name: companyName,
+          sending_domain: sendingDomain,
           ms_domain: `GrowBig${domainN}`,
           overall_status: "ordered",
         };

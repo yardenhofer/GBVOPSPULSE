@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Pax8 company name for display"
     },
+    "sending_domain": {
+      "type": "string",
+      "description": "Real sending domain for this tenant (e.g. growbigventuresboldpath.info)"
+    },
     "ms_domain": {
       "type": "string",
       "description": "Domain used during ordering (e.g. GrowBig3)"

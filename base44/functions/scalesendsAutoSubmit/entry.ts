@@ -131,7 +131,8 @@ Deno.serve(async (req) => {
   }
 
   // Call Scalesends API to create new order
-  const orderPayload = { email: tenant.ms_admin_username, password: tenant.ms_admin_password_encrypted };
+  const orderPayload = { email: tenant.ms_admin_username, password: tenant.ms_admin_password_encrypted, provider: "outlook" };
+  if (tenant.sending_domain) orderPayload.domain = tenant.sending_domain;
   if (names.length > 0) orderPayload.names = names;
 
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;
