@@ -71,43 +71,8 @@ export default function InboxNamePool() {
         setError("Failed to read the file.");
       };
       reader.readAsText(file);
-    } else if (ext === "docx") {
-      setUploading(true);
-      try {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
-        const result = await base44.integrations.Core.InvokeLLM({
-          prompt: `Extract all person names from this document. Return every first name and last name pair you find. If there are columns or a table, use the first_name and last_name columns. Return ALL names, do not truncate or summarize.`,
-          file_urls: [file_url],
-          response_json_schema: {
-            type: "object",
-            properties: {
-              names: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    first_name: { type: "string" },
-                    last_name: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-        });
-        const cleaned = (result?.names || []).filter(n => n.first_name && n.last_name);
-        if (cleaned.length === 0) {
-          setError("File processed but no valid first_name/last_name pairs found.");
-        } else {
-          setPreview(cleaned);
-        }
-      } catch (err) {
-        console.error("DOCX processing error:", err);
-        setError(`DOCX processing failed: ${err.message || "Unknown error"}`);
-      }
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
     } else {
-      setError("Please upload a .csv or .docx file.");
+      setError("Please upload a .csv file with first_name and last_name columns.");
       if (fileRef.current) fileRef.current.value = "";
     }
   }
@@ -156,8 +121,8 @@ export default function InboxNamePool() {
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer font-medium">
-            <Upload className="w-3 h-3" /> Upload CSV / DOCX
-            <input type="file" accept=".csv,.docx" className="hidden" onChange={handleFileSelect} ref={fileRef} />
+            <Upload className="w-3 h-3" /> Upload CSV
+            <input type="file" accept=".csv" className="hidden" onChange={handleFileSelect} ref={fileRef} />
           </label>
           {names.length > 0 && (
             <button onClick={handleClear}
@@ -169,7 +134,7 @@ export default function InboxNamePool() {
       </div>
 
       <p className="text-xs text-gray-500">
-        Upload a CSV (with <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">first_name</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">last_name</code> columns) or a DOCX with names. 100 random names will be selected per Scalesends order.
+        Upload a CSV with <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">first_name</code> and <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">last_name</code> columns. 100 random names will be selected per Scalesends order.
       </p>
 
       {/* Error display */}
