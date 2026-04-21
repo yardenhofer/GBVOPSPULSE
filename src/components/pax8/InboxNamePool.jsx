@@ -75,9 +75,10 @@ export default function InboxNamePool() {
       setUploading(true);
       try {
         const { file_url } = await base44.integrations.Core.UploadFile({ file });
-        const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-          file_url,
-          json_schema: {
+        const result = await base44.integrations.Core.InvokeLLM({
+          prompt: `Extract all person names from this document. Return every first name and last name pair you find. If there are columns or a table, use the first_name and last_name columns. Return ALL names, do not truncate or summarize.`,
+          file_urls: [file_url],
+          response_json_schema: {
             type: "object",
             properties: {
               names: {
@@ -93,15 +94,11 @@ export default function InboxNamePool() {
             },
           },
         });
-        if (result.status === "success" && result.output?.names) {
-          const cleaned = result.output.names.filter(n => n.first_name && n.last_name);
-          if (cleaned.length === 0) {
-            setError("File processed but no valid first_name/last_name pairs found.");
-          } else {
-            setPreview(cleaned);
-          }
+        const cleaned = (result?.names || []).filter(n => n.first_name && n.last_name);
+        if (cleaned.length === 0) {
+          setError("File processed but no valid first_name/last_name pairs found.");
         } else {
-          setError("Could not extract names from DOCX. Make sure it contains first and last names.");
+          setPreview(cleaned);
         }
       } catch (err) {
         console.error("DOCX processing error:", err);
