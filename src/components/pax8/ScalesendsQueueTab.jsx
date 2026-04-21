@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { RefreshCw, Send, Copy, FileCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Square, CheckSquare, RotateCw } from "lucide-react";
+import { RefreshCw, Send, Copy, FileCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Square, CheckSquare, RotateCw, Upload } from "lucide-react";
 import ScalesendsSettings from "./ScalesendsSettings";
 import ScalesendsConfirmDialog from "./ScalesendsConfirmDialog";
 import ScalesendsMarkManualDialog from "./ScalesendsMarkManualDialog";
@@ -25,6 +25,7 @@ export default function ScalesendsQueueTab() {
   const [confirmDialog, setConfirmDialog] = useState(null); // { type: 'single'|'bulk', tenantIds: [], tenantDomain?: '' }
   const [manualDialog, setManualDialog] = useState(null); // { type: 'single'|'bulk', tenantIds: [] }
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
+  const [uploadingTenantId, setUploadingTenantId] = useState(null);
   const [activeView, setActiveView] = useState("ready");
   const [syncing, setSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState(null);
@@ -64,6 +65,18 @@ export default function ScalesendsQueueTab() {
     const failed = (res.data.results || []).filter(r => r.status === "failed");
     if (failed.length > 0) {
       alert(`${failed.length} submission(s) failed. Check the Failed tab for details.`);
+    }
+    await loadAll();
+  }
+
+  async function handleUploadToInstantly(tenantId) {
+    setUploadingTenantId(tenantId);
+    const res = await base44.functions.invoke("instantlyUpload", { action: "uploadTenantInboxes", tenantId });
+    setUploadingTenantId(null);
+    if (res.data.error) {
+      alert(`Upload failed: ${res.data.error}`);
+    } else {
+      alert(`Uploaded ${res.data.success}/${res.data.total} inboxes to ${res.data.workspace}`);
     }
     await loadAll();
   }
@@ -277,11 +290,36 @@ export default function ScalesendsQueueTab() {
                       </>
                     )}
                     {activeView === "complete" && (
-                      <span className="text-xs text-green-600 flex items-center gap-2 flex-wrap">
-                        <CheckCircle2 className="w-3 h-3" /> {t.scalesends_inbox_count || 0} inboxes
-                        {t.scalesends_completed_at && <span className="text-gray-400">· {new Date(t.scalesends_completed_at).toLocaleDateString()}</span>}
-                        {t.instantly_workspace_name && <span className="text-purple-500">→ {t.instantly_workspace_name}</span>}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-green-600 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> {t.scalesends_inbox_count || 0} inboxes
+                        </span>
+                        {t.scalesends_completed_at && <span className="text-xs text-gray-400">{new Date(t.scalesends_completed_at).toLocaleDateString()}</span>}
+                        {t.instantly_workspace_name && (
+                          <span className={`text-xs font-medium ${
+                            t.instantly_upload_status === "complete" ? "text-green-600" :
+                            t.instantly_upload_status === "failed" ? "text-red-500" :
+                            t.instantly_upload_status === "uploading" ? "text-blue-500" :
+                            "text-purple-500"
+                          }`}>
+                            → {t.instantly_workspace_name}
+                            {t.instantly_upload_status === "complete" && " ✓"}
+                            {t.instantly_upload_status === "failed" && " ✗"}
+                            {t.instantly_upload_status === "uploading" && " …"}
+                          </span>
+                        )}
+                        {t.instantly_workspace_id && (!t.instantly_upload_status || t.instantly_upload_status === "pending" || t.instantly_upload_status === "failed") && (
+                          <button onClick={() => handleUploadToInstantly(t.id)}
+                            disabled={uploadingTenantId === t.id}
+                            className="text-xs px-2 py-0.5 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1">
+                            {uploadingTenantId === t.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                            Upload
+                          </button>
+                        )}
+                        {!t.instantly_workspace_id && (
+                          <span className="text-xs text-gray-400 italic">No workspace</span>
+                        )}
+                      </div>
                     )}
                     {activeView === "manual" && (
                       <span className="text-xs text-gray-500">{t.scalesends_marked_manual_by} · {t.scalesends_marked_manual_at ? new Date(t.scalesends_marked_manual_at).toLocaleDateString() : ""}</span>
