@@ -1,4 +1,5 @@
-import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 export default function ScalesendsSettings({ settings, onToggle }) {
   if (!settings) return null;
@@ -8,27 +9,27 @@ export default function ScalesendsSettings({ settings, onToggle }) {
       <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Scalesends Settings</h4>
 
       {/* Auto-submit toggle */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-submit to Scalesends</p>
           <p className="text-xs text-gray-400">When ON, tenants are sent to Scalesends as soon as credentials are captured. When OFF, tenants sit in the queue awaiting manual action.</p>
         </div>
-        <button onClick={() => onToggle("scalesends_auto_submit")}
-          className={`relative w-10 h-5 rounded-full transition-colors ${settings.autoSubmit ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"}`}>
-          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${settings.autoSubmit ? "translate-x-5" : "translate-x-0.5"}`} />
-        </button>
+        <Switch
+          checked={settings.autoSubmit}
+          onCheckedChange={() => onToggle("scalesends_auto_submit")}
+        />
       </div>
 
       {/* Kill switch */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
           <p className="text-sm font-medium text-red-500">Kill Switch (Pause All Submissions)</p>
           <p className="text-xs text-gray-400">When ON, blocks all auto and manual submissions. Already-submitted jobs continue to be monitored.</p>
         </div>
-        <button onClick={() => onToggle("pause_scalesends")}
-          className={`relative w-10 h-5 rounded-full transition-colors ${settings.pauseScalesends ? "bg-red-600" : "bg-gray-300 dark:bg-gray-600"}`}>
-          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${settings.pauseScalesends ? "translate-x-5" : "translate-x-0.5"}`} />
-        </button>
+        <Switch
+          checked={settings.pauseScalesends}
+          onCheckedChange={() => onToggle("pause_scalesends")}
+        />
       </div>
 
       {/* Status indicators */}

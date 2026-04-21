@@ -194,7 +194,7 @@ export default function ScalesendsQueueTab() {
         )}
         {reconcileResult && (
           <span className="text-xs text-amber-600 dark:text-amber-400">
-            Reconcile: {reconcileResult.totalScalesendsOrders} Scalesends orders — {reconcileResult.newlyMatched} newly linked, {reconcileResult.alreadyLinked} already linked, {reconcileResult.orphanedInScalesends} orphaned
+            Reconcile: {reconcileResult.totalScalesendsOrders} Scalesends orders — {reconcileResult.newlyMatched} newly linked, {reconcileResult.alreadyLinkedCount} already linked, {reconcileResult.orphanedInScalesends} orphaned
           </span>
         )}
       </div>
