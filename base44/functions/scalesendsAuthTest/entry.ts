@@ -105,6 +105,20 @@ Deno.serve(async (req) => {
       return Response.json({ status: res.status, success: res.ok, data: json, raw: text.substring(0, 2000) });
     }
 
+    // ── getNameservers: fetch nameserver/registrar info for an order ──
+    if (action === "getNameservers") {
+      const { orderId } = body;
+      if (!orderId) return Response.json({ error: "orderId required" });
+      const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/nameservers/`;
+      console.log(`[SCALESENDS] GET ${url}`);
+      const res = await fetch(url, { headers });
+      const text = await res.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch {}
+      console.log(`[SCALESENDS] Nameservers response: HTTP ${res.status} — ${text.substring(0, 2000)}`);
+      return Response.json({ status: res.status, data: json, raw: text.substring(0, 2000) });
+    }
+
     return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (error) {
     console.error("[SCALESENDS TEST] Error:", error.message, error.stack);
