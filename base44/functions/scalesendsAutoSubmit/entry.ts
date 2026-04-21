@@ -131,8 +131,9 @@ Deno.serve(async (req) => {
   }
 
   // Call Scalesends API to create new order
+  const sendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
   const orderPayload = { email: tenant.ms_admin_username, password: tenant.ms_admin_password_encrypted, provider: "outlook" };
-  if (tenant.sending_domain) orderPayload.domain = tenant.sending_domain;
+  if (sendingDomain) orderPayload.domain = sendingDomain;
   if (names.length > 0) orderPayload.names = names;
 
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;

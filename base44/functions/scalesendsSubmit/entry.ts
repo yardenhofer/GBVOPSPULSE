@@ -102,7 +102,7 @@ async function createScalesendsOrder(apiKey, customerId, email, password, domain
   console.log(`[SCALESENDS] POST ${url} — email: ${email}, domain: ${domain}, names: ${(names || []).length}`);
 
   const payload = { email, password, provider: "outlook" };
-  if (domain) {
+  if (domain && domain.length > 0) {
     payload.domain = domain;
   }
   if (names && names.length > 0) {
@@ -320,7 +320,7 @@ Deno.serve(async (req) => {
     }
 
     const names = await getRandomNames(base44, 100);
-    const sendingDomain = tenant.sending_domain || "";
+    const sendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
     const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, sendingDomain, names);
 
     // Handle duplicate detection (API returned 500 but we found existing order)
@@ -463,7 +463,7 @@ Deno.serve(async (req) => {
       }
 
       const bulkNames = await getRandomNames(base44, 100);
-      const bulkSendingDomain = tenant.sending_domain || "";
+      const bulkSendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
       const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, bulkSendingDomain, bulkNames);
 
       // Handle duplicate in bulk
