@@ -1,18 +1,25 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, Trash2, Users, RefreshCw, Download } from "lucide-react";
+import { Upload, Trash2, Users, RefreshCw, AlertCircle } from "lucide-react";
 
 export default function InboxNamePool() {
   const [names, setNames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [error, setError] = useState(null);
   const fileRef = useRef(null);
 
   async function loadNames() {
     setLoading(true);
-    const res = await base44.functions.invoke("scalesendsSubmit", { action: "getNamePool" });
-    setNames(res.data.names || []);
+    setError(null);
+    try {
+      const res = await base44.functions.invoke("scalesendsSubmit", { action: "getNamePool" });
+      setNames(res.data.names || []);
+    } catch (err) {
+      console.error("Failed to load name pool:", err);
+      setError("Failed to load name pool.");
+    }
     setLoading(false);
   }
 
@@ -43,63 +50,95 @@ export default function InboxNamePool() {
   async function handleFileSelect(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (fileRef.current) fileRef.current.value = "";
 
+    setError(null);
+    setPreview(null);
     const ext = file.name.split(".").pop().toLowerCase();
 
     if (ext === "csv") {
       const reader = new FileReader();
       reader.onload = (ev) => {
+        if (fileRef.current) fileRef.current.value = "";
         const parsed = parseCsv(ev.target.result);
+        if (parsed.length === 0) {
+          setError("No names found in CSV. Make sure it has first_name and last_name columns.");
+          return;
+        }
         setPreview(parsed);
+      };
+      reader.onerror = () => {
+        if (fileRef.current) fileRef.current.value = "";
+        setError("Failed to read the file.");
       };
       reader.readAsText(file);
     } else if (ext === "docx") {
       setUploading(true);
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: {
-          type: "object",
-          properties: {
-            names: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  first_name: { type: "string" },
-                  last_name: { type: "string" },
+      try {
+        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
+          file_url,
+          json_schema: {
+            type: "object",
+            properties: {
+              names: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    first_name: { type: "string" },
+                    last_name: { type: "string" },
+                  },
                 },
               },
             },
           },
-        },
-      });
-      setUploading(false);
-      if (result.status === "success" && result.output?.names) {
-        const cleaned = result.output.names.filter(n => n.first_name && n.last_name);
-        setPreview(cleaned);
-      } else {
-        alert("Could not extract names from DOCX. Make sure it contains first and last names.");
+        });
+        if (result.status === "success" && result.output?.names) {
+          const cleaned = result.output.names.filter(n => n.first_name && n.last_name);
+          if (cleaned.length === 0) {
+            setError("File processed but no valid first_name/last_name pairs found.");
+          } else {
+            setPreview(cleaned);
+          }
+        } else {
+          setError("Could not extract names from DOCX. Make sure it contains first and last names.");
+        }
+      } catch (err) {
+        console.error("DOCX processing error:", err);
+        setError(`DOCX processing failed: ${err.message || "Unknown error"}`);
       }
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
     } else {
-      alert("Please upload a .csv or .docx file.");
+      setError("Please upload a .csv or .docx file.");
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
   async function handleUpload() {
     if (!preview || preview.length === 0) return;
     setUploading(true);
-    await base44.functions.invoke("scalesendsSubmit", { action: "uploadNamePool", names: preview });
-    setPreview(null);
+    setError(null);
+    try {
+      await base44.functions.invoke("scalesendsSubmit", { action: "uploadNamePool", names: preview });
+      setPreview(null);
+      await loadNames();
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setError(`Upload failed: ${err.message || "Unknown error"}`);
+    }
     setUploading(false);
-    await loadNames();
   }
 
   async function handleClear() {
     if (!confirm("Clear all inbox names from the pool?")) return;
-    await base44.functions.invoke("scalesendsSubmit", { action: "clearNamePool" });
-    await loadNames();
+    setError(null);
+    try {
+      await base44.functions.invoke("scalesendsSubmit", { action: "clearNamePool" });
+      await loadNames();
+    } catch (err) {
+      setError(`Clear failed: ${err.message || "Unknown error"}`);
+    }
   }
 
   function generateSample() {
@@ -135,6 +174,22 @@ export default function InboxNamePool() {
       <p className="text-xs text-gray-500">
         Upload a CSV (with <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">first_name</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">last_name</code> columns) or a DOCX with names. 100 random names will be selected per Scalesends order.
       </p>
+
+      {/* Error display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-2.5 flex items-start gap-2">
+          <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+          <span className="text-xs text-red-600 dark:text-red-400">{error}</span>
+        </div>
+      )}
+
+      {/* Uploading/processing indicator */}
+      {uploading && !preview && (
+        <div className="flex items-center gap-2 py-2">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
+          <span className="text-xs text-blue-600 dark:text-blue-400">Processing file…</span>
+        </div>
+      )}
 
       {/* Preview before upload */}
       {preview && (
