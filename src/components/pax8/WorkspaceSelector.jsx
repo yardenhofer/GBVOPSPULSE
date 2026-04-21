@@ -8,9 +8,9 @@ export default function WorkspaceSelector({ value, onChange }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    base44.entities.InstantlyWorkspace.list("-created_date", 100).then(list => {
+    base44.functions.invoke("workspaceManager", { action: "list" }).then(res => {
+      const list = res.data.workspaces || [];
       setWorkspaces(list);
-      // Auto-select default if no value yet
       if (!value) {
         const def = list.find(w => w.is_default);
         if (def) onChange(def.id);
