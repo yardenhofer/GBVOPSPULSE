@@ -40,9 +40,39 @@ Deno.serve(async (req) => {
           domain: o.domain,
           endDomain: o.endDomain,
           status: o.status,
+          onboardStatus: o.onboardStatus,
           mailboxCount: o.mailboxes?.length || 0,
           allKeys: Object.keys(o),
         })),
+      });
+    }
+
+    // ── inspectOrder: return full order structure including sample mailboxes ──
+    if (action === "inspectOrder") {
+      const res = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, { headers });
+      const data = await res.json();
+      const orders = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+      const orderId = body.orderId;
+      const order = orderId ? orders.find(o => o._id === orderId) : orders[0];
+      if (!order) return Response.json({ error: "Order not found" });
+      
+      const sampleMailboxes = (order.mailboxes || []).slice(0, 5);
+      return Response.json({
+        _id: order._id,
+        email: order.email,
+        domain: order.domain,
+        endDomain: order.endDomain,
+        onboardStatus: order.onboardStatus,
+        provider: order.provider,
+        company: order.company,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        totalMailboxes: (order.mailboxes || []).length,
+        sampleMailboxes: sampleMailboxes.map(m => ({
+          allKeys: Object.keys(m),
+          ...m,
+        })),
+        fullOrderKeys: Object.keys(order),
       });
     }
 
