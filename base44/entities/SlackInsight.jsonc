@@ -1,0 +1,63 @@
+{
+  "name": "SlackInsight",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "sentiment": {
+      "type": "string",
+      "enum": [
+        "Happy",
+        "Neutral",
+        "Slightly Concerned",
+        "Unhappy"
+      ],
+      "description": "AI-determined current client sentiment (weighted toward most recent messages)"
+    },
+    "sentiment_score": {
+      "type": "number",
+      "description": "Sentiment score 1-10 (10=very happy)"
+    },
+    "sentiment_trend": {
+      "type": "string",
+      "enum": [
+        "Improving",
+        "Stable",
+        "Declining"
+      ],
+      "description": "Direction of sentiment change over the analysis period"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Brief summary of recent client communications"
+    },
+    "upsell_opportunities": {
+      "type": "string",
+      "description": "Identified upsell opportunities from conversations"
+    },
+    "risk_signals": {
+      "type": "string",
+      "description": "Any risk signals or concerns detected"
+    },
+    "key_topics": {
+      "type": "string",
+      "description": "Comma-separated key topics discussed"
+    },
+    "messages_analyzed": {
+      "type": "number",
+      "description": "Number of messages analyzed"
+    },
+    "analysis_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "client_id",
+    "sentiment"
+  ]
+}

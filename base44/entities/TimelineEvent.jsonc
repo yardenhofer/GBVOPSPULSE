@@ -1,0 +1,45 @@
+{
+  "name": "TimelineEvent",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "am_email": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "status_change",
+        "sentiment_change",
+        "note",
+        "escalation",
+        "recovery_plan",
+        "settings_update",
+        "activity"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "detail": {
+      "type": "string"
+    },
+    "old_value": {
+      "type": "string"
+    },
+    "new_value": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "client_id",
+    "type",
+    "title"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "LeadList",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Ready",
+        "Waiting on Data",
+        "Being Built",
+        "QA Review",
+        "Live"
+      ],
+      "default": "Waiting on Data"
+    },
+    "date_uploaded": {
+      "type": "string",
+      "format": "date"
+    },
+    "expected_next_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "client_id"
+  ]
+}

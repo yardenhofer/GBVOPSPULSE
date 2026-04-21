@@ -1,0 +1,86 @@
+{
+  "name": "Pax8AuditLog",
+  "type": "object",
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Unique ID for this run"
+    },
+    "triggered_by": {
+      "type": "string",
+      "description": "Email of user who triggered the run"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "mock",
+        "live"
+      ],
+      "description": "Whether this was a mock or live run"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "started",
+        "completed",
+        "halted",
+        "error"
+      ],
+      "description": "Final status of the run"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "product_sku": {
+      "type": "string"
+    },
+    "eligible_count": {
+      "type": "number"
+    },
+    "skipped_count": {
+      "type": "number"
+    },
+    "success_count": {
+      "type": "number"
+    },
+    "failed_count": {
+      "type": "number"
+    },
+    "total_monthly_cost": {
+      "type": "number"
+    },
+    "confirmation_amount_typed": {
+      "type": "string"
+    },
+    "confirmation_word_typed": {
+      "type": "string"
+    },
+    "eligible_clients": {
+      "type": "string",
+      "description": "JSON array of eligible client names/IDs at time of run"
+    },
+    "skipped_clients": {
+      "type": "string",
+      "description": "JSON array of skipped clients with reasons"
+    },
+    "results": {
+      "type": "string",
+      "description": "JSON array of per-client results (success/fail/skip)"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "api_log": {
+      "type": "string",
+      "description": "JSON array of API request/response pairs (credentials redacted)"
+    }
+  },
+  "required": [
+    "run_id",
+    "triggered_by",
+    "mode"
+  ]
+}

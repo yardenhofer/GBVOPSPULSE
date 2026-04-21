@@ -1,0 +1,32 @@
+{
+  "name": "RecoveryPlan",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "plan": {
+      "type": "string"
+    },
+    "submitted_by": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pending",
+        "In Progress",
+        "Resolved"
+      ],
+      "default": "Pending"
+    },
+    "submitted_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "client_id",
+    "plan"
+  ]
+}

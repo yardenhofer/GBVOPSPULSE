@@ -1,0 +1,26 @@
+{
+  "name": "EmailCopyLog",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "previous_copy": {
+      "type": "string",
+      "description": "The email copy before the change"
+    },
+    "new_copy": {
+      "type": "string",
+      "description": "The email copy after the change"
+    },
+    "changed_by": {
+      "type": "string",
+      "description": "Email of the user who made the change"
+    }
+  },
+  "required": [
+    "client_id",
+    "previous_copy",
+    "new_copy"
+  ]
+}

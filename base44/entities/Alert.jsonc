@@ -1,0 +1,43 @@
+{
+  "name": "Alert",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "Yellow",
+        "Red"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "triggered_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "resolved_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "client_id",
+    "type",
+    "severity",
+    "message"
+  ]
+}

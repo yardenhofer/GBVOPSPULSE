@@ -92,8 +92,8 @@ function attemptParse(body) {
     }
   }
 
-  // Look for password near keywords
-  const pwdMatch = body.match(/(?:initial password|temporary password|password)[:\s]*([^\s<\n\r]{4,40})/i);
+  // Look for password near keywords (handles HTML tags like <strong>Password:</strong> value)
+  const pwdMatch = body.match(/(?:initial password|temporary password|password)\s*(?:<[^>]*>)*[:\s]*(?:<[^>]*>)*\s*([^\s<\n\r]{4,40})/i);
   if (pwdMatch) {
     result.adminPassword = pwdMatch[1].replace(/[.,;]$/, "");
   }

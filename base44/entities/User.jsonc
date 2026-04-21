@@ -1,0 +1,36 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user"
+    },
+    "group": {
+      "type": "number",
+      "description": "Group number this AM belongs to"
+    },
+    "can_view_executive": {
+      "type": "boolean",
+      "default": true,
+      "description": "Can access the Executive View tab"
+    },
+    "can_view_all_clients": {
+      "type": "boolean",
+      "default": true,
+      "description": "Can see all clients (not just their own)"
+    },
+    "can_edit_clients": {
+      "type": "boolean",
+      "default": true,
+      "description": "Can edit client settings and data"
+    }
+  },
+  "required": [
+    "group"
+  ]
+}

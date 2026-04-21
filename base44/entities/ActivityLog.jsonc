@@ -1,0 +1,38 @@
+{
+  "name": "ActivityLog",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "am_email": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "Call",
+        "Email",
+        "Slack",
+        "Strategy",
+        "Issue"
+      ]
+    },
+    "note": {
+      "type": "string"
+    },
+    "follow_up_needed": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "client_id",
+    "type",
+    "note"
+  ]
+}
