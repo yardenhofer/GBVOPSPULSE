@@ -120,6 +120,18 @@ async function createScalesendsOrder(apiKey, customerId, email, password, names)
 
   if (!res.ok) {
     const errMsg = json?.error || json?.message || text.substring(0, 200) || `HTTP ${res.status}`;
+    // If 500, likely a duplicate — try to find the existing order by email
+    if (res.status === 500) {
+      console.log(`[SCALESENDS] Got 500, checking for existing order by email: ${email}`);
+      _ordersCache = null; // force fresh fetch (cache may have stale data from pre-check)
+      const orders = await fetchAllScalesendsOrders(apiKey, customerId);
+      const emailLower = email.toLowerCase().trim();
+      const existing = orders.find(o => (o.email || "").toLowerCase().trim() === emailLower);
+      if (existing) {
+        console.log(`[SCALESENDS] Found existing order ${existing._id} for ${email} — returning as duplicate`);
+        return { success: false, error: errMsg, httpStatus: res.status, duplicate: true, existingOrder: existing };
+      }
+    }
     return { success: false, error: errMsg, httpStatus: res.status };
   }
 
@@ -255,6 +267,13 @@ Deno.serve(async (req) => {
 
     const { apiKey, customerId } = getApiCredentials();
 
+    // Resolve workspace name early (needed for both pre-check and create paths)
+    let workspaceName = null;
+    if (workspaceId) {
+      const wsList = await base44.asServiceRole.entities.InstantlyWorkspace.filter({ id: workspaceId });
+      if (wsList.length > 0) workspaceName = wsList[0].name;
+    }
+
     // ── Pre-submission check: look for existing Scalesends order ──
     const existingOrder = await findExistingOrder(apiKey, customerId, tenant);
     if (existingOrder) {
@@ -300,11 +319,30 @@ Deno.serve(async (req) => {
     const names = await getRandomNames(base44, 100);
     const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, names);
 
-    // Resolve workspace name if workspace selected
-    let workspaceName = null;
-    if (workspaceId) {
-      const wsList = await base44.asServiceRole.entities.InstantlyWorkspace.filter({ id: workspaceId });
-      if (wsList.length > 0) workspaceName = wsList[0].name;
+    // Handle duplicate detection (API returned 500 but we found existing order)
+    if (result.duplicate && result.existingOrder) {
+      const dupOrder = result.existingOrder;
+      const { scalesendsStatus, overallStatus } = mapScalesendsStatus(dupOrder);
+      const inboxDetails = (dupOrder.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password }));
+      const updateData = {
+        scalesends_status: scalesendsStatus, scalesends_job_id: dupOrder._id,
+        overall_status: overallStatus, scalesends_inbox_count: dupOrder.mailboxes?.length || 0,
+      };
+      if (scalesendsStatus === "complete") {
+        updateData.scalesends_completed_at = dupOrder.updatedAt || new Date().toISOString();
+        updateData.scalesends_inbox_details = JSON.stringify(inboxDetails);
+      }
+      if (workspaceId) { updateData.instantly_workspace_id = workspaceId; updateData.instantly_workspace_name = workspaceName; updateData.instantly_upload_status = "pending"; }
+      await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
+      await base44.asServiceRole.entities.TenantAuditLog.create({
+        action: "email_linked", tenant_lifecycle_id: tenant.id, performed_by: user.email,
+        detail: `API returned 500 (duplicate). Found existing Scalesends order (ID: ${dupOrder._id}, status: ${scalesendsStatus}). Auto-linked.`,
+      });
+      return Response.json({
+        success: true, linked: true, tenantId: tenant.id, tenantDomain: tenant.ms_tenant_domain,
+        orderId: dupOrder._id, scalesendsStatus, overallStatus, mailboxCount: dupOrder.mailboxes?.length || 0,
+        message: `Order already existed in Scalesends (ID: ${dupOrder._id}). Auto-linked.`,
+      });
     }
 
     if (result.success) {
@@ -422,6 +460,20 @@ Deno.serve(async (req) => {
 
       const bulkNames = await getRandomNames(base44, 100);
       const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, bulkNames);
+
+      // Handle duplicate in bulk
+      if (result.duplicate && result.existingOrder) {
+        const dup = result.existingOrder;
+        const { scalesendsStatus: dStat, overallStatus: dOverall } = mapScalesendsStatus(dup);
+        const dInbox = (dup.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password }));
+        const dUpdate = { scalesends_status: dStat, scalesends_job_id: dup._id, overall_status: dOverall, scalesends_inbox_count: dup.mailboxes?.length || 0 };
+        if (dStat === "complete") { dUpdate.scalesends_completed_at = dup.updatedAt || new Date().toISOString(); dUpdate.scalesends_inbox_details = JSON.stringify(dInbox); }
+        if (bulkWorkspaceId) { dUpdate.instantly_workspace_id = bulkWorkspaceId; dUpdate.instantly_workspace_name = bulkWorkspaceName; dUpdate.instantly_upload_status = "pending"; }
+        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, dUpdate);
+        await base44.asServiceRole.entities.TenantAuditLog.create({ action: "email_linked", tenant_lifecycle_id: tenant.id, performed_by: user.email, detail: `Bulk: API returned 500 (duplicate). Auto-linked to order ${dup._id}.` });
+        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "linked", orderId: dup._id, scalesendsStatus: dStat, mailboxCount: dup.mailboxes?.length || 0 });
+        continue;
+      }
 
       if (result.success) {
         const bulkUpdate = {
