@@ -105,6 +105,20 @@ Deno.serve(async (req) => {
       return Response.json({ status: res.status, success: res.ok, data: json, raw: text.substring(0, 2000) });
     }
 
+    // ── setRegistrar: assign a registrar to an order ──
+    if (action === "setRegistrar") {
+      const { orderId, registrarName } = body;
+      if (!orderId || !registrarName) return Response.json({ error: "orderId and registrarName required" });
+      const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/set-registrar/`;
+      console.log(`[SCALESENDS] POST ${url} — registrarName: ${registrarName}`);
+      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ registrarName }) });
+      const text = await res.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch {}
+      console.log(`[SCALESENDS] Set-registrar response: HTTP ${res.status} — ${text.substring(0, 2000)}`);
+      return Response.json({ status: res.status, data: json, raw: text.substring(0, 2000) });
+    }
+
     // ── getNameservers: fetch nameserver/registrar info for an order ──
     if (action === "getNameservers") {
       const { orderId } = body;
