@@ -97,9 +97,9 @@ async function getRandomNames(base44, count) {
   return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 
-async function createScalesendsOrder(apiKey, customerId, email, password, domain, names, inboxProvider) {
+async function createScalesendsOrder(apiKey, customerId, email, password, domain, names) {
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;
-  console.log(`[SCALESENDS] POST ${url} — email: ${email}, domain: ${domain}, names: ${(names || []).length}, inboxProvider: ${JSON.stringify(inboxProvider || null)}`);
+  console.log(`[SCALESENDS] POST ${url} — email: ${email}, domain: ${domain}, names: ${(names || []).length}`);
 
   const payload = { email, password, provider: "outlook" };
   if (domain && domain.length > 0) {
@@ -107,9 +107,6 @@ async function createScalesendsOrder(apiKey, customerId, email, password, domain
   }
   if (names && names.length > 0) {
     payload.names = names;
-  }
-  if (inboxProvider) {
-    payload.inboxProvider = inboxProvider;
   }
 
   const res = await fetch(url, {
@@ -149,6 +146,23 @@ async function createScalesendsOrder(apiKey, customerId, email, password, domain
     onboardStatus: order?.onboardStatus || null,
     mailboxCount: order?.mailboxes?.length || 0,
   };
+}
+
+// ── Assign inbox provider to an order (separate API call) ──
+async function assignInboxProvider(apiKey, customerId, orderId, inboxProvider) {
+  if (!inboxProvider || !orderId) return { success: false, error: "No provider or orderId" };
+  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/inbox-providers/add/`;
+  const payload = { name: inboxProvider.name, provider: inboxProvider.provider };
+  console.log(`[SCALESENDS] POST ${url} — provider: ${JSON.stringify(payload)}`);
+  const res = await fetch(url, { method: "POST", headers: getHeaders(apiKey), body: JSON.stringify(payload) });
+  const text = await res.text();
+  console.log(`[SCALESENDS] inbox-providers/add response: HTTP ${res.status} — ${text.substring(0, 300)}`);
+  if (!res.ok) {
+    return { success: false, error: `Set provider failed: HTTP ${res.status} — ${text.substring(0, 200)}` };
+  }
+  let json = null;
+  try { json = JSON.parse(text); } catch {}
+  return { success: true, data: json };
 }
 
 // ── Auto-assign registrar after order creation ──
@@ -363,7 +377,7 @@ Deno.serve(async (req) => {
 
     const names = await getRandomNames(base44, 100);
     const sendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
-    const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, sendingDomain, names, inboxProvider);
+    const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, sendingDomain, names);
 
     // Handle duplicate detection (API returned 500 but we found existing order)
     if (result.duplicate && result.existingOrder) {
@@ -392,10 +406,18 @@ Deno.serve(async (req) => {
     }
 
     if (result.success) {
-      // Auto-assign registrar
+      // Step 2: Assign inbox provider (separate API call)
+      let providerResult = null;
+      if (result.orderId && inboxProvider) {
+        providerResult = await assignInboxProvider(apiKey, customerId, result.orderId, inboxProvider);
+        if (!providerResult.success) console.log(`[SCALESENDS] Warning: inbox provider assignment failed for order ${result.orderId}: ${providerResult.error}`);
+      }
+
+      // Step 3: Assign registrar (separate API call)
       let registrarResult = null;
       if (result.orderId) {
         registrarResult = await autoAssignRegistrar(apiKey, customerId, result.orderId);
+        if (!registrarResult.success) console.log(`[SCALESENDS] Warning: registrar assignment deferred for order ${result.orderId}: ${registrarResult.error}`);
       }
 
       const updateData = {
@@ -413,12 +435,13 @@ Deno.serve(async (req) => {
       }
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
 
+      const providerInfo = providerResult?.success ? `. Provider: ${inboxProvider.name}` : "";
       const registrarInfo = registrarResult?.success ? `. Registrar: ${registrarResult.registrar?.name}` : "";
       await base44.asServiceRole.entities.TenantAuditLog.create({
         action: "email_parsed",
         tenant_lifecycle_id: tenant.id,
         performed_by: user.email,
-        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}${workspaceName ? `. Workspace: ${workspaceName}` : ""}${registrarInfo}`,
+        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}${workspaceName ? `. Workspace: ${workspaceName}` : ""}${providerInfo}${registrarInfo}`,
       });
 
       return Response.json({
@@ -430,6 +453,7 @@ Deno.serve(async (req) => {
         onboardStatus: result.onboardStatus,
         mailboxCount: result.mailboxCount,
         workspace: workspaceName,
+        provider: providerResult?.success ? inboxProvider : null,
         registrar: registrarResult?.registrar || null,
       });
     } else {
@@ -522,7 +546,7 @@ Deno.serve(async (req) => {
 
       const bulkNames = await getRandomNames(base44, 100);
       const bulkSendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
-      const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, bulkSendingDomain, bulkNames, bulkInboxProvider);
+      const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, bulkSendingDomain, bulkNames);
 
       // Handle duplicate in bulk
       if (result.duplicate && result.existingOrder) {
@@ -539,9 +563,16 @@ Deno.serve(async (req) => {
       }
 
       if (result.success) {
-        // Auto-assign registrar
+        // Step 2: Assign inbox provider (separate API call)
+        if (result.orderId && bulkInboxProvider) {
+          const provRes = await assignInboxProvider(apiKey, customerId, result.orderId, bulkInboxProvider);
+          if (!provRes.success) console.log(`[SCALESENDS] Bulk: inbox provider failed for order ${result.orderId}: ${provRes.error}`);
+        }
+
+        // Step 3: Assign registrar (separate API call)
         if (result.orderId) {
-          await autoAssignRegistrar(apiKey, customerId, result.orderId);
+          const regRes = await autoAssignRegistrar(apiKey, customerId, result.orderId);
+          if (!regRes.success) console.log(`[SCALESENDS] Bulk: registrar deferred for order ${result.orderId}: ${regRes.error}`);
         }
 
         const bulkUpdate = {
@@ -835,6 +866,23 @@ Deno.serve(async (req) => {
       alreadyLinked,
       orphaned,
     });
+  }
+
+  // ── fixMissingProviders: retroactively assign inbox provider to orders missing it ──
+  if (action === "fixMissingProviders") {
+    const { orderIds, providerName, providerType } = body;
+    if (!orderIds || !Array.isArray(orderIds)) return Response.json({ error: "orderIds array required" }, { status: 400 });
+
+    const { apiKey, customerId } = getApiCredentials();
+    const provider = { name: providerName || "Instantly - Growth Team", provider: providerType || "instantly" };
+    const results = [];
+
+    for (const orderId of orderIds) {
+      const result = await assignInboxProvider(apiKey, customerId, orderId, provider);
+      results.push({ orderId, ...result });
+    }
+
+    return Response.json({ results });
   }
 
   // ── getNamePool: return stored names ──

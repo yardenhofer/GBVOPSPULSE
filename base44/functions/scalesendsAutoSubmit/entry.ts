@@ -138,12 +138,11 @@ Deno.serve(async (req) => {
     console.log(`[SCALESENDS-AUTO] Using default inbox provider: ${JSON.stringify(inboxProvider)}`);
   }
 
-  // Call Scalesends API to create new order
+  // Step 1: Create order (without inboxProvider in payload)
   const sendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
   const orderPayload = { email: tenant.ms_admin_username, password: tenant.ms_admin_password_encrypted, provider: "outlook" };
   if (sendingDomain) orderPayload.domain = sendingDomain;
   if (names.length > 0) orderPayload.names = names;
-  if (inboxProvider) orderPayload.inboxProvider = inboxProvider;
 
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;
   const res = await fetch(url, {
@@ -162,7 +161,21 @@ Deno.serve(async (req) => {
     const orderId = order?._id || null;
     const mailboxCount = order?.mailboxes?.length || 0;
 
-    // Auto-assign registrar
+    // Step 2: Assign inbox provider (separate API call)
+    let providerInfo = "";
+    if (orderId && inboxProvider) {
+      const provUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/inbox-providers/add/`;
+      console.log(`[SCALESENDS-AUTO] Assigning inbox provider for order ${orderId}`);
+      const provRes = await fetch(provUrl, { method: "POST", headers, body: JSON.stringify({ name: inboxProvider.name, provider: inboxProvider.provider }) });
+      if (provRes.ok) {
+        providerInfo = `. Provider: ${inboxProvider.name}`;
+        console.log(`[SCALESENDS-AUTO] Provider assigned: ${inboxProvider.name}`);
+      } else {
+        console.log(`[SCALESENDS-AUTO] Set-provider failed: HTTP ${provRes.status}`);
+      }
+    }
+
+    // Step 3: Assign registrar (separate API call)
     let registrarInfo = "";
     if (orderId) {
       const nsUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/nameservers/`;
@@ -199,7 +212,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.TenantAuditLog.create({
       action: "email_parsed",
       tenant_lifecycle_id: tenant.id,
-      detail: `Auto-submitted to Scalesends. Order ID: ${orderId}. Domain: ${order?.domain || "pending"}${registrarInfo}.`,
+      detail: `Auto-submitted to Scalesends. Order ID: ${orderId}. Domain: ${order?.domain || "pending"}${providerInfo}${registrarInfo}.`,
     });
 
     console.log(`[SCALESENDS-AUTO] Success! Order ${orderId} for ${tenant.ms_tenant_domain}`);
