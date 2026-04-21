@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { RefreshCw, Send, Copy, FileCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Square, CheckSquare } from "lucide-react";
+import { RefreshCw, Send, Copy, FileCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Square, CheckSquare, RotateCw } from "lucide-react";
 import ScalesendsSettings from "./ScalesendsSettings";
 import ScalesendsConfirmDialog from "./ScalesendsConfirmDialog";
 import ScalesendsMarkManualDialog from "./ScalesendsMarkManualDialog";
@@ -24,6 +24,8 @@ export default function ScalesendsQueueTab() {
   const [confirmDialog, setConfirmDialog] = useState(null); // { type: 'single'|'bulk', tenantIds: [], tenantDomain?: '' }
   const [manualDialog, setManualDialog] = useState(null); // { type: 'single'|'bulk', tenantIds: [] }
   const [activeView, setActiveView] = useState("ready");
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState(null);
 
   async function loadAll() {
     setLoading(true);
@@ -43,8 +45,8 @@ export default function ScalesendsQueueTab() {
     const res = await base44.functions.invoke("scalesendsSubmit", { action: "submit", tenantId, triggerType: "manual" });
     setSubmitting(null);
     setConfirmDialog(null);
-    if (res.data.placeholder) {
-      alert(`API Docs Pending: ${res.data.error}`);
+    if (res.data.error) {
+      alert(`Submit failed: ${res.data.error}`);
     }
     await loadAll();
   }
@@ -55,10 +57,19 @@ export default function ScalesendsQueueTab() {
     setBulkSubmitting(false);
     setConfirmDialog(null);
     setSelectedIds(new Set());
-    const placeholders = (res.data.results || []).filter(r => r.placeholder);
-    if (placeholders.length > 0) {
-      alert(`API Docs Pending: ${placeholders[0].error}`);
+    const failed = (res.data.results || []).filter(r => r.status === "failed");
+    if (failed.length > 0) {
+      alert(`${failed.length} submission(s) failed. Check the Failed tab for details.`);
     }
+    await loadAll();
+  }
+
+  async function handleSyncOrders() {
+    setSyncing(true);
+    setLastSyncResult(null);
+    const res = await base44.functions.invoke("scalesendsSubmit", { action: "syncOrders" });
+    setLastSyncResult(res.data);
+    setSyncing(false);
     await loadAll();
   }
 
@@ -126,12 +137,21 @@ export default function ScalesendsQueueTab() {
         <button onClick={loadAll} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 font-medium">
           <RefreshCw className="w-3 h-3" /> Refresh
         </button>
+        <button onClick={handleSyncOrders} disabled={syncing}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-500/20 font-medium disabled:opacity-50">
+          <RotateCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} /> Sync Orders
+        </button>
         <button onClick={() => setShowSettings(!showSettings)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 font-medium">
           Settings
         </button>
         {settings && (
           <span className="text-xs text-gray-400">
             Today: {settings.todaySubmissions}/{settings.dailyCap} submissions · API: {settings.apiKeyConfigured ? "✓" : "✗"}
+          </span>
+        )}
+        {lastSyncResult && (
+          <span className="text-xs text-green-600 dark:text-green-400">
+            Synced {lastSyncResult.syncedCount} order(s) from {lastSyncResult.totalOrders} total
           </span>
         )}
       </div>
@@ -248,13 +268,19 @@ export default function ScalesendsQueueTab() {
                       </>
                     )}
                     {activeView === "complete" && (
-                      <span className="text-xs text-green-600">{t.scalesends_inbox_count || 0} inboxes</span>
+                      <span className="text-xs text-green-600 flex items-center gap-2">
+                        <CheckCircle2 className="w-3 h-3" /> {t.scalesends_inbox_count || 0} inboxes
+                        {t.scalesends_completed_at && <span className="text-gray-400">· {new Date(t.scalesends_completed_at).toLocaleDateString()}</span>}
+                      </span>
                     )}
                     {activeView === "manual" && (
                       <span className="text-xs text-gray-500">{t.scalesends_marked_manual_by} · {t.scalesends_marked_manual_at ? new Date(t.scalesends_marked_manual_at).toLocaleDateString() : ""}</span>
                     )}
                     {activeView === "processing" && (
-                      <span className="text-xs text-blue-500 flex items-center gap-1"><Clock className="w-3 h-3" /> In progress</span>
+                      <span className="text-xs text-blue-500 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> In progress
+                        {t.scalesends_job_id && <span className="text-gray-400 font-mono">· {t.scalesends_job_id.substring(0, 8)}…</span>}
+                      </span>
                     )}
                   </div>
                 </td>

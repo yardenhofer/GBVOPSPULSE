@@ -38,8 +38,8 @@ export default function ScalesendsSettings({ settings, onToggle }) {
           <span className="text-gray-600 dark:text-gray-400">API Key: {settings.apiKeyConfigured ? "Configured" : "Not configured"}</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          {settings.baseUrlConfigured ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />}
-          <span className="text-gray-600 dark:text-gray-400">Base URL: {settings.baseUrlConfigured ? "Configured" : "Pending docs"}</span>
+          {settings.baseUrlConfigured ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <XCircle className="w-3.5 h-3.5 text-red-500" />}
+          <span className="text-gray-600 dark:text-gray-400">Customer ID: {settings.baseUrlConfigured ? "Configured" : "Not configured"}</span>
         </div>
         <div className="text-xs text-gray-500">Daily cap: {settings.dailyCap}</div>
         <div className="text-xs text-gray-500">Today: {settings.todaySubmissions} submissions</div>

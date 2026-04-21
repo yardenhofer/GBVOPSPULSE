@@ -1,9 +1,22 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// Rate limit: 1 submission per 10 seconds (enforced via timestamp tracking)
-// Daily cap: configurable, default 20
+const BASE_URL = "https://cloud-api.plugsaas.com";
 const DEFAULT_DAILY_CAP = 20;
-const AUTO_HOURLY_CAP = 10;
+
+function getApiCredentials() {
+  const apiKey = (Deno.env.get("SCALESENDS_API_KEY") || "").replace(/[^\x20-\x7E]/g, "").trim();
+  const customerId = (Deno.env.get("SCALESENDS_CUSTOMER_ID") || "").replace(/[^\x20-\x7E]/g, "").trim();
+  if (!apiKey || !customerId) throw new Error("SCALESENDS_API_KEY or SCALESENDS_CUSTOMER_ID not configured");
+  return { apiKey, customerId };
+}
+
+function getHeaders(apiKey) {
+  return {
+    "Authorization": `Bearer ${apiKey}`,
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+  };
+}
 
 async function getSetting(base44, key) {
   const settings = await base44.asServiceRole.entities.AppSettings.filter({ key });
@@ -24,22 +37,48 @@ async function setSettingValue(base44, key, value) {
   }
 }
 
-// Placeholder API call - DO NOT replace until real Scalesends docs arrive
-async function callScalesendsAPI(tenantData) {
-  // ╔══════════════════════════════════════════════════════════════╗
-  // ║  PLACEHOLDER: Scalesends API integration pending docs.      ║
-  // ║  Do NOT attempt real HTTP calls until Leon provides:        ║
-  // ║  - Endpoint URLs                                            ║
-  // ║  - Auth header format                                       ║
-  // ║  - Payload schema                                           ║
-  // ║  - Response schema                                          ║
-  // ╚══════════════════════════════════════════════════════════════╝
-  console.log("[SCALESENDS] Placeholder call for tenant:", tenantData.ms_tenant_domain, "(credentials redacted)");
+// ── Create a Scalesends order ──
+async function createScalesendsOrder(apiKey, customerId, email, password) {
+  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
+  console.log(`[SCALESENDS] POST ${url} — email: ${email}`);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: getHeaders(apiKey),
+    body: JSON.stringify({ email, password }),
+  });
+
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch {}
+
+  console.log(`[SCALESENDS] Response: HTTP ${res.status} — ${text.substring(0, 500)}`);
+
+  if (!res.ok) {
+    const errMsg = json?.error || json?.message || text.substring(0, 200) || `HTTP ${res.status}`;
+    return { success: false, error: errMsg, httpStatus: res.status };
+  }
+
+  const order = json?.data || json;
   return {
-    success: false,
-    error: "Scalesends API integration pending documentation from vendor. Please use manual upload or mark as manually uploaded.",
-    placeholder: true,
+    success: true,
+    orderId: order?._id || null,
+    domain: order?.domain || null,
+    onboardStatus: order?.onboardStatus || null,
+    mailboxCount: order?.mailboxes?.length || 0,
   };
+}
+
+// ── List all Scalesends orders (for polling/sync) ──
+async function listScalesendsOrders(apiKey, customerId) {
+  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
+  const res = await fetch(url, { headers: getHeaders(apiKey) });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`List orders failed: HTTP ${res.status} — ${text.substring(0, 200)}`);
+  }
+  const data = await res.json();
+  return Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
 }
 
 Deno.serve(async (req) => {
@@ -52,15 +91,15 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const { action } = body;
 
-  // ── getSettings: return all scalesends-related settings ──
+  // ── getSettings ──
   if (action === "getSettings") {
     const autoSubmit = await getSettingValue(base44, "scalesends_auto_submit", "false");
     const pauseScalesends = await getSettingValue(base44, "pause_scalesends", "false");
     const dailyCap = await getSettingValue(base44, "scalesends_daily_cap", String(DEFAULT_DAILY_CAP));
-    const apiKeySet = !!Deno.env.get("SCALESENDS_API_KEY");
-    const baseUrlSet = false; // Will be true once SCALESENDS_BASE_URL secret is configured after docs arrive
 
-    // Count today's submissions
+    let apiKeyConfigured = false;
+    try { const c = getApiCredentials(); apiKeyConfigured = true; } catch {}
+
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
     const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
@@ -73,12 +112,12 @@ Deno.serve(async (req) => {
       pauseScalesends: pauseScalesends === "true",
       dailyCap: parseInt(dailyCap, 10),
       todaySubmissions,
-      apiKeyConfigured: apiKeySet,
-      baseUrlConfigured: baseUrlSet,
+      apiKeyConfigured,
+      baseUrlConfigured: apiKeyConfigured,
     });
   }
 
-  // ── toggleSetting: toggle a boolean setting ──
+  // ── toggleSetting ──
   if (action === "toggleSetting") {
     const { key } = body;
     const allowedKeys = ["scalesends_auto_submit", "pause_scalesends"];
@@ -97,14 +136,14 @@ Deno.serve(async (req) => {
     return Response.json({ key, value: newVal === "true" });
   }
 
-  // ── getQueue: return tenants ready for Scalesends ──
+  // ── getQueue ──
   if (action === "getQueue") {
     const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
-    
+
     const readyQueue = allTenants.filter(t =>
       t.overall_status === "tenant_provisioned" && !t.scalesends_status
     );
-    const processing = allTenants.filter(t => t.scalesends_status === "processing");
+    const processing = allTenants.filter(t => t.scalesends_status === "processing" || t.scalesends_status === "pending");
     const complete = allTenants.filter(t => t.scalesends_status === "complete");
     const failed = allTenants.filter(t => t.scalesends_status === "failed");
     const manual = allTenants.filter(t => t.scalesends_status === "manual_upload");
@@ -117,13 +156,11 @@ Deno.serve(async (req) => {
     const { tenantId, triggerType } = body;
     if (!tenantId) return Response.json({ error: "tenantId required" }, { status: 400 });
 
-    // Check kill switch
     const paused = await getSettingValue(base44, "pause_scalesends", "false");
     if (paused === "true") {
-      return Response.json({ error: "Scalesends submissions are paused (kill switch active). Disable PAUSE_SCALESENDS to continue." });
+      return Response.json({ error: "Scalesends submissions are paused (kill switch active)." });
     }
 
-    // Check daily cap
     const dailyCap = parseInt(await getSettingValue(base44, "scalesends_daily_cap", String(DEFAULT_DAILY_CAP)), 10);
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
@@ -132,34 +169,53 @@ Deno.serve(async (req) => {
       t.scalesends_submitted_at && new Date(t.scalesends_submitted_at) >= todayStart
     ).length;
     if (todaySubmissions >= dailyCap) {
-      return Response.json({ error: `Daily submission cap reached (${todaySubmissions}/${dailyCap}). Try again tomorrow or increase cap in settings.` });
+      return Response.json({ error: `Daily cap reached (${todaySubmissions}/${dailyCap}).` });
     }
 
-    // Fetch tenant
     const tenants = await base44.asServiceRole.entities.TenantLifecycle.filter({ id: tenantId });
     if (tenants.length === 0) return Response.json({ error: "Tenant not found" }, { status: 404 });
     const tenant = tenants[0];
 
-    // Duplicate job check
     if (tenant.scalesends_job_id && (tenant.scalesends_status === "processing" || tenant.scalesends_status === "complete")) {
       return Response.json({ error: `Tenant already has an active Scalesends job (${tenant.scalesends_status}). Use Force Retry to override.` });
     }
 
-    // Call placeholder API
-    const result = await callScalesendsAPI({
-      ms_tenant_id: tenant.ms_tenant_id,
-      ms_tenant_domain: tenant.ms_tenant_domain,
-      ms_admin_username: tenant.ms_admin_username,
-      // Password would be decrypted here in real implementation
-    });
+    // Validate required credentials
+    if (!tenant.ms_admin_username) {
+      return Response.json({ error: "Missing admin username — cannot submit to Scalesends." });
+    }
+    if (!tenant.ms_admin_password_encrypted) {
+      return Response.json({ error: "Missing admin password — cannot submit to Scalesends." });
+    }
+
+    const { apiKey, customerId } = getApiCredentials();
+    const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted);
 
     if (result.success) {
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
         scalesends_status: "processing",
-        scalesends_job_id: result.jobId,
+        scalesends_job_id: result.orderId,
         scalesends_submitted_at: new Date().toISOString(),
         scalesends_trigger_type: triggerType || "manual",
+        scalesends_inbox_count: result.mailboxCount || null,
         overall_status: "inboxes_creating",
+      });
+
+      await base44.asServiceRole.entities.TenantAuditLog.create({
+        action: "email_parsed",
+        tenant_lifecycle_id: tenant.id,
+        performed_by: user.email,
+        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}`,
+      });
+
+      return Response.json({
+        success: true,
+        tenantId: tenant.id,
+        tenantDomain: tenant.ms_tenant_domain,
+        orderId: result.orderId,
+        scalesendsDomain: result.domain,
+        onboardStatus: result.onboardStatus,
+        mailboxCount: result.mailboxCount,
       });
     } else {
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
@@ -170,27 +226,155 @@ Deno.serve(async (req) => {
         scalesends_retry_count: (tenant.scalesends_retry_count || 0) + 1,
         overall_status: "scalesends_failed",
       });
+
+      await base44.asServiceRole.entities.TenantAuditLog.create({
+        action: "email_parsed",
+        tenant_lifecycle_id: tenant.id,
+        performed_by: user.email,
+        detail: `Scalesends submission failed (${triggerType || "manual"}): ${result.error}`,
+      });
+
+      return Response.json({
+        success: false,
+        error: result.error,
+        tenantId: tenant.id,
+        tenantDomain: tenant.ms_tenant_domain,
+      });
     }
-
-    await base44.asServiceRole.entities.TenantAuditLog.create({
-      action: "email_parsed", // reusing closest enum for "submit"
-      tenant_lifecycle_id: tenant.id,
-      performed_by: user.email,
-      detail: result.success
-        ? `Submitted to Scalesends (${triggerType || "manual"}). Job ID: ${result.jobId}`
-        : `Scalesends submission failed (${triggerType || "manual"}): ${result.error}`,
-    });
-
-    return Response.json({
-      success: result.success,
-      error: result.error,
-      placeholder: result.placeholder,
-      tenantId: tenant.id,
-      tenantDomain: tenant.ms_tenant_domain,
-    });
   }
 
-  // ── markManual: mark tenant as manually uploaded ──
+  // ── bulkSubmit: submit multiple tenants with delay between calls ──
+  if (action === "bulkSubmit") {
+    const { tenantIds } = body;
+    if (!tenantIds || !Array.isArray(tenantIds)) return Response.json({ error: "tenantIds array required" }, { status: 400 });
+
+    const paused = await getSettingValue(base44, "pause_scalesends", "false");
+    if (paused === "true") {
+      return Response.json({ error: "Scalesends submissions are paused (kill switch active)." });
+    }
+
+    const { apiKey, customerId } = getApiCredentials();
+    const results = [];
+
+    for (let i = 0; i < tenantIds.length; i++) {
+      const tenantId = tenantIds[i];
+      const tenants = await base44.asServiceRole.entities.TenantLifecycle.filter({ id: tenantId });
+      if (tenants.length === 0) {
+        results.push({ tenantId, status: "not_found" });
+        continue;
+      }
+      const tenant = tenants[0];
+
+      if (tenant.scalesends_job_id && (tenant.scalesends_status === "processing" || tenant.scalesends_status === "complete")) {
+        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "skipped", reason: "Already has active job" });
+        continue;
+      }
+
+      if (!tenant.ms_admin_username || !tenant.ms_admin_password_encrypted) {
+        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "skipped", reason: "Missing credentials" });
+        continue;
+      }
+
+      const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted);
+
+      if (result.success) {
+        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
+          scalesends_status: "processing",
+          scalesends_job_id: result.orderId,
+          scalesends_submitted_at: new Date().toISOString(),
+          scalesends_trigger_type: "manual",
+          scalesends_inbox_count: result.mailboxCount || null,
+          overall_status: "inboxes_creating",
+        });
+        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "submitted", orderId: result.orderId });
+      } else {
+        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
+          scalesends_status: "failed",
+          scalesends_failure_reason: result.error,
+          scalesends_submitted_at: new Date().toISOString(),
+          scalesends_trigger_type: "manual",
+          scalesends_retry_count: (tenant.scalesends_retry_count || 0) + 1,
+          overall_status: "scalesends_failed",
+        });
+        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "failed", error: result.error });
+      }
+
+      // 5-second delay between submissions
+      if (i < tenantIds.length - 1) {
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    }
+
+    return Response.json({ results });
+  }
+
+  // ── syncOrders: poll Scalesends for updated order statuses ──
+  if (action === "syncOrders") {
+    const { apiKey, customerId } = getApiCredentials();
+    const orders = await listScalesendsOrders(apiKey, customerId);
+    const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
+
+    // Build lookup: scalesends_job_id → tenant record
+    const tenantByJobId = {};
+    for (const t of allTenants) {
+      if (t.scalesends_job_id) tenantByJobId[t.scalesends_job_id] = t;
+    }
+
+    const synced = [];
+    for (const order of orders) {
+      const tenant = tenantByJobId[order._id];
+      if (!tenant) continue;
+      if (tenant.scalesends_status === "complete" || tenant.scalesends_status === "manual_upload") continue;
+
+      const mailboxCount = order.mailboxes?.length || 0;
+      const hasMailboxes = mailboxCount > 0;
+      const onboardStatus = order.onboardStatus || "";
+
+      // Determine new status
+      let newStatus = tenant.scalesends_status;
+      let newOverall = tenant.overall_status;
+
+      if (hasMailboxes && (onboardStatus === "complete" || onboardStatus === "onboarded" || onboardStatus === "ready")) {
+        newStatus = "complete";
+        newOverall = "inboxes_ready";
+      } else if (hasMailboxes) {
+        // Has mailboxes but status not final yet — still processing
+        newStatus = "processing";
+        newOverall = "inboxes_creating";
+      }
+
+      if (newStatus !== tenant.scalesends_status || mailboxCount !== tenant.scalesends_inbox_count) {
+        const updateData = {
+          scalesends_status: newStatus,
+          scalesends_inbox_count: mailboxCount,
+          overall_status: newOverall,
+        };
+        if (newStatus === "complete") {
+          updateData.scalesends_completed_at = new Date().toISOString();
+          // Store inbox details (email + password pairs) as JSON
+          const inboxDetails = (order.mailboxes || []).map(m => ({
+            name: m.name, email: m.email, password: m.password,
+          }));
+          updateData.scalesends_inbox_details = JSON.stringify(inboxDetails);
+        }
+
+        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
+        synced.push({
+          tenantId: tenant.id,
+          tenantDomain: tenant.ms_tenant_domain,
+          orderId: order._id,
+          oldStatus: tenant.scalesends_status,
+          newStatus,
+          mailboxCount,
+          onboardStatus,
+        });
+      }
+    }
+
+    return Response.json({ totalOrders: orders.length, synced, syncedCount: synced.length });
+  }
+
+  // ── markManual ──
   if (action === "markManual") {
     const { tenantId, notes } = body;
     if (!tenantId) return Response.json({ error: "tenantId required" }, { status: 400 });
@@ -207,7 +391,7 @@ Deno.serve(async (req) => {
     });
 
     await base44.asServiceRole.entities.TenantAuditLog.create({
-      action: "email_parsed", // closest available enum
+      action: "email_parsed",
       tenant_lifecycle_id: tenantId,
       performed_by: user.email,
       detail: `Marked as manually uploaded to Scalesends${notes ? `. Notes: ${notes}` : ""}`,
@@ -216,69 +400,7 @@ Deno.serve(async (req) => {
     return Response.json({ success: true, tenantId });
   }
 
-  // ── bulkSubmit: submit multiple tenants with 10s delay ──
-  if (action === "bulkSubmit") {
-    const { tenantIds } = body;
-    if (!tenantIds || !Array.isArray(tenantIds)) return Response.json({ error: "tenantIds array required" }, { status: 400 });
-
-    // Check kill switch
-    const paused = await getSettingValue(base44, "pause_scalesends", "false");
-    if (paused === "true") {
-      return Response.json({ error: "Scalesends submissions are paused (kill switch active)." });
-    }
-
-    const results = [];
-    for (let i = 0; i < tenantIds.length; i++) {
-      const tenantId = tenantIds[i];
-      const tenants = await base44.asServiceRole.entities.TenantLifecycle.filter({ id: tenantId });
-      if (tenants.length === 0) {
-        results.push({ tenantId, status: "not_found" });
-        continue;
-      }
-      const tenant = tenants[0];
-
-      if (tenant.scalesends_job_id && (tenant.scalesends_status === "processing" || tenant.scalesends_status === "complete")) {
-        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "skipped", reason: "Already has active job" });
-        continue;
-      }
-
-      const result = await callScalesendsAPI({
-        ms_tenant_id: tenant.ms_tenant_id,
-        ms_tenant_domain: tenant.ms_tenant_domain,
-        ms_admin_username: tenant.ms_admin_username,
-      });
-
-      if (result.success) {
-        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
-          scalesends_status: "processing",
-          scalesends_job_id: result.jobId,
-          scalesends_submitted_at: new Date().toISOString(),
-          scalesends_trigger_type: "manual",
-          overall_status: "inboxes_creating",
-        });
-        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "submitted" });
-      } else {
-        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
-          scalesends_status: "failed",
-          scalesends_failure_reason: result.error,
-          scalesends_submitted_at: new Date().toISOString(),
-          scalesends_trigger_type: "manual",
-          scalesends_retry_count: (tenant.scalesends_retry_count || 0) + 1,
-          overall_status: "scalesends_failed",
-        });
-        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "failed", error: result.error, placeholder: result.placeholder });
-      }
-
-      // 10-second delay between submissions
-      if (i < tenantIds.length - 1) {
-        await new Promise(r => setTimeout(r, 10000));
-      }
-    }
-
-    return Response.json({ results });
-  }
-
-  // ── bulkMarkManual: mark multiple as manually uploaded ──
+  // ── bulkMarkManual ──
   if (action === "bulkMarkManual") {
     const { tenantIds, notes } = body;
     if (!tenantIds || !Array.isArray(tenantIds)) return Response.json({ error: "tenantIds array required" }, { status: 400 });
@@ -306,7 +428,7 @@ Deno.serve(async (req) => {
     return Response.json({ results });
   }
 
-  // ── copyCredentials: return formatted credentials for clipboard ──
+  // ── copyCredentials ──
   if (action === "copyCredentials") {
     const { tenantId } = body;
     if (!tenantId) return Response.json({ error: "tenantId required" }, { status: 400 });
@@ -315,7 +437,6 @@ Deno.serve(async (req) => {
     if (tenants.length === 0) return Response.json({ error: "Tenant not found" }, { status: 404 });
     const t = tenants[0];
 
-    // Audit the credential access
     await base44.asServiceRole.entities.TenantAuditLog.create({
       action: "password_revealed",
       tenant_lifecycle_id: tenantId,

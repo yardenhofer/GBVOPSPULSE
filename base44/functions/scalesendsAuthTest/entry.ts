@@ -5,73 +5,79 @@ const BASE_URL = "https://cloud-api.plugsaas.com";
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user || user.role !== "admin") {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
 
-    const rawApiKey = Deno.env.get("SCALESENDS_API_KEY") || "";
-    const rawCustomerId = Deno.env.get("SCALESENDS_CUSTOMER_ID") || "";
-    // Strip non-ASCII and whitespace
-    const apiKey = rawApiKey.replace(/[^\x20-\x7E]/g, "").trim();
-    const customerId = rawCustomerId.replace(/[^\x20-\x7E]/g, "").trim();
+    const body = await req.json();
+    const { action } = body;
 
-    console.log(`[AUTH TEST] API key length: ${apiKey.length}, raw length: ${rawApiKey.length}, first 8: ${apiKey.substring(0, 8)}`);
-    console.log(`[AUTH TEST] Customer ID length: ${customerId.length}, value: ${customerId}`);
+    const apiKey = (Deno.env.get("SCALESENDS_API_KEY") || "").replace(/[^\x20-\x7E]/g, "").trim();
+    const customerId = (Deno.env.get("SCALESENDS_CUSTOMER_ID") || "").replace(/[^\x20-\x7E]/g, "").trim();
 
     if (!apiKey || !customerId) {
       return Response.json({ error: "SCALESENDS_API_KEY or SCALESENDS_CUSTOMER_ID not set" });
     }
 
-    const testUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
-    const headerFormats = [
-      { name: "Bearer", headers: { "Authorization": `Bearer ${apiKey}` } },
-      { name: "x-api-key", headers: { "x-api-key": apiKey } },
-      { name: "X-Partner-API-Key", headers: { "X-Partner-API-Key": apiKey } },
-    ];
+    const headers = {
+      "Authorization": `Bearer ${apiKey}`,
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    };
 
-    const results = [];
-
-    for (const format of headerFormats) {
-      console.log(`[AUTH TEST] Testing: ${format.name} against GET ${testUrl}`);
-
-      const res = await fetch(testUrl, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          ...format.headers,
-        },
+    // ── listOrders: list existing orders ──
+    if (action === "listOrders") {
+      const res = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, { headers });
+      const data = await res.json();
+      // Return just the first 3 orders to understand structure
+      const orders = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+      return Response.json({
+        totalOrders: orders.length,
+        sampleOrders: orders.slice(0, 3).map(o => ({
+          _id: o._id,
+          email: o.email,
+          domain: o.domain,
+          endDomain: o.endDomain,
+          status: o.status,
+          mailboxCount: o.mailboxes?.length || 0,
+          allKeys: Object.keys(o),
+        })),
       });
+    }
 
+    // ── getOrderDetail: get single order ──
+    if (action === "getOrderDetail") {
+      const { orderId } = body;
+      const res = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}`, { headers });
       const text = await res.text();
       let json = null;
       try { json = JSON.parse(text); } catch {}
-
-      console.log(`[AUTH TEST] ${format.name}: HTTP ${res.status} — ${text.substring(0, 500)}`);
-
-      results.push({
-        format: format.name,
-        status: res.status,
-        success: res.status >= 200 && res.status < 300,
-        response: json || text.substring(0, 500),
-      });
-
-      if (res.status >= 200 && res.status < 300) {
-        break;
-      }
+      return Response.json({ status: res.status, data: json, raw: text.substring(0, 2000) });
     }
 
-    const winner = results.find(r => r.success);
+    // ── testCreate: test creating an order (dry run with real data) ──
+    if (action === "testCreate") {
+      const { email, password } = body;
+      if (!email || !password) return Response.json({ error: "email and password required" });
 
-    return Response.json({
-      testUrl,
-      customerId: customerId.substring(0, 6) + "...",
-      apiKeyPresent: true,
-      results,
-      winner: winner ? winner.format : null,
-      recommendation: winner
-        ? `Use "${winner.format}" header format for all Scalesends API calls.`
-        : "No auth format worked. Leon should contact Scalesends support for the correct auth header.",
-    });
+      console.log(`[SCALESENDS] Creating order for: ${email}`);
+      const res = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email, password }),
+      });
+      const text = await res.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch {}
+      console.log(`[SCALESENDS] Create response: HTTP ${res.status} — ${text.substring(0, 500)}`);
+
+      return Response.json({ status: res.status, success: res.ok, data: json, raw: text.substring(0, 2000) });
+    }
+
+    return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (error) {
-    console.error("[AUTH TEST] Error:", error.message, error.stack);
+    console.error("[SCALESENDS TEST] Error:", error.message, error.stack);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
