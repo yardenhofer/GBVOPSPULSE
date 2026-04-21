@@ -342,7 +342,7 @@ Deno.serve(async (req) => {
 
   // ── placeOrder (LIVE — single client with domain retry) ──
   if (action === "placeOrder") {
-    const { companyId, companyName, runId, maxDomainRetries } = body;
+    const { companyId, companyName, runId, maxDomainRetries, workspaceId, workspaceName } = body;
     if (!companyId) return Response.json({ error: "companyId required" });
 
     const token = await getPax8Token();
@@ -360,10 +360,27 @@ Deno.serve(async (req) => {
         // Success — increment counter past this domain
         await setDomainCounter(base44, domainN + 1);
         console.log(`[LIVE ORDER] Success for ${companyName}, order ID: ${res.data?.id}, domain: GrowBig${domainN}`);
+
+        // Create TenantLifecycle record with workspace assignment
+        const tenantData = {
+          pax8_company_id: companyId,
+          pax8_company_name: companyName,
+          ms_domain: `GrowBig${domainN}`,
+          overall_status: "ordered",
+        };
+        if (workspaceId) {
+          tenantData.instantly_workspace_id = workspaceId;
+          tenantData.instantly_workspace_name = workspaceName || null;
+          tenantData.instantly_upload_status = "pending";
+        }
+        const tenantRecord = await base44.asServiceRole.entities.TenantLifecycle.create(tenantData);
+        console.log(`[LIVE ORDER] Created TenantLifecycle ${tenantRecord.id} for ${companyName}`);
+
         return Response.json({
           status: "success",
           orderId: res.data?.id,
           domainUsed: `GrowBig${domainN}`,
+          tenantLifecycleId: tenantRecord.id,
           response: res.data,
           apiLog: {
             request: { ...payload, _note: "credentials redacted" },

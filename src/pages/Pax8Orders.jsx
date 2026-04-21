@@ -12,6 +12,7 @@ import MockResultsSummary from "../components/pax8/MockResultsSummary.jsx";
 import CsvCompanyImport from "../components/pax8/CsvCompanyImport.jsx";
 import TenantListTab from "../components/pax8/TenantListTab.jsx";
 import ScalesendsQueueTab from "../components/pax8/ScalesendsQueueTab.jsx";
+import WorkspaceSelector from "../components/pax8/WorkspaceSelector.jsx";
 
 const SPEND_CAP = 20; // $20/month spend cap for test run (normally 250)
 const ESTIMATED_MONTHLY_COST_PER_LICENSE = 4.2; // Exchange Online Plan 1 actual cost
@@ -54,6 +55,9 @@ export default function Pax8Orders() {
   const [cumulativeCost, setCumulativeCost] = useState(0);
   const haltRef = useRef(false);
   const [halted, setHalted] = useState(false);
+
+  // Workspace selection for inbox delivery
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
 
   useEffect(() => {
     base44.auth.me().then(u => setUser(u)).catch(() => {});
@@ -111,6 +115,13 @@ export default function Pax8Orders() {
   }
 
   // ── Step 4+5: Live Orders ──
+  // Resolve workspace name for audit/display
+  async function getWorkspaceName() {
+    if (!selectedWorkspaceId) return null;
+    const list = await base44.entities.InstantlyWorkspace.filter({ id: selectedWorkspaceId });
+    return list.length > 0 ? list[0].name : null;
+  }
+
   async function startLiveRun(amountTyped, confirmWord) {
     setShowConfirmModal(false);
     setLiveRunning(true);
@@ -121,6 +132,7 @@ export default function Pax8Orders() {
 
     const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const eligible = cappedEligible;
+    const workspaceName = await getWorkspaceName();
 
     // Create audit log entry
     await base44.entities.Pax8AuditLog.create({
@@ -161,6 +173,8 @@ export default function Pax8Orders() {
         companyName: client.companyName,
         runId,
         maxDomainRetries: MAX_DOMAIN_RETRIES,
+        workspaceId: selectedWorkspaceId || null,
+        workspaceName: workspaceName || null,
       });
 
       const result = {
@@ -314,10 +328,13 @@ export default function Pax8Orders() {
           )}
 
           {preflightData && cappedEligible.length > 0 && (
-            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 text-center">
-              <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-medium text-blue-700 dark:text-blue-300 text-center">
                 {cappedEligible.length} tenant{cappedEligible.length !== 1 ? "s" : ""} selected · Est. cost: ${(cappedEligible.length * ESTIMATED_MONTHLY_COST_PER_LICENSE).toFixed(2)}/mo
               </p>
+              <div className="max-w-xs mx-auto">
+                <WorkspaceSelector value={selectedWorkspaceId} onChange={setSelectedWorkspaceId} />
+              </div>
             </div>
           )}
 
