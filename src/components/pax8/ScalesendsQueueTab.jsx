@@ -5,6 +5,7 @@ import ScalesendsSettings from "./ScalesendsSettings";
 import ScalesendsConfirmDialog from "./ScalesendsConfirmDialog";
 import ScalesendsMarkManualDialog from "./ScalesendsMarkManualDialog";
 import WorkspaceManager from "./WorkspaceManager";
+import InboxNamePool from "./InboxNamePool";
 
 const SS_STATUS_COLORS = {
   pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400",
@@ -205,6 +206,7 @@ export default function ScalesendsQueueTab() {
             await loadAll();
           }} />
           <WorkspaceManager />
+          <InboxNamePool />
         </div>
       )}
 

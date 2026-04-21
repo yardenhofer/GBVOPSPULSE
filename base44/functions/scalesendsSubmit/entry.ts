@@ -87,14 +87,29 @@ function mapScalesendsStatus(order) {
 }
 
 // ── Create a Scalesends order ──
-async function createScalesendsOrder(apiKey, customerId, email, password) {
-  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
-  console.log(`[SCALESENDS] POST ${url} — email: ${email}`);
+async function getRandomNames(base44, count) {
+  const setting = await base44.asServiceRole.entities.AppSettings.filter({ key: "scalesends_name_pool" });
+  if (!setting.length || !setting[0].value) return [];
+  const allNames = JSON.parse(setting[0].value);
+  if (allNames.length === 0) return [];
+  // Shuffle and pick `count` random names
+  const shuffled = [...allNames].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+}
+
+async function createScalesendsOrder(apiKey, customerId, email, password, names) {
+  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;
+  console.log(`[SCALESENDS] POST ${url} — email: ${email}, names: ${(names || []).length}`);
+
+  const payload = { email, password };
+  if (names && names.length > 0) {
+    payload.names = names;
+  }
 
   const res = await fetch(url, {
     method: "POST",
     headers: getHeaders(apiKey),
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(payload),
   });
 
   const text = await res.text();
@@ -282,7 +297,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted);
+    const names = await getRandomNames(base44, 100);
+    const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, names);
 
     // Resolve workspace name if workspace selected
     let workspaceName = null;
@@ -404,7 +420,8 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted);
+      const bulkNames = await getRandomNames(base44, 100);
+      const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, bulkNames);
 
       if (result.success) {
         const bulkUpdate = {
@@ -671,6 +688,32 @@ Deno.serve(async (req) => {
       alreadyLinked,
       orphaned,
     });
+  }
+
+  // ── getNamePool: return stored names ──
+  if (action === "getNamePool") {
+    const setting = await getSetting(base44, "scalesends_name_pool");
+    const names = setting ? JSON.parse(setting.value) : [];
+    return Response.json({ names, count: names.length });
+  }
+
+  // ── uploadNamePool: replace the name pool from CSV data ──
+  if (action === "uploadNamePool") {
+    const { names } = body;
+    if (!names || !Array.isArray(names)) return Response.json({ error: "names array required" }, { status: 400 });
+    // Each name should be { first_name, last_name }
+    const cleaned = names.filter(n => n.first_name && n.last_name).map(n => ({
+      first_name: n.first_name.trim(),
+      last_name: n.last_name.trim(),
+    }));
+    await setSettingValue(base44, "scalesends_name_pool", JSON.stringify(cleaned));
+    return Response.json({ success: true, count: cleaned.length });
+  }
+
+  // ── clearNamePool ──
+  if (action === "clearNamePool") {
+    await setSettingValue(base44, "scalesends_name_pool", "[]");
+    return Response.json({ success: true });
   }
 
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });

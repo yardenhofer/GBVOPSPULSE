@@ -121,12 +121,24 @@ Deno.serve(async (req) => {
     return Response.json({ success: true, linked: true, tenantId, orderId: existingOrder._id });
   }
 
+  // Get random names for the order
+  const namePoolSetting = await base44.asServiceRole.entities.AppSettings.filter({ key: "scalesends_name_pool" });
+  let names = [];
+  if (namePoolSetting.length > 0 && namePoolSetting[0].value) {
+    const allNames = JSON.parse(namePoolSetting[0].value);
+    const shuffled = [...allNames].sort(() => Math.random() - 0.5);
+    names = shuffled.slice(0, Math.min(100, shuffled.length));
+  }
+
   // Call Scalesends API to create new order
-  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
+  const orderPayload = { email: tenant.ms_admin_username, password: tenant.ms_admin_password_encrypted };
+  if (names.length > 0) orderPayload.names = names;
+
+  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;
   const res = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify({ email: tenant.ms_admin_username, password: tenant.ms_admin_password_encrypted }),
+    body: JSON.stringify(orderPayload),
   });
 
   const text = await res.text();
