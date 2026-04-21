@@ -1,0 +1,23 @@
+{
+  "name": "InstantlyWorkspace",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Friendly name for this workspace (e.g. client name)"
+    },
+    "api_key": {
+      "type": "string",
+      "description": "Instantly.ai API key for this workspace"
+    },
+    "is_default": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this is the default workspace for new orders"
+    }
+  },
+  "required": [
+    "name",
+    "api_key"
+  ]
+}

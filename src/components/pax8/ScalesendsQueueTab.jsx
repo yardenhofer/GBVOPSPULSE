@@ -4,6 +4,7 @@ import { RefreshCw, Send, Copy, FileCheck, AlertTriangle, CheckCircle2, XCircle,
 import ScalesendsSettings from "./ScalesendsSettings";
 import ScalesendsConfirmDialog from "./ScalesendsConfirmDialog";
 import ScalesendsMarkManualDialog from "./ScalesendsMarkManualDialog";
+import WorkspaceManager from "./WorkspaceManager";
 
 const SS_STATUS_COLORS = {
   pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400",
@@ -23,6 +24,7 @@ export default function ScalesendsQueueTab() {
   const [showSettings, setShowSettings] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null); // { type: 'single'|'bulk', tenantIds: [], tenantDomain?: '' }
   const [manualDialog, setManualDialog] = useState(null); // { type: 'single'|'bulk', tenantIds: [] }
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
   const [activeView, setActiveView] = useState("ready");
   const [syncing, setSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState(null);
@@ -42,9 +44,10 @@ export default function ScalesendsQueueTab() {
 
   async function handleSubmitSingle(tenantId, tenantDomain) {
     setSubmitting(tenantId);
-    const res = await base44.functions.invoke("scalesendsSubmit", { action: "submit", tenantId, triggerType: "manual" });
+    const res = await base44.functions.invoke("scalesendsSubmit", { action: "submit", tenantId, triggerType: "manual", workspaceId: selectedWorkspaceId });
     setSubmitting(null);
     setConfirmDialog(null);
+    setSelectedWorkspaceId(null);
     if (res.data.error) {
       alert(`Submit failed: ${res.data.error}`);
     }
@@ -53,10 +56,11 @@ export default function ScalesendsQueueTab() {
 
   async function handleBulkSubmit() {
     setBulkSubmitting(true);
-    const res = await base44.functions.invoke("scalesendsSubmit", { action: "bulkSubmit", tenantIds: Array.from(selectedIds) });
+    const res = await base44.functions.invoke("scalesendsSubmit", { action: "bulkSubmit", tenantIds: Array.from(selectedIds), workspaceId: selectedWorkspaceId });
     setBulkSubmitting(false);
     setConfirmDialog(null);
     setSelectedIds(new Set());
+    setSelectedWorkspaceId(null);
     const failed = (res.data.results || []).filter(r => r.status === "failed");
     if (failed.length > 0) {
       alert(`${failed.length} submission(s) failed. Check the Failed tab for details.`);
@@ -156,10 +160,15 @@ export default function ScalesendsQueueTab() {
         )}
       </div>
 
-      {showSettings && <ScalesendsSettings settings={settings} onToggle={async (key) => {
-        await base44.functions.invoke("scalesendsSubmit", { action: "toggleSetting", key });
-        await loadAll();
-      }} />}
+      {showSettings && (
+        <div className="space-y-4">
+          <ScalesendsSettings settings={settings} onToggle={async (key) => {
+            await base44.functions.invoke("scalesendsSubmit", { action: "toggleSetting", key });
+            await loadAll();
+          }} />
+          <WorkspaceManager />
+        </div>
+      )}
 
       {/* View tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800/50 rounded-lg p-1">
@@ -268,18 +277,20 @@ export default function ScalesendsQueueTab() {
                       </>
                     )}
                     {activeView === "complete" && (
-                      <span className="text-xs text-green-600 flex items-center gap-2">
+                      <span className="text-xs text-green-600 flex items-center gap-2 flex-wrap">
                         <CheckCircle2 className="w-3 h-3" /> {t.scalesends_inbox_count || 0} inboxes
                         {t.scalesends_completed_at && <span className="text-gray-400">· {new Date(t.scalesends_completed_at).toLocaleDateString()}</span>}
+                        {t.instantly_workspace_name && <span className="text-purple-500">→ {t.instantly_workspace_name}</span>}
                       </span>
                     )}
                     {activeView === "manual" && (
                       <span className="text-xs text-gray-500">{t.scalesends_marked_manual_by} · {t.scalesends_marked_manual_at ? new Date(t.scalesends_marked_manual_at).toLocaleDateString() : ""}</span>
                     )}
                     {activeView === "processing" && (
-                      <span className="text-xs text-blue-500 flex items-center gap-1">
+                      <span className="text-xs text-blue-500 flex items-center gap-1 flex-wrap">
                         <Clock className="w-3 h-3" /> In progress
                         {t.scalesends_job_id && <span className="text-gray-400 font-mono">· {t.scalesends_job_id.substring(0, 8)}…</span>}
+                        {t.instantly_workspace_name && <span className="text-purple-500">→ {t.instantly_workspace_name}</span>}
                       </span>
                     )}
                   </div>
@@ -298,11 +309,13 @@ export default function ScalesendsQueueTab() {
         <ScalesendsConfirmDialog
           count={confirmDialog.tenantIds.length}
           tenantDomain={confirmDialog.tenantDomain}
+          workspaceId={selectedWorkspaceId}
+          onWorkspaceChange={setSelectedWorkspaceId}
           onConfirm={() => {
             if (confirmDialog.type === "single") handleSubmitSingle(confirmDialog.tenantIds[0], confirmDialog.tenantDomain);
             else handleBulkSubmit();
           }}
-          onCancel={() => setConfirmDialog(null)}
+          onCancel={() => { setConfirmDialog(null); setSelectedWorkspaceId(null); }}
           submitting={submitting !== null || bulkSubmitting}
         />
       )}

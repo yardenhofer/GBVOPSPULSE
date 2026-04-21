@@ -78,6 +78,29 @@
     "error_message": {
       "type": "string"
     },
+    "instantly_workspace_id": {
+      "type": "string",
+      "description": "ID of the InstantlyWorkspace to deliver finished inboxes to"
+    },
+    "instantly_workspace_name": {
+      "type": "string",
+      "description": "Name of the selected Instantly workspace (denormalized for display)"
+    },
+    "instantly_upload_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "uploading",
+        "complete",
+        "failed",
+        "skipped"
+      ],
+      "description": "Status of inbox upload to Instantly"
+    },
+    "instantly_upload_error": {
+      "type": "string",
+      "description": "Error message if Instantly upload failed"
+    },
     "scalesends_job_id": {
       "type": "string",
       "description": "Scalesends job ID"

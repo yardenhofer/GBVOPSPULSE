@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
 
   // ── submit: submit a single tenant to Scalesends ──
   if (action === "submit") {
-    const { tenantId, triggerType } = body;
+    const { tenantId, triggerType, workspaceId } = body;
     if (!tenantId) return Response.json({ error: "tenantId required" }, { status: 400 });
 
     const paused = await getSettingValue(base44, "pause_scalesends", "false");
@@ -191,21 +191,34 @@ Deno.serve(async (req) => {
     const { apiKey, customerId } = getApiCredentials();
     const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted);
 
+    // Resolve workspace name if workspace selected
+    let workspaceName = null;
+    if (workspaceId) {
+      const wsList = await base44.asServiceRole.entities.InstantlyWorkspace.filter({ id: workspaceId });
+      if (wsList.length > 0) workspaceName = wsList[0].name;
+    }
+
     if (result.success) {
-      await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
+      const updateData = {
         scalesends_status: "processing",
         scalesends_job_id: result.orderId,
         scalesends_submitted_at: new Date().toISOString(),
         scalesends_trigger_type: triggerType || "manual",
         scalesends_inbox_count: result.mailboxCount || null,
         overall_status: "inboxes_creating",
-      });
+      };
+      if (workspaceId) {
+        updateData.instantly_workspace_id = workspaceId;
+        updateData.instantly_workspace_name = workspaceName;
+        updateData.instantly_upload_status = "pending";
+      }
+      await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
 
       await base44.asServiceRole.entities.TenantAuditLog.create({
         action: "email_parsed",
         tenant_lifecycle_id: tenant.id,
         performed_by: user.email,
-        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}`,
+        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}${workspaceName ? `. Workspace: ${workspaceName}` : ""}`,
       });
 
       return Response.json({
@@ -216,6 +229,7 @@ Deno.serve(async (req) => {
         scalesendsDomain: result.domain,
         onboardStatus: result.onboardStatus,
         mailboxCount: result.mailboxCount,
+        workspace: workspaceName,
       });
     } else {
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
@@ -245,7 +259,7 @@ Deno.serve(async (req) => {
 
   // ── bulkSubmit: submit multiple tenants with delay between calls ──
   if (action === "bulkSubmit") {
-    const { tenantIds } = body;
+    const { tenantIds, workspaceId: bulkWorkspaceId } = body;
     if (!tenantIds || !Array.isArray(tenantIds)) return Response.json({ error: "tenantIds array required" }, { status: 400 });
 
     const paused = await getSettingValue(base44, "pause_scalesends", "false");
@@ -254,6 +268,11 @@ Deno.serve(async (req) => {
     }
 
     const { apiKey, customerId } = getApiCredentials();
+    let bulkWorkspaceName = null;
+    if (bulkWorkspaceId) {
+      const wsList = await base44.asServiceRole.entities.InstantlyWorkspace.filter({ id: bulkWorkspaceId });
+      if (wsList.length > 0) bulkWorkspaceName = wsList[0].name;
+    }
     const results = [];
 
     for (let i = 0; i < tenantIds.length; i++) {
@@ -278,14 +297,20 @@ Deno.serve(async (req) => {
       const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted);
 
       if (result.success) {
-        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
+        const bulkUpdate = {
           scalesends_status: "processing",
           scalesends_job_id: result.orderId,
           scalesends_submitted_at: new Date().toISOString(),
           scalesends_trigger_type: "manual",
           scalesends_inbox_count: result.mailboxCount || null,
           overall_status: "inboxes_creating",
-        });
+        };
+        if (bulkWorkspaceId) {
+          bulkUpdate.instantly_workspace_id = bulkWorkspaceId;
+          bulkUpdate.instantly_workspace_name = bulkWorkspaceName;
+          bulkUpdate.instantly_upload_status = "pending";
+        }
+        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, bulkUpdate);
         results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "submitted", orderId: result.orderId });
       } else {
         await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {

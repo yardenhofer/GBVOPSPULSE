@@ -1,6 +1,7 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import WorkspaceSelector from "./WorkspaceSelector";
 
-export default function ScalesendsConfirmDialog({ count, tenantDomain, onConfirm, onCancel, submitting }) {
+export default function ScalesendsConfirmDialog({ count, tenantDomain, onConfirm, onCancel, submitting, workspaceId, onWorkspaceChange }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full mx-4 shadow-xl">
@@ -14,8 +15,14 @@ export default function ScalesendsConfirmDialog({ count, tenantDomain, onConfirm
             : `Send ${count} tenants to Scalesends?`
           }
         </p>
+        
+        {/* Workspace selector */}
+        <div className="mb-4">
+          <WorkspaceSelector value={workspaceId} onChange={onWorkspaceChange} />
+        </div>
+
         <p className="text-xs text-amber-600 dark:text-amber-400 mb-4">
-          This will consume Scalesends job credits. Continue?
+          This will consume Scalesends job credits. Inboxes will be uploaded to the selected workspace once complete.
         </p>
         <div className="flex justify-end gap-2">
           <button onClick={onCancel} disabled={submitting}
