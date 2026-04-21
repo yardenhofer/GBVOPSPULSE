@@ -1,7 +1,8 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import WorkspaceSelector from "./WorkspaceSelector";
+import InboxProviderSelector from "./InboxProviderSelector";
 
-export default function ScalesendsConfirmDialog({ count, tenantDomain, onConfirm, onCancel, submitting, workspaceId, onWorkspaceChange }) {
+export default function ScalesendsConfirmDialog({ count, tenantDomain, onConfirm, onCancel, submitting, workspaceId, onWorkspaceChange, inboxProviderId, onInboxProviderChange }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full mx-4 shadow-xl">
@@ -16,6 +17,11 @@ export default function ScalesendsConfirmDialog({ count, tenantDomain, onConfirm
           }
         </p>
         
+        {/* Inbox Provider selector */}
+        <div className="mb-4">
+          <InboxProviderSelector value={inboxProviderId} onChange={onInboxProviderChange} />
+        </div>
+
         {/* Workspace selector */}
         <div className="mb-4">
           <WorkspaceSelector value={workspaceId} onChange={onWorkspaceChange} />

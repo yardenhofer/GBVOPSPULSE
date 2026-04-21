@@ -130,11 +130,20 @@ Deno.serve(async (req) => {
     names = shuffled.slice(0, Math.min(100, shuffled.length));
   }
 
+  // Resolve default inbox provider (if one is set)
+  let inboxProvider = null;
+  const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
+  if (defaultProviders.length > 0) {
+    inboxProvider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
+    console.log(`[SCALESENDS-AUTO] Using default inbox provider: ${JSON.stringify(inboxProvider)}`);
+  }
+
   // Call Scalesends API to create new order
   const sendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
   const orderPayload = { email: tenant.ms_admin_username, password: tenant.ms_admin_password_encrypted, provider: "outlook" };
   if (sendingDomain) orderPayload.domain = sendingDomain;
   if (names.length > 0) orderPayload.names = names;
+  if (inboxProvider) orderPayload.inboxProvider = inboxProvider;
 
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;
   const res = await fetch(url, {

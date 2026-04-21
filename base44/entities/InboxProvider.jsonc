@@ -1,0 +1,29 @@
+{
+  "name": "InboxProvider",
+  "type": "object",
+  "properties": {
+    "display_name": {
+      "type": "string",
+      "description": "Friendly name shown in the selector (e.g. Growth Team (GBV))"
+    },
+    "provider_name": {
+      "type": "string",
+      "description": "Name sent to Scalesends inboxProvider.name (e.g. Instantly - Growth Team)"
+    },
+    "provider_type": {
+      "type": "string",
+      "default": "instantly",
+      "description": "Provider type sent to Scalesends inboxProvider.provider (e.g. instantly)"
+    },
+    "is_default": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this is the default provider for new orders"
+    }
+  },
+  "required": [
+    "display_name",
+    "provider_name",
+    "provider_type"
+  ]
+}

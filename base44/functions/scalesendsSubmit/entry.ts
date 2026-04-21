@@ -97,9 +97,9 @@ async function getRandomNames(base44, count) {
   return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 
-async function createScalesendsOrder(apiKey, customerId, email, password, domain, names) {
+async function createScalesendsOrder(apiKey, customerId, email, password, domain, names, inboxProvider) {
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;
-  console.log(`[SCALESENDS] POST ${url} — email: ${email}, domain: ${domain}, names: ${(names || []).length}`);
+  console.log(`[SCALESENDS] POST ${url} — email: ${email}, domain: ${domain}, names: ${(names || []).length}, inboxProvider: ${JSON.stringify(inboxProvider || null)}`);
 
   const payload = { email, password, provider: "outlook" };
   if (domain && domain.length > 0) {
@@ -107,6 +107,9 @@ async function createScalesendsOrder(apiKey, customerId, email, password, domain
   }
   if (names && names.length > 0) {
     payload.names = names;
+  }
+  if (inboxProvider) {
+    payload.inboxProvider = inboxProvider;
   }
 
   const res = await fetch(url, {
@@ -233,7 +236,7 @@ Deno.serve(async (req) => {
 
   // ── submit: submit a single tenant to Scalesends ──
   if (action === "submit") {
-    const { tenantId, triggerType, workspaceId } = body;
+    const { tenantId, triggerType, workspaceId, inboxProviderId } = body;
     if (!tenantId) return Response.json({ error: "tenantId required" }, { status: 400 });
 
     const paused = await getSettingValue(base44, "pause_scalesends", "false");
@@ -275,6 +278,15 @@ Deno.serve(async (req) => {
     if (workspaceId) {
       const wsList = await base44.asServiceRole.entities.InstantlyWorkspace.filter({ id: workspaceId });
       if (wsList.length > 0) workspaceName = wsList[0].name;
+    }
+
+    // Resolve inbox provider
+    let inboxProvider = null;
+    if (inboxProviderId) {
+      const provList = await base44.asServiceRole.entities.InboxProvider.filter({ id: inboxProviderId });
+      if (provList.length > 0) {
+        inboxProvider = { name: provList[0].provider_name, provider: provList[0].provider_type };
+      }
     }
 
     // ── Pre-submission check: look for existing Scalesends order ──
@@ -321,7 +333,7 @@ Deno.serve(async (req) => {
 
     const names = await getRandomNames(base44, 100);
     const sendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
-    const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, sendingDomain, names);
+    const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, sendingDomain, names, inboxProvider);
 
     // Handle duplicate detection (API returned 500 but we found existing order)
     if (result.duplicate && result.existingOrder) {
@@ -410,7 +422,7 @@ Deno.serve(async (req) => {
 
   // ── bulkSubmit: submit multiple tenants with delay between calls ──
   if (action === "bulkSubmit") {
-    const { tenantIds, workspaceId: bulkWorkspaceId } = body;
+    const { tenantIds, workspaceId: bulkWorkspaceId, inboxProviderId: bulkInboxProviderId } = body;
     if (!tenantIds || !Array.isArray(tenantIds)) return Response.json({ error: "tenantIds array required" }, { status: 400 });
 
     const paused = await getSettingValue(base44, "pause_scalesends", "false");
@@ -423,6 +435,14 @@ Deno.serve(async (req) => {
     if (bulkWorkspaceId) {
       const wsList = await base44.asServiceRole.entities.InstantlyWorkspace.filter({ id: bulkWorkspaceId });
       if (wsList.length > 0) bulkWorkspaceName = wsList[0].name;
+    }
+    // Resolve inbox provider for bulk
+    let bulkInboxProvider = null;
+    if (bulkInboxProviderId) {
+      const provList = await base44.asServiceRole.entities.InboxProvider.filter({ id: bulkInboxProviderId });
+      if (provList.length > 0) {
+        bulkInboxProvider = { name: provList[0].provider_name, provider: provList[0].provider_type };
+      }
     }
     const results = [];
 
@@ -464,7 +484,7 @@ Deno.serve(async (req) => {
 
       const bulkNames = await getRandomNames(base44, 100);
       const bulkSendingDomain = tenant.sending_domain || (tenant.pax8_company_name ? tenant.pax8_company_name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info" : "");
-      const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, bulkSendingDomain, bulkNames);
+      const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted, bulkSendingDomain, bulkNames, bulkInboxProvider);
 
       // Handle duplicate in bulk
       if (result.duplicate && result.existingOrder) {
