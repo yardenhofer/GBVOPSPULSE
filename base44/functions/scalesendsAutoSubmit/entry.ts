@@ -76,16 +76,56 @@ Deno.serve(async (req) => {
     return Response.json({ skipped: true, reason: `Daily cap reached (${todaySubmissions}/${dailyCap})` });
   }
 
-  // Call Scalesends API
+  // ── Pre-submission check: look for existing order in Scalesends ──
   const BASE_URL = "https://cloud-api.plugsaas.com";
+  const headers = { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json", "Content-Type": "application/json" };
+
+  let existingOrders = [];
+  try {
+    const listRes = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, { headers });
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      existingOrders = Array.isArray(listData.data) ? listData.data : (Array.isArray(listData) ? listData : []);
+    }
+  } catch (e) { console.log(`[SCALESENDS-AUTO] Warning: could not fetch orders list: ${e.message}`); }
+
+  const adminEmail = (tenant.ms_admin_username || "").toLowerCase();
+  const tenantDomain = (tenant.ms_tenant_domain || "").toLowerCase();
+  const msDomain = (tenant.ms_domain || "").toLowerCase();
+
+  let existingOrder = null;
+  for (const order of existingOrders) {
+    const oEmail = (order.email || "").toLowerCase();
+    const oDomain = (order.domain || "").toLowerCase();
+    const oEnd = (order.endDomain || "").toLowerCase();
+    if (adminEmail && oEmail && oEmail === adminEmail) { existingOrder = order; break; }
+    if (tenantDomain && oDomain && tenantDomain.includes(oDomain)) { existingOrder = order; break; }
+    if (msDomain && oDomain && oDomain.includes(msDomain.toLowerCase())) { existingOrder = order; break; }
+    if (tenantDomain && oEnd && tenantDomain.includes(oEnd)) { existingOrder = order; break; }
+  }
+
+  if (existingOrder) {
+    const mCount = existingOrder.mailboxes?.length || 0;
+    const onboard = (existingOrder.onboardStatus || "").toLowerCase();
+    const isComplete = mCount > 0 && (onboard === "complete" || onboard === "onboarded" || onboard === "ready");
+    const sStatus = isComplete ? "complete" : "processing";
+    const oStatus = isComplete ? "inboxes_ready" : "inboxes_creating";
+    const updateData = { scalesends_status: sStatus, scalesends_job_id: existingOrder._id, overall_status: oStatus, scalesends_inbox_count: mCount };
+    if (isComplete) {
+      updateData.scalesends_completed_at = existingOrder.updatedAt || new Date().toISOString();
+      updateData.scalesends_inbox_details = JSON.stringify((existingOrder.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
+    }
+    await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
+    await base44.asServiceRole.entities.TenantAuditLog.create({ action: "email_linked", tenant_lifecycle_id: tenant.id, detail: `Auto-submit: Found existing Scalesends order (ID: ${existingOrder._id}, status: ${sStatus}). Linked instead of creating new.` });
+    console.log(`[SCALESENDS-AUTO] Found existing order ${existingOrder._id} for tenant ${tenantId} — linked`);
+    return Response.json({ success: true, linked: true, tenantId, orderId: existingOrder._id });
+  }
+
+  // Call Scalesends API to create new order
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({ email: tenant.ms_admin_username, password: tenant.ms_admin_password_encrypted }),
   });
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { RefreshCw, Send, Copy, FileCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Square, CheckSquare, RotateCw, Upload } from "lucide-react";
+import { RefreshCw, Send, Copy, FileCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Square, CheckSquare, RotateCw, Upload, Link2 } from "lucide-react";
 import ScalesendsSettings from "./ScalesendsSettings";
 import ScalesendsConfirmDialog from "./ScalesendsConfirmDialog";
 import ScalesendsMarkManualDialog from "./ScalesendsMarkManualDialog";
@@ -29,6 +29,8 @@ export default function ScalesendsQueueTab() {
   const [activeView, setActiveView] = useState("ready");
   const [syncing, setSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState(null);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileResult, setReconcileResult] = useState(null);
 
   async function loadAll() {
     setLoading(true);
@@ -51,6 +53,8 @@ export default function ScalesendsQueueTab() {
     setSelectedWorkspaceId(null);
     if (res.data.error) {
       alert(`Submit failed: ${res.data.error}`);
+    } else if (res.data.linked) {
+      alert(res.data.message);
     }
     await loadAll();
   }
@@ -62,10 +66,13 @@ export default function ScalesendsQueueTab() {
     setConfirmDialog(null);
     setSelectedIds(new Set());
     setSelectedWorkspaceId(null);
-    const failed = (res.data.results || []).filter(r => r.status === "failed");
-    if (failed.length > 0) {
-      alert(`${failed.length} submission(s) failed. Check the Failed tab for details.`);
-    }
+    const results = res.data.results || [];
+    const failed = results.filter(r => r.status === "failed");
+    const linked = results.filter(r => r.status === "linked");
+    const parts = [];
+    if (linked.length > 0) parts.push(`${linked.length} linked to existing Scalesends orders`);
+    if (failed.length > 0) parts.push(`${failed.length} failed`);
+    if (parts.length > 0) alert(parts.join(". ") + ".");
     await loadAll();
   }
 
@@ -78,6 +85,15 @@ export default function ScalesendsQueueTab() {
     } else {
       alert(`Uploaded ${res.data.success}/${res.data.total} inboxes to ${res.data.workspace}`);
     }
+    await loadAll();
+  }
+
+  async function handleReconcile() {
+    setReconciling(true);
+    setReconcileResult(null);
+    const res = await base44.functions.invoke("scalesendsSubmit", { action: "reconcile" });
+    setReconcileResult(res.data);
+    setReconciling(false);
     await loadAll();
   }
 
@@ -158,6 +174,10 @@ export default function ScalesendsQueueTab() {
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-500/20 font-medium disabled:opacity-50">
           <RotateCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} /> Sync Orders
         </button>
+        <button onClick={handleReconcile} disabled={reconciling}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/20 font-medium disabled:opacity-50">
+          <Link2 className={`w-3 h-3 ${reconciling ? "animate-spin" : ""}`} /> Reconcile
+        </button>
         <button onClick={() => setShowSettings(!showSettings)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 font-medium">
           Settings
         </button>
@@ -169,6 +189,11 @@ export default function ScalesendsQueueTab() {
         {lastSyncResult && (
           <span className="text-xs text-green-600 dark:text-green-400">
             Synced {lastSyncResult.syncedCount} order(s) from {lastSyncResult.totalOrders} total
+          </span>
+        )}
+        {reconcileResult && (
+          <span className="text-xs text-amber-600 dark:text-amber-400">
+            Reconcile: {reconcileResult.totalScalesendsOrders} Scalesends orders — {reconcileResult.newlyMatched} newly linked, {reconcileResult.alreadyLinked} already linked, {reconcileResult.orphanedInScalesends} orphaned
           </span>
         )}
       </div>

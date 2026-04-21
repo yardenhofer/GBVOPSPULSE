@@ -37,6 +37,55 @@ async function setSettingValue(base44, key, value) {
   }
 }
 
+// ── Fetch all Scalesends orders (cached per request) ──
+let _ordersCache = null;
+async function fetchAllScalesendsOrders(apiKey, customerId) {
+  if (_ordersCache) return _ordersCache;
+  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
+  const res = await fetch(url, { headers: getHeaders(apiKey) });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`List orders failed: HTTP ${res.status} — ${text.substring(0, 200)}`);
+  }
+  const data = await res.json();
+  _ordersCache = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+  return _ordersCache;
+}
+
+// ── Check if a tenant already has a Scalesends order ──
+async function findExistingOrder(apiKey, customerId, tenant) {
+  const orders = await fetchAllScalesendsOrders(apiKey, customerId);
+  const adminEmail = (tenant.ms_admin_username || "").toLowerCase();
+  const tenantDomain = (tenant.ms_tenant_domain || "").toLowerCase();
+  const msDomain = (tenant.ms_domain || "").toLowerCase();
+
+  for (const order of orders) {
+    const orderEmail = (order.email || "").toLowerCase();
+    const orderDomain = (order.domain || "").toLowerCase();
+    const orderEndDomain = (order.endDomain || "").toLowerCase();
+
+    // Match by admin email
+    if (adminEmail && orderEmail && orderEmail === adminEmail) return order;
+    // Match by domain
+    if (tenantDomain && orderDomain && tenantDomain.includes(orderDomain)) return order;
+    if (msDomain && orderDomain && orderDomain.toLowerCase().includes(msDomain.toLowerCase())) return order;
+    if (tenantDomain && orderEndDomain && tenantDomain.includes(orderEndDomain)) return order;
+  }
+  return null;
+}
+
+function mapScalesendsStatus(order) {
+  const mailboxCount = order.mailboxes?.length || 0;
+  const onboard = (order.onboardStatus || "").toLowerCase();
+  if (mailboxCount > 0 && (onboard === "complete" || onboard === "onboarded" || onboard === "ready")) {
+    return { scalesendsStatus: "complete", overallStatus: "inboxes_ready" };
+  }
+  if (mailboxCount > 0) {
+    return { scalesendsStatus: "processing", overallStatus: "inboxes_creating" };
+  }
+  return { scalesendsStatus: "processing", overallStatus: "inboxes_creating" };
+}
+
 // ── Create a Scalesends order ──
 async function createScalesendsOrder(apiKey, customerId, email, password) {
   const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
@@ -88,6 +137,7 @@ Deno.serve(async (req) => {
     return Response.json({ error: "Forbidden: Admin access required" }, { status: 403 });
   }
 
+  _ordersCache = null; // reset per-request cache
   const body = await req.json();
   const { action } = body;
 
@@ -189,6 +239,49 @@ Deno.serve(async (req) => {
     }
 
     const { apiKey, customerId } = getApiCredentials();
+
+    // ── Pre-submission check: look for existing Scalesends order ──
+    const existingOrder = await findExistingOrder(apiKey, customerId, tenant);
+    if (existingOrder) {
+      const { scalesendsStatus, overallStatus } = mapScalesendsStatus(existingOrder);
+      const inboxDetails = (existingOrder.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password }));
+      const updateData = {
+        scalesends_status: scalesendsStatus,
+        scalesends_job_id: existingOrder._id,
+        overall_status: overallStatus,
+        scalesends_inbox_count: existingOrder.mailboxes?.length || 0,
+      };
+      if (scalesendsStatus === "complete") {
+        updateData.scalesends_completed_at = existingOrder.updatedAt || new Date().toISOString();
+        updateData.scalesends_inbox_details = JSON.stringify(inboxDetails);
+      }
+      if (workspaceId) {
+        updateData.instantly_workspace_id = workspaceId;
+        updateData.instantly_workspace_name = workspaceName;
+        updateData.instantly_upload_status = "pending";
+      }
+      await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
+
+      await base44.asServiceRole.entities.TenantAuditLog.create({
+        action: "email_linked",
+        tenant_lifecycle_id: tenant.id,
+        performed_by: user.email,
+        detail: `Found existing Scalesends order (ID: ${existingOrder._id}, status: ${scalesendsStatus}, email: ${existingOrder.email}). Linked to existing order instead of creating new.`,
+      });
+
+      return Response.json({
+        success: true,
+        linked: true,
+        tenantId: tenant.id,
+        tenantDomain: tenant.ms_tenant_domain,
+        orderId: existingOrder._id,
+        scalesendsStatus,
+        overallStatus,
+        mailboxCount: existingOrder.mailboxes?.length || 0,
+        message: `This tenant already has a Scalesends order (ID: ${existingOrder._id}, status: ${scalesendsStatus}). Linked to existing order instead of creating new.`,
+      });
+    }
+
     const result = await createScalesendsOrder(apiKey, customerId, tenant.ms_admin_username, tenant.ms_admin_password_encrypted);
 
     // Resolve workspace name if workspace selected
@@ -291,6 +384,23 @@ Deno.serve(async (req) => {
 
       if (!tenant.ms_admin_username || !tenant.ms_admin_password_encrypted) {
         results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "skipped", reason: "Missing credentials" });
+        continue;
+      }
+
+      // ── Pre-submission check for bulk ──
+      const existingBulk = await findExistingOrder(apiKey, customerId, tenant);
+      if (existingBulk) {
+        const { scalesendsStatus: eStat, overallStatus: eOverall } = mapScalesendsStatus(existingBulk);
+        const eInboxDetails = (existingBulk.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password }));
+        const eUpdate = {
+          scalesends_status: eStat, scalesends_job_id: existingBulk._id,
+          overall_status: eOverall, scalesends_inbox_count: existingBulk.mailboxes?.length || 0,
+        };
+        if (eStat === "complete") { eUpdate.scalesends_completed_at = existingBulk.updatedAt || new Date().toISOString(); eUpdate.scalesends_inbox_details = JSON.stringify(eInboxDetails); }
+        if (bulkWorkspaceId) { eUpdate.instantly_workspace_id = bulkWorkspaceId; eUpdate.instantly_workspace_name = bulkWorkspaceName; eUpdate.instantly_upload_status = "pending"; }
+        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, eUpdate);
+        await base44.asServiceRole.entities.TenantAuditLog.create({ action: "email_linked", tenant_lifecycle_id: tenant.id, performed_by: user.email, detail: `Bulk: Found existing Scalesends order (ID: ${existingBulk._id}, status: ${eStat}). Linked instead of creating new.` });
+        results.push({ tenantId, tenantDomain: tenant.ms_tenant_domain, status: "linked", orderId: existingBulk._id, scalesendsStatus: eStat, mailboxCount: existingBulk.mailboxes?.length || 0 });
         continue;
       }
 
@@ -484,6 +594,83 @@ Deno.serve(async (req) => {
       password: t.ms_admin_password_encrypted,
       company: t.pax8_company_name,
     }});
+  }
+
+  // ── reconcile: one-time reconciliation of all Scalesends orders against Base44 tenants ──
+  if (action === "reconcile") {
+    const { apiKey, customerId } = getApiCredentials();
+    _ordersCache = null; // force fresh fetch
+    const orders = await fetchAllScalesendsOrders(apiKey, customerId);
+    const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
+
+    const matched = [];
+    const orphaned = [];
+    const alreadyLinked = [];
+
+    for (const order of orders) {
+      const orderEmail = (order.email || "").toLowerCase();
+      const orderDomain = (order.domain || "").toLowerCase();
+      const orderEndDomain = (order.endDomain || "").toLowerCase();
+
+      // Try to find a matching tenant
+      let matchedTenant = null;
+      for (const t of allTenants) {
+        // Already linked to this order
+        if (t.scalesends_job_id === order._id) { matchedTenant = t; break; }
+        const tEmail = (t.ms_admin_username || "").toLowerCase();
+        const tDomain = (t.ms_tenant_domain || "").toLowerCase();
+        const tMs = (t.ms_domain || "").toLowerCase();
+        if (orderEmail && tEmail && orderEmail === tEmail) { matchedTenant = t; break; }
+        if (orderDomain && tDomain && tDomain.includes(orderDomain)) { matchedTenant = t; break; }
+        if (orderDomain && tMs && orderDomain.includes(tMs.toLowerCase())) { matchedTenant = t; break; }
+        if (orderEndDomain && tDomain && tDomain.includes(orderEndDomain)) { matchedTenant = t; break; }
+      }
+
+      if (!matchedTenant) {
+        orphaned.push({ orderId: order._id, email: order.email, domain: order.domain, endDomain: order.endDomain, onboardStatus: order.onboardStatus, mailboxCount: order.mailboxes?.length || 0 });
+        continue;
+      }
+
+      // Already linked — just note it
+      if (matchedTenant.scalesends_job_id === order._id) {
+        alreadyLinked.push({ orderId: order._id, tenantId: matchedTenant.id, tenantDomain: matchedTenant.ms_tenant_domain });
+        continue;
+      }
+
+      // Link it
+      const { scalesendsStatus, overallStatus } = mapScalesendsStatus(order);
+      const inboxDetails = (order.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password }));
+      const updateData = {
+        scalesends_status: scalesendsStatus,
+        scalesends_job_id: order._id,
+        overall_status: overallStatus,
+        scalesends_inbox_count: order.mailboxes?.length || 0,
+      };
+      if (scalesendsStatus === "complete") {
+        updateData.scalesends_completed_at = order.updatedAt || new Date().toISOString();
+        updateData.scalesends_inbox_details = JSON.stringify(inboxDetails);
+      }
+      await base44.asServiceRole.entities.TenantLifecycle.update(matchedTenant.id, updateData);
+
+      await base44.asServiceRole.entities.TenantAuditLog.create({
+        action: "email_linked",
+        tenant_lifecycle_id: matchedTenant.id,
+        performed_by: user.email,
+        detail: `Reconciliation: Linked existing Scalesends order (ID: ${order._id}, status: ${scalesendsStatus}, email: ${order.email}) to tenant ${matchedTenant.ms_tenant_domain || matchedTenant.id}.`,
+      });
+
+      matched.push({ orderId: order._id, tenantId: matchedTenant.id, tenantDomain: matchedTenant.ms_tenant_domain, scalesendsStatus, mailboxCount: order.mailboxes?.length || 0 });
+    }
+
+    return Response.json({
+      totalScalesendsOrders: orders.length,
+      newlyMatched: matched.length,
+      alreadyLinked: alreadyLinked.length,
+      orphanedInScalesends: orphaned.length,
+      matched,
+      alreadyLinked,
+      orphaned,
+    });
   }
 
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
