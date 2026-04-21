@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     return Response.json({ error: "SCALESENDS_API_KEY or SCALESENDS_CUSTOMER_ID not configured" });
   }
 
-  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
+  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/add/`;
   const authHeader = `Bearer ${apiKey}`;
   const headers = {
     "Authorization": authHeader,
