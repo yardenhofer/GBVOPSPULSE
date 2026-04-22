@@ -80,6 +80,14 @@ Deno.serve(async (req) => {
   const BASE_URL = "https://cloud-api.plugsaas.com";
   const headers = { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json", "Content-Type": "application/json" };
 
+  // Resolve default inbox provider early (needed for both linked and new order paths)
+  let inboxProvider = null;
+  const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
+  if (defaultProviders.length > 0) {
+    inboxProvider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
+    console.log(`[SCALESENDS-AUTO] Using default inbox provider: ${JSON.stringify(inboxProvider)}`);
+  }
+
   let existingOrders = [];
   try {
     const listRes = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, { headers });
@@ -115,6 +123,18 @@ Deno.serve(async (req) => {
       updateData.scalesends_completed_at = existingOrder.updatedAt || new Date().toISOString();
       updateData.scalesends_inbox_details = JSON.stringify((existingOrder.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
     }
+
+    // Also assign inbox provider to the linked order (may already have one, but safe to call)
+    if (inboxProvider && existingOrder._id) {
+      const provUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${existingOrder._id}/inbox-providers/add/`;
+      const provRes = await fetch(provUrl, { method: "POST", headers, body: JSON.stringify({ name: inboxProvider.name, provider: inboxProvider.provider }) });
+      if (provRes.ok) {
+        console.log(`[SCALESENDS-AUTO] Assigned provider ${inboxProvider.name} to linked order ${existingOrder._id}`);
+      } else {
+        console.log(`[SCALESENDS-AUTO] Provider assignment failed for linked order ${existingOrder._id}: HTTP ${provRes.status}`);
+      }
+    }
+
     await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
     await base44.asServiceRole.entities.TenantAuditLog.create({ action: "email_linked", tenant_lifecycle_id: tenant.id, detail: `Auto-submit: Found existing Scalesends order (ID: ${existingOrder._id}, status: ${sStatus}). Linked instead of creating new.` });
     console.log(`[SCALESENDS-AUTO] Found existing order ${existingOrder._id} for tenant ${tenantId} — linked`);
@@ -128,14 +148,6 @@ Deno.serve(async (req) => {
     const allNames = JSON.parse(namePoolSetting[0].value);
     const shuffled = [...allNames].sort(() => Math.random() - 0.5);
     names = shuffled.slice(0, Math.min(100, shuffled.length));
-  }
-
-  // Resolve default inbox provider (if one is set)
-  let inboxProvider = null;
-  const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
-  if (defaultProviders.length > 0) {
-    inboxProvider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
-    console.log(`[SCALESENDS-AUTO] Using default inbox provider: ${JSON.stringify(inboxProvider)}`);
   }
 
   // Step 1: Create order (without inboxProvider in payload)

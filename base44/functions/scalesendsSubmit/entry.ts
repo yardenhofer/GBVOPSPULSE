@@ -373,6 +373,12 @@ Deno.serve(async (req) => {
         updateData.instantly_workspace_name = workspaceName;
         updateData.instantly_upload_status = "pending";
       }
+
+      // Assign inbox provider to the linked order
+      if (inboxProvider && existingOrder._id) {
+        await assignInboxProvider(apiKey, customerId, existingOrder._id, inboxProvider);
+      }
+
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
 
       await base44.asServiceRole.entities.TenantAuditLog.create({
@@ -941,18 +947,73 @@ Deno.serve(async (req) => {
   // ── fixMissingProviders: retroactively assign inbox provider to orders missing it ──
   if (action === "fixMissingProviders") {
     const { orderIds, providerName, providerType } = body;
-    if (!orderIds || !Array.isArray(orderIds)) return Response.json({ error: "orderIds array required" }, { status: 400 });
 
     const { apiKey, customerId } = getApiCredentials();
-    const provider = { name: providerName || "Instantly - Growth Team", provider: providerType || "instantly" };
-    const results = [];
 
-    for (const orderId of orderIds) {
+    // If no orderIds provided, auto-detect orders missing providers
+    let targetOrderIds = orderIds;
+    if (!targetOrderIds || !Array.isArray(targetOrderIds) || targetOrderIds.length === 0) {
+      const allOrders = await fetchAllScalesendsOrders(apiKey, customerId);
+      targetOrderIds = allOrders
+        .filter(o => !o.inboxProviders || o.inboxProviders.length === 0)
+        .map(o => o._id);
+      if (targetOrderIds.length === 0) {
+        return Response.json({ message: "All orders already have providers assigned", results: [] });
+      }
+      console.log(`[SCALESENDS] Auto-detected ${targetOrderIds.length} orders missing providers: ${targetOrderIds.join(", ")}`);
+    }
+
+    // Resolve provider: use specified, or use default InboxProvider entity
+    let provider = null;
+    if (providerName) {
+      provider = { name: providerName, provider: providerType || "instantly" };
+    } else {
+      const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
+      if (defaultProviders.length > 0) {
+        provider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
+      } else {
+        provider = { name: "Instantly - Growth Team", provider: "instantly" };
+      }
+    }
+
+    const results = [];
+    for (const orderId of targetOrderIds) {
       const result = await assignInboxProvider(apiKey, customerId, orderId, provider);
       results.push({ orderId, ...result });
     }
 
-    return Response.json({ results });
+    return Response.json({ fixed: results.filter(r => r.success).length, total: targetOrderIds.length, provider, results });
+  }
+
+  // ── checkMissingProviders: list orders missing inbox providers without fixing them ──
+  // ── checkMissingProviders: removed — list API doesn't return inboxProviders field ──
+
+  // ── fixAllProviders: assign provider to ALL orders (use when Scalesends dashboard shows missing providers) ──
+  if (action === "fixAllProviders") {
+    const { apiKey, customerId } = getApiCredentials();
+    const allOrders = await fetchAllScalesendsOrders(apiKey, customerId);
+
+    // Resolve provider
+    let provider = null;
+    if (body.providerName) {
+      provider = { name: body.providerName, provider: body.providerType || "instantly" };
+    } else {
+      const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
+      if (defaultProviders.length > 0) {
+        provider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
+      } else {
+        provider = { name: "Instantly - Growth Team", provider: "instantly" };
+      }
+    }
+
+    const results = [];
+    for (const order of allOrders) {
+      const result = await assignInboxProvider(apiKey, customerId, order._id, provider);
+      results.push({ orderId: order._id, email: order.email, domain: order.domain, ...result });
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    return Response.json({ total: allOrders.length, assigned: successCount, provider, results });
   }
 
   // ── getNamePool: return stored names ──

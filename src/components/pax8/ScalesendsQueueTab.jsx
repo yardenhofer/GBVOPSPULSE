@@ -36,6 +36,8 @@ export default function ScalesendsQueueTab() {
   const [reconcileResult, setReconcileResult] = useState(null);
   const [porkbunSyncing, setPorkbunSyncing] = useState(false);
   const [porkbunResult, setPorkbunResult] = useState(null);
+  const [fixingProviders, setFixingProviders] = useState(false);
+  const [fixProvidersResult, setFixProvidersResult] = useState(null);
 
   async function loadAll() {
     setLoading(true);
@@ -102,6 +104,14 @@ export default function ScalesendsQueueTab() {
     setReconcileResult(res.data);
     setReconciling(false);
     await loadAll();
+  }
+
+  async function handleFixProviders() {
+    setFixingProviders(true);
+    setFixProvidersResult(null);
+    const res = await base44.functions.invoke("scalesendsSubmit", { action: "fixAllProviders" });
+    setFixProvidersResult(res.data);
+    setFixingProviders(false);
   }
 
   async function handlePorkbunSync() {
@@ -197,6 +207,10 @@ export default function ScalesendsQueueTab() {
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-500/20 font-medium disabled:opacity-50">
           <RotateCw className={`w-3 h-3 ${porkbunSyncing ? "animate-spin" : ""}`} /> Porkbun NS
         </button>
+        <button onClick={handleFixProviders} disabled={fixingProviders}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-100 dark:bg-teal-500/10 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/20 font-medium disabled:opacity-50">
+          <RotateCw className={`w-3 h-3 ${fixingProviders ? "animate-spin" : ""}`} /> Fix Providers
+        </button>
         <button onClick={() => setShowSettings(!showSettings)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 font-medium">
           Settings
         </button>
@@ -213,6 +227,11 @@ export default function ScalesendsQueueTab() {
         {reconcileResult && (
           <span className="text-xs text-amber-600 dark:text-amber-400">
             Reconcile: {reconcileResult.totalScalesendsOrders} Scalesends orders — {reconcileResult.newlyMatched} newly linked, {reconcileResult.alreadyLinkedCount} already linked, {reconcileResult.orphanedInScalesends} orphaned
+          </span>
+        )}
+        {fixProvidersResult && (
+          <span className="text-xs text-teal-600 dark:text-teal-400">
+            Providers: {fixProvidersResult.assigned}/{fixProvidersResult.total} assigned ({fixProvidersResult.provider?.name})
           </span>
         )}
         {porkbunResult && (
