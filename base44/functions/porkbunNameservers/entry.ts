@@ -183,13 +183,17 @@ async function processTenant(base44, tenant, ssApiKey, ssCustomerId, performedBy
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user || user.role !== "admin") {
-    return Response.json({ error: "Forbidden: Admin access required" }, { status: 403 });
-  }
-
   const body = await req.json();
   const { action } = body;
+
+  // syncAll runs from scheduled automation (no user context needed)
+  // Manual actions require admin auth
+  if (action !== "syncAll") {
+    const user = await base44.auth.me();
+    if (!user || user.role !== "admin") {
+      return Response.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+    }
+  }
 
   // ── getStatus: get Porkbun NS status for a single tenant ──
   if (action === "getStatus") {
@@ -256,7 +260,8 @@ Deno.serve(async (req) => {
     if (tenants.length === 0) return Response.json({ error: "Tenant not found" }, { status: 404 });
 
     const { apiKey, customerId } = getScalesendsCredentials();
-    const result = await processTenant(base44, tenants[0], apiKey, customerId, user.email);
+    const caller = await base44.auth.me();
+    const result = await processTenant(base44, tenants[0], apiKey, customerId, caller?.email || "admin");
     return Response.json(result);
   }
 
