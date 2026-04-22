@@ -160,6 +160,19 @@
     "scalesends_manual_notes": {
       "type": "string",
       "description": "Notes added when marking as manually uploaded"
+    },
+    "porkbun_ns_applied_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when nameservers were successfully applied via Porkbun"
+    },
+    "porkbun_last_response": {
+      "type": "string",
+      "description": "JSON-encoded last response from Porkbun API for debugging"
+    },
+    "porkbun_last_error": {
+      "type": "string",
+      "description": "Last error message from Porkbun API"
     }
   },
   "required": [

@@ -34,6 +34,8 @@ export default function ScalesendsQueueTab() {
   const [lastSyncResult, setLastSyncResult] = useState(null);
   const [reconciling, setReconciling] = useState(false);
   const [reconcileResult, setReconcileResult] = useState(null);
+  const [porkbunSyncing, setPorkbunSyncing] = useState(false);
+  const [porkbunResult, setPorkbunResult] = useState(null);
 
   async function loadAll() {
     setLoading(true);
@@ -100,6 +102,14 @@ export default function ScalesendsQueueTab() {
     setReconcileResult(res.data);
     setReconciling(false);
     await loadAll();
+  }
+
+  async function handlePorkbunSync() {
+    setPorkbunSyncing(true);
+    setPorkbunResult(null);
+    const res = await base44.functions.invoke("porkbunNameservers", { action: "syncAll" });
+    setPorkbunResult(res.data);
+    setPorkbunSyncing(false);
   }
 
   async function handleSyncOrders() {
@@ -183,6 +193,10 @@ export default function ScalesendsQueueTab() {
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/20 font-medium disabled:opacity-50">
           <Link2 className={`w-3 h-3 ${reconciling ? "animate-spin" : ""}`} /> Reconcile
         </button>
+        <button onClick={handlePorkbunSync} disabled={porkbunSyncing}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-500/20 font-medium disabled:opacity-50">
+          <RotateCw className={`w-3 h-3 ${porkbunSyncing ? "animate-spin" : ""}`} /> Porkbun NS
+        </button>
         <button onClick={() => setShowSettings(!showSettings)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 font-medium">
           Settings
         </button>
@@ -199,6 +213,11 @@ export default function ScalesendsQueueTab() {
         {reconcileResult && (
           <span className="text-xs text-amber-600 dark:text-amber-400">
             Reconcile: {reconcileResult.totalScalesendsOrders} Scalesends orders — {reconcileResult.newlyMatched} newly linked, {reconcileResult.alreadyLinkedCount} already linked, {reconcileResult.orphanedInScalesends} orphaned
+          </span>
+        )}
+        {porkbunResult && (
+          <span className="text-xs text-indigo-600 dark:text-indigo-400">
+            {porkbunResult.skipped ? porkbunResult.message : `Porkbun NS: ${porkbunResult.eligible} eligible — ${porkbunResult.successCount} applied, ${porkbunResult.alreadyMatchedCount} matched, ${porkbunResult.errorCount} errors, ${porkbunResult.skippedCount} skipped`}
           </span>
         )}
       </div>

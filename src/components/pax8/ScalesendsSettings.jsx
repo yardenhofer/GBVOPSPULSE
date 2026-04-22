@@ -8,6 +8,18 @@ export default function ScalesendsSettings({ settings, onToggle }) {
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
       <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Scalesends Settings</h4>
 
+      {/* Porkbun workaround flag */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Use Scalesends Autofix (disable Porkbun workaround)</p>
+          <p className="text-xs text-gray-400">When ON, Scalesends handles nameserver setup directly (no Porkbun calls). When OFF, our Porkbun workaround applies nameservers.</p>
+        </div>
+        <Switch
+          checked={settings.useScalesendsAutofix}
+          onCheckedChange={() => onToggle("use_scalesends_autofix")}
+        />
+      </div>
+
       {/* Auto-submit toggle */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1">

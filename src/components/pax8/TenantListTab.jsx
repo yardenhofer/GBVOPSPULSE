@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Shield, Eye, EyeOff, Copy, RefreshCw, Pause, Play, Mail, AlertTriangle, CheckCircle2, XCircle, Clock, Search, ChevronDown, ChevronUp } from "lucide-react";
+import PorkbunNameserverPanel from "./PorkbunNameserverPanel";
 
 const STATUS_COLORS = {
   ordered: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
@@ -303,6 +304,9 @@ function TenantDetail({ tenant: t, revealedPassword, revealing, onReveal, onCopy
           </div>
         </div>
       )}
+
+      {/* Porkbun Nameserver Panel */}
+      <PorkbunNameserverPanel tenant={t} />
 
       {t.error_message && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2 text-xs text-red-400">{t.error_message}</div>

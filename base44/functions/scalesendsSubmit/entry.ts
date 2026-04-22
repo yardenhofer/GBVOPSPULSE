@@ -251,9 +251,12 @@ Deno.serve(async (req) => {
       t.scalesends_submitted_at && new Date(t.scalesends_submitted_at) >= todayStart
     ).length;
 
+    const useScalesendsAutofix = await getSettingValue(base44, "use_scalesends_autofix", "false");
+
     return Response.json({
       autoSubmit: autoSubmit === "true",
       pauseScalesends: pauseScalesends === "true",
+      useScalesendsAutofix: useScalesendsAutofix === "true",
       dailyCap: parseInt(dailyCap, 10),
       todaySubmissions,
       apiKeyConfigured,
@@ -264,7 +267,7 @@ Deno.serve(async (req) => {
   // ── toggleSetting ──
   if (action === "toggleSetting") {
     const { key } = body;
-    const allowedKeys = ["scalesends_auto_submit", "pause_scalesends"];
+    const allowedKeys = ["scalesends_auto_submit", "pause_scalesends", "use_scalesends_autofix"];
     if (!allowedKeys.includes(key)) return Response.json({ error: "Invalid setting key" }, { status: 400 });
 
     const current = await getSettingValue(base44, key, "false");
