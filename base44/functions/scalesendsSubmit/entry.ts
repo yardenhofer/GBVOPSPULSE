@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const BASE_URL = "https://cloud-api.plugsaas.com";
-const DEFAULT_DAILY_CAP = 20;
+const DEFAULT_DAILY_CAP = 100;
 
 function getApiCredentials() {
   const apiKey = (Deno.env.get("SCALESENDS_API_KEY") || "").replace(/[^\x20-\x7E]/g, "").trim();
