@@ -217,7 +217,7 @@ export default function ScalesendsQueueTab() {
         )}
         {porkbunResult && (
           <span className="text-xs text-indigo-600 dark:text-indigo-400">
-            {porkbunResult.skipped ? porkbunResult.message : `Porkbun NS: ${porkbunResult.eligible} eligible — ${porkbunResult.successCount} applied, ${porkbunResult.alreadyMatchedCount} matched, ${porkbunResult.errorCount} errors, ${porkbunResult.skippedCount} skipped${porkbunResult.alreadyDone ? ` · ${porkbunResult.alreadyDone}/${porkbunResult.totalWithJob} already done` : ""}`}
+            {porkbunResult.skipped ? porkbunResult.message : `Porkbun NS: ${porkbunResult.successCount} applied, ${porkbunResult.alreadyMatchedCount} matched, ${porkbunResult.errorCount} errors, ${porkbunResult.skippedCount} skipped · ${porkbunResult.alreadyDone || 0} already done${porkbunResult.orphanedProcessed ? ` · ${porkbunResult.orphanedProcessed} orphaned orders processed` : ""}`}
           </span>
         )}
       </div>

@@ -290,10 +290,60 @@ Deno.serve(async (req) => {
     for (const tenant of eligible) {
       const result = await processTenant(base44, tenant, apiKey, customerId, "system/sync");
       results.push({ tenantId: tenant.id, domain: tenant.sending_domain, ...result });
-      // Rate limit: 10-second gap between domains
       if (eligible.indexOf(tenant) < eligible.length - 1) {
         await new Promise(r => setTimeout(r, 10000));
       }
+    }
+
+    // ── Also process orphaned Scalesends orders (exist in Scalesends but no tenant record) ──
+    const linkedJobIds = new Set(allTenants.filter(t => t.scalesends_job_id).map(t => t.scalesends_job_id));
+    let allOrders = [];
+    try {
+      const listUrl = `${SCALESENDS_BASE_URL}/api/v1/simple/customers/${customerId}/orders/`;
+      const listRes = await fetch(listUrl, { headers: { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json" } });
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        allOrders = Array.isArray(listData.data) ? listData.data : (Array.isArray(listData) ? listData : []);
+      }
+    } catch (e) { console.log(`[PORKBUN] Warning: could not fetch Scalesends orders: ${e.message}`); }
+
+    const orphanedOrders = allOrders.filter(o => !linkedJobIds.has(o._id) && o.domain);
+    const orphanResults = [];
+    for (const order of orphanedOrders) {
+      const domain = order.domain || order.endDomain;
+      if (!domain) continue;
+
+      // Get required NS from Scalesends
+      const ssResult = await getScalesendsNameservers(apiKey, customerId, order._id);
+      if (!ssResult.success || !ssResult.nameservers || ssResult.nameservers.length === 0) {
+        orphanResults.push({ orderId: order._id, domain, skipped: true, reason: `No NS from Scalesends (${ssResult.error || ssResult.nameserversStatus})` });
+        continue;
+      }
+
+      // Get current NS at Porkbun
+      const currentResult = await getPorkbunNameservers(domain);
+      if (currentResult.data?.status === "ERROR") {
+        orphanResults.push({ orderId: order._id, domain, error: true, reason: currentResult.data.message || "Porkbun error" });
+        if (orphanedOrders.indexOf(order) < orphanedOrders.length - 1) await new Promise(r => setTimeout(r, 10000));
+        continue;
+      }
+
+      const currentNs = currentResult.data?.ns || [];
+      if (nsMatch(currentNs, ssResult.nameservers)) {
+        orphanResults.push({ orderId: order._id, domain, alreadyMatched: true });
+        if (orphanedOrders.indexOf(order) < orphanedOrders.length - 1) await new Promise(r => setTimeout(r, 10000));
+        continue;
+      }
+
+      // Apply NS
+      const updateResult = await updatePorkbunNameservers(domain, ssResult.nameservers);
+      if (updateResult.data?.status === "SUCCESS") {
+        orphanResults.push({ orderId: order._id, domain, success: true, requiredNs: ssResult.nameservers });
+        console.log(`[PORKBUN] Applied NS for orphaned order ${order._id} (${domain})`);
+      } else {
+        orphanResults.push({ orderId: order._id, domain, error: true, reason: updateResult.data?.message || `HTTP ${updateResult.httpStatus}` });
+      }
+      if (orphanedOrders.indexOf(order) < orphanedOrders.length - 1) await new Promise(r => setTimeout(r, 10000));
     }
 
     return Response.json({
@@ -301,10 +351,12 @@ Deno.serve(async (req) => {
       alreadyDone: alreadyDone.length,
       totalWithJob: withJobAndDomain.length,
       results,
-      successCount: results.filter(r => r.success).length,
-      alreadyMatchedCount: results.filter(r => r.alreadyMatched).length,
-      errorCount: results.filter(r => r.error).length,
-      skippedCount: results.filter(r => r.skipped).length,
+      orphanedProcessed: orphanResults.length,
+      orphanResults,
+      successCount: results.filter(r => r.success).length + orphanResults.filter(r => r.success).length,
+      alreadyMatchedCount: results.filter(r => r.alreadyMatched).length + orphanResults.filter(r => r.alreadyMatched).length,
+      errorCount: results.filter(r => r.error).length + orphanResults.filter(r => r.error).length,
+      skippedCount: results.filter(r => r.skipped).length + orphanResults.filter(r => r.skipped).length,
     });
   }
 

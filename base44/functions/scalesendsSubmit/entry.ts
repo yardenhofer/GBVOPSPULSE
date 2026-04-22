@@ -686,10 +686,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Second pass: update statuses for all linked tenants ──
+    // ── Second pass: update statuses + backfill missing sending_domain for all linked tenants ──
+    const domainBackfilled = [];
     for (const order of orders) {
       const tenant = tenantByJobId[order._id];
       if (!tenant) continue;
+
+      // Backfill sending_domain from Scalesends order if tenant is missing it
+      const orderDomain = order.domain || order.endDomain || "";
+      if (!tenant.sending_domain && orderDomain) {
+        await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, { sending_domain: orderDomain });
+        tenant.sending_domain = orderDomain;
+        domainBackfilled.push({ tenantId: tenant.id, tenantDomain: tenant.ms_tenant_domain, sendingDomain: orderDomain });
+        console.log(`[SYNC] Backfilled sending_domain "${orderDomain}" for tenant ${tenant.ms_tenant_domain}`);
+      }
+
       if (tenant.scalesends_status === "complete" || tenant.scalesends_status === "manual_upload") continue;
 
       const mailboxCount = order.mailboxes?.length || 0;
@@ -704,7 +715,6 @@ Deno.serve(async (req) => {
         newStatus = "complete";
         newOverall = "inboxes_ready";
       } else if (hasMailboxes) {
-        // Has mailboxes but status not final yet — still processing
         newStatus = "processing";
         newOverall = "inboxes_creating";
       }
@@ -717,7 +727,6 @@ Deno.serve(async (req) => {
         };
         if (newStatus === "complete") {
           updateData.scalesends_completed_at = new Date().toISOString();
-          // Store inbox details (email + password pairs) as JSON
           const inboxDetails = (order.mailboxes || []).map(m => ({
             name: m.name, email: m.email, password: m.password,
           }));
@@ -762,7 +771,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({ totalOrders: orders.length, synced, syncedCount: synced.length, backfilled, backfilledCount: backfilled.length, registrarsAssigned, registrarsAssignedCount: registrarsAssigned.length });
+    return Response.json({ totalOrders: orders.length, synced, syncedCount: synced.length, backfilled, backfilledCount: backfilled.length, domainBackfilled, domainBackfilledCount: domainBackfilled.length, registrarsAssigned, registrarsAssignedCount: registrarsAssigned.length });
   }
 
   // ── markManual ──
