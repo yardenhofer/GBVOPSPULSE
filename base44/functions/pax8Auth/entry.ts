@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
 
   // ── placeOrder (LIVE — single client with domain retry) ──
   if (action === "placeOrder") {
-    const { companyId, companyName, runId, maxDomainRetries, workspaceId, workspaceName } = body;
+    const { companyId, companyName, runId, maxDomainRetries, workspaceId, workspaceName, sendingDomain: explicitDomain } = body;
     if (!companyId) return Response.json({ error: "companyId required" });
 
     const token = await getPax8Token();
@@ -403,9 +403,8 @@ Deno.serve(async (req) => {
         await setDomainCounter(base44, domainN + 1);
         console.log(`[LIVE ORDER] Success for ${companyName}, order ID: ${res.data?.id}, domain: GrowBig${domainN}`);
 
-        // Create TenantLifecycle record with workspace assignment
-        // Derive sending domain from company name: lowercase, remove spaces/special chars, add .info
-        const sendingDomain = companyName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info";
+        // Use explicit sending domain from CSV if provided, otherwise derive from company name
+        const sendingDomain = explicitDomain || (companyName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info");
         const tenantData = {
           pax8_company_id: companyId,
           pax8_company_name: companyName,

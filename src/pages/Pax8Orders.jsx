@@ -106,7 +106,7 @@ export default function Pax8Orders() {
     const res = await base44.functions.invoke("pax8Auth", {
       action: "mockOrders",
       productId: product.productId,
-      eligible: cappedEligible,
+      eligible: cappedEligible.map(c => ({ ...c, domain: c.domain || null })),
     });
     if (res.data.mockResults) {
       setMockResults(res.data.mockResults);
@@ -175,6 +175,7 @@ export default function Pax8Orders() {
         maxDomainRetries: MAX_DOMAIN_RETRIES,
         workspaceId: selectedWorkspaceId || null,
         workspaceName: workspaceName || null,
+        sendingDomain: client.domain || null,
       });
 
       const result = {
