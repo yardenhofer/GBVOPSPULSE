@@ -70,20 +70,19 @@ Deno.serve(async (req) => {
     existingOrders = Array.isArray(listData.data) ? listData.data : (Array.isArray(listData) ? listData : []);
   }
 
-  // Get default inbox provider
-  let inboxProvider = null;
+  // Default provider and workspace — only used if the tenant already has a workspace assigned
+  let defaultInboxProvider = null;
   const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
   if (defaultProviders.length > 0) {
-    inboxProvider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
+    defaultInboxProvider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
   }
 
-  // Get default workspace
-  let workspaceId = null;
-  let workspaceName = null;
+  let defaultWorkspaceId = null;
+  let defaultWorkspaceName = null;
   const defaultWorkspaces = await base44.asServiceRole.entities.InstantlyWorkspace.filter({ is_default: true });
   if (defaultWorkspaces.length > 0) {
-    workspaceId = defaultWorkspaces[0].id;
-    workspaceName = defaultWorkspaces[0].name;
+    defaultWorkspaceId = defaultWorkspaces[0].id;
+    defaultWorkspaceName = defaultWorkspaces[0].name;
   }
 
   // Get name pool
@@ -114,6 +113,11 @@ Deno.serve(async (req) => {
       if (tenantDomain && oEnd && tenantDomain.includes(oEnd)) { existing = order; break; }
     }
 
+    // Determine workspace and provider for this tenant — only use defaults if tenant already has a workspace
+    const tenantWorkspaceId = tenant.instantly_workspace_id || null;
+    const tenantWorkspaceName = tenant.instantly_workspace_name || null;
+    const inboxProvider = tenantWorkspaceId ? defaultInboxProvider : null;
+
     if (existing) {
       // Link to existing order
       const mCount = existing.mailboxes?.length || 0;
@@ -126,7 +130,7 @@ Deno.serve(async (req) => {
         updateData.scalesends_completed_at = existing.updatedAt || new Date().toISOString();
         updateData.scalesends_inbox_details = JSON.stringify((existing.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
       }
-      if (workspaceId) { updateData.instantly_workspace_id = workspaceId; updateData.instantly_workspace_name = workspaceName; updateData.instantly_upload_status = "pending"; }
+      if (tenantWorkspaceId) { updateData.instantly_workspace_id = tenantWorkspaceId; updateData.instantly_workspace_name = tenantWorkspaceName; updateData.instantly_upload_status = "pending"; }
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
       await base44.asServiceRole.entities.TenantAuditLog.create({
         action: "email_linked", tenant_lifecycle_id: tenant.id,
@@ -192,7 +196,7 @@ Deno.serve(async (req) => {
         scalesends_submitted_at: new Date().toISOString(), scalesends_trigger_type: "auto",
         overall_status: "inboxes_creating",
       };
-      if (workspaceId) { updateData.instantly_workspace_id = workspaceId; updateData.instantly_workspace_name = workspaceName; updateData.instantly_upload_status = "pending"; }
+      if (tenantWorkspaceId) { updateData.instantly_workspace_id = tenantWorkspaceId; updateData.instantly_workspace_name = tenantWorkspaceName; updateData.instantly_upload_status = "pending"; }
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
       await base44.asServiceRole.entities.TenantAuditLog.create({
         action: "email_parsed", tenant_lifecycle_id: tenant.id,
@@ -223,7 +227,7 @@ Deno.serve(async (req) => {
               updateData.scalesends_completed_at = dup.updatedAt || new Date().toISOString();
               updateData.scalesends_inbox_details = JSON.stringify((dup.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
             }
-            if (workspaceId) { updateData.instantly_workspace_id = workspaceId; updateData.instantly_workspace_name = workspaceName; updateData.instantly_upload_status = "pending"; }
+            if (tenantWorkspaceId) { updateData.instantly_workspace_id = tenantWorkspaceId; updateData.instantly_workspace_name = tenantWorkspaceName; updateData.instantly_upload_status = "pending"; }
             await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
             await base44.asServiceRole.entities.TenantAuditLog.create({
               action: "email_linked", tenant_lifecycle_id: tenant.id,

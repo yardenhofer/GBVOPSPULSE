@@ -80,12 +80,16 @@ Deno.serve(async (req) => {
   const BASE_URL = "https://cloud-api.plugsaas.com";
   const headers = { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json", "Content-Type": "application/json" };
 
-  // Resolve default inbox provider early (needed for both linked and new order paths)
+  // Only resolve inbox provider if the tenant already has a workspace assigned (respects "Skip" choice)
   let inboxProvider = null;
-  const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
-  if (defaultProviders.length > 0) {
-    inboxProvider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
-    console.log(`[SCALESENDS-AUTO] Using default inbox provider: ${JSON.stringify(inboxProvider)}`);
+  if (tenant.instantly_workspace_id) {
+    const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
+    if (defaultProviders.length > 0) {
+      inboxProvider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
+      console.log(`[SCALESENDS-AUTO] Using default inbox provider: ${JSON.stringify(inboxProvider)}`);
+    }
+  } else {
+    console.log(`[SCALESENDS-AUTO] No workspace assigned on tenant — skipping provider assignment`);
   }
 
   let existingOrders = [];
