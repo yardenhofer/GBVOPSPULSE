@@ -207,7 +207,7 @@ export default function ScalesendsQueueTab() {
         )}
         {lastSyncResult && (
           <span className="text-xs text-green-600 dark:text-green-400">
-            Synced {lastSyncResult.syncedCount} order(s) from {lastSyncResult.totalOrders} total
+            Synced {lastSyncResult.syncedCount} order(s){lastSyncResult.backfilledCount > 0 ? `, backfilled ${lastSyncResult.backfilledCount} missing ID(s)` : ""} from {lastSyncResult.totalOrders} total
           </span>
         )}
         {reconcileResult && (

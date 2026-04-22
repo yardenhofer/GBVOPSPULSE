@@ -643,9 +643,50 @@ Deno.serve(async (req) => {
       if (t.scalesends_job_id) tenantByJobId[t.scalesends_job_id] = t;
     }
 
+    // Build list of tenants with scalesends_status but no job_id (need backfill)
+    const orphanedTenants = allTenants.filter(t => t.scalesends_status && !t.scalesends_job_id);
+
     const synced = [];
     const registrarsAssigned = [];
+    const backfilled = [];
 
+    // ── First pass: backfill missing job IDs by matching on email/domain ──
+    for (const order of orders) {
+      if (tenantByJobId[order._id]) continue; // already linked
+      const orderEmail = (order.email || "").toLowerCase();
+      const orderDomain = (order.domain || "").toLowerCase();
+
+      let matched = null;
+      for (const t of orphanedTenants) {
+        const tEmail = (t.ms_admin_username || "").toLowerCase();
+        const tSendingDomain = (t.sending_domain || "").toLowerCase();
+        if (orderEmail && tEmail && orderEmail === tEmail) { matched = t; break; }
+        if (orderDomain && tSendingDomain && orderDomain === tSendingDomain) { matched = t; break; }
+      }
+
+      if (matched) {
+        const { scalesendsStatus, overallStatus } = mapScalesendsStatus(order);
+        const inboxDetails = (order.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password }));
+        const updateData = {
+          scalesends_job_id: order._id,
+          scalesends_status: scalesendsStatus,
+          overall_status: overallStatus,
+          scalesends_inbox_count: order.mailboxes?.length || 0,
+        };
+        if (scalesendsStatus === "complete") {
+          updateData.scalesends_completed_at = order.updatedAt || new Date().toISOString();
+          updateData.scalesends_inbox_details = JSON.stringify(inboxDetails);
+        }
+        await base44.asServiceRole.entities.TenantLifecycle.update(matched.id, updateData);
+        tenantByJobId[order._id] = { ...matched, ...updateData };
+        // Remove from orphaned list so it's not matched again
+        orphanedTenants.splice(orphanedTenants.indexOf(matched), 1);
+        backfilled.push({ tenantId: matched.id, tenantDomain: matched.ms_tenant_domain, orderId: order._id, scalesendsStatus });
+        console.log(`[SYNC] Backfilled job ID ${order._id} for tenant ${matched.ms_tenant_domain} (matched by ${orderEmail === (matched.ms_admin_username || "").toLowerCase() ? "email" : "domain"})`);
+      }
+    }
+
+    // ── Second pass: update statuses for all linked tenants ──
     for (const order of orders) {
       const tenant = tenantByJobId[order._id];
       if (!tenant) continue;
@@ -721,7 +762,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({ totalOrders: orders.length, synced, syncedCount: synced.length, registrarsAssigned, registrarsAssignedCount: registrarsAssigned.length });
+    return Response.json({ totalOrders: orders.length, synced, syncedCount: synced.length, backfilled, backfilledCount: backfilled.length, registrarsAssigned, registrarsAssignedCount: registrarsAssigned.length });
   }
 
   // ── markManual ──
