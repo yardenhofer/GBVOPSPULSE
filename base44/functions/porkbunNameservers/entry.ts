@@ -276,11 +276,12 @@ Deno.serve(async (req) => {
     const { apiKey, customerId } = getScalesendsCredentials();
     const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
 
+    // Count tenants in each category for diagnostics
+    const withJobAndDomain = allTenants.filter(t => t.scalesends_job_id && t.sending_domain && t.scalesends_status && t.scalesends_status !== "failed" && t.scalesends_status !== "manual_upload");
+    const alreadyDone = withJobAndDomain.filter(t => t.porkbun_ns_applied_at && !t.porkbun_last_error);
+
     // Filter: has a Scalesends order, has a sending domain, and NS not yet confirmed
-    const eligible = allTenants.filter(t => {
-      if (!t.scalesends_job_id || !t.sending_domain) return false;
-      if (!t.scalesends_status || t.scalesends_status === "failed" || t.scalesends_status === "manual_upload") return false;
-      // Skip if Porkbun already applied AND no error
+    const eligible = withJobAndDomain.filter(t => {
       if (t.porkbun_ns_applied_at && !t.porkbun_last_error) return false;
       return true;
     });
@@ -297,6 +298,8 @@ Deno.serve(async (req) => {
 
     return Response.json({
       eligible: eligible.length,
+      alreadyDone: alreadyDone.length,
+      totalWithJob: withJobAndDomain.length,
       results,
       successCount: results.filter(r => r.success).length,
       alreadyMatchedCount: results.filter(r => r.alreadyMatched).length,
