@@ -321,21 +321,63 @@ Deno.serve(async (req) => {
     const mockResults = [];
 
     for (const client of eligible) {
-      const payload = buildOrderPayload(client.companyId, currentN);
-      const res = await pax8Post(token, "/orders", payload, { isMock: "true" });
+      let succeeded = false;
+      let lastError = null;
+      let domainUsed = currentN;
 
-      mockResults.push({
-        companyId: client.companyId,
-        companyName: client.companyName,
-        status: res.ok ? "mock_success" : "mock_failed",
-        domainUsed: `GrowBig${currentN}`,
-        error: res.ok ? null : (res.data?.message || res.text || `HTTP ${res.status}`),
-        response: res.data,
-      });
+      // Retry up to DOMAIN_RETRY_LIMIT times on domain collision (same logic as live orders)
+      for (let attempt = 0; attempt < DOMAIN_RETRY_LIMIT; attempt++) {
+        domainUsed = currentN;
+        const payload = buildOrderPayload(client.companyId, currentN);
+        const res = await pax8Post(token, "/orders", payload, { isMock: "true" });
 
-      // In mock mode, increment counter to simulate unique domains
-      currentN++;
+        if (res.ok) {
+          mockResults.push({
+            companyId: client.companyId,
+            companyName: client.companyName,
+            status: "mock_success",
+            domainUsed: `GrowBig${currentN}`,
+            error: null,
+            response: res.data,
+          });
+          currentN++;
+          succeeded = true;
+          break;
+        }
+
+        // Check if domain collision — retry with next number
+        const errText = (res.data?.message || res.text || "").toLowerCase();
+        const detailsText = JSON.stringify(res.data?.details || []).toLowerCase();
+        const combined = errText + " " + detailsText;
+        const isDomainCollision = combined.includes("domain") && (combined.includes("taken") || combined.includes("exists") || combined.includes("already") || combined.includes("unavailable") || combined.includes("invalid") || combined.includes("not available"));
+
+        if (isDomainCollision) {
+          console.log(`[MOCK] Domain GrowBig${currentN} collision for ${client.companyName}, retrying...`);
+          currentN++;
+          lastError = res.data?.message || res.text || `HTTP ${res.status}`;
+          continue;
+        }
+
+        // Non-domain error — fail immediately
+        lastError = res.data?.message || res.text || `HTTP ${res.status}`;
+        currentN++;
+        break;
+      }
+
+      if (!succeeded) {
+        mockResults.push({
+          companyId: client.companyId,
+          companyName: client.companyName,
+          status: "mock_failed",
+          domainUsed: `GrowBig${domainUsed}`,
+          error: lastError,
+          response: null,
+        });
+      }
     }
+
+    // Persist counter so next run starts from where we left off
+    await setDomainCounter(base44, currentN);
 
     return Response.json({ mockResults });
   }
