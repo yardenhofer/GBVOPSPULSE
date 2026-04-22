@@ -14,7 +14,7 @@ import TenantListTab from "../components/pax8/TenantListTab.jsx";
 import ScalesendsQueueTab from "../components/pax8/ScalesendsQueueTab.jsx";
 import WorkspaceSelector from "../components/pax8/WorkspaceSelector.jsx";
 
-const SPEND_CAP = 200; // $200/month spend cap per run
+const SPEND_CAP = 1000; // $1000/month spend cap per run
 const ESTIMATED_MONTHLY_COST_PER_LICENSE = 4.2; // Exchange Online Plan 1 actual cost
 const MAX_DOMAIN_RETRIES = 1; // No retries for test run (normally 5)
 
