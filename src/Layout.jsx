@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Bell, Sun, Moon, Menu, Zap, Settings, LogOut, Activity, FileCheck, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Bell, Sun, Moon, Menu, Zap, Settings, LogOut, Activity, FileCheck, ShieldAlert, Users, Linkedin } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const NAV = [
@@ -91,23 +91,56 @@ export default function Layout({ children, currentPageName }) {
             <span className="font-bold text-gray-900 dark:text-white tracking-tight">GBV Ops Center</span>
           </div>
 
+          {/* Client / Internal toggle */}
+          {user?.role === "admin" && (
+            <div className="px-3 pt-3 pb-1">
+              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
+                <Link
+                  to={createPageUrl("Dashboard")}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    currentPageName === "Dashboard"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" /> Client
+                </Link>
+                <Link
+                  to="/InternalDashboard"
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    currentPageName === "InternalDashboard"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  }`}
+                >
+                  <Linkedin className="w-3.5 h-3.5" /> Internal
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* Nav */}
           <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-            {NAV.filter(({ adminOnly }) => !adminOnly || user?.role === "admin").map(({ label, page, icon: Icon }) => (
-              <Link
-                key={page}
-                to={createPageUrl(page)}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                  ${currentPageName === page
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
-                  }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                {label}
-              </Link>
-            ))}
+            {NAV.filter(({ adminOnly }) => !adminOnly || user?.role === "admin").map(({ label, page, icon: Icon }) => {
+              const isActive = currentPageName === page || (page === "Dashboard" && currentPageName === "InternalDashboard");
+              return (
+                <Link
+                  key={page}
+                  to={page === "Dashboard" ? (currentPageName === "InternalDashboard" ? "/InternalDashboard" : createPageUrl(page)) : createPageUrl(page)}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                    ${isActive
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Bottom */}

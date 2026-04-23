@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import { RefreshCw, Plus, Linkedin, LayoutDashboard } from "lucide-react";
+import { RefreshCw, Plus } from "lucide-react";
 import { differenceInDays } from "date-fns";
 
 import SummaryBar from "../components/dashboard/SummaryBar";
@@ -11,7 +11,6 @@ import ClientFilters from "../components/dashboard/ClientFilters";
 import ClientRow from "../components/dashboard/ClientRow";
 import ClientTableHeader from "../components/dashboard/ClientTableHeader";
 import { computeRedFlags, computeAutoStatus } from "../components/utils/redFlagEngine";
-import InternalDashboard from "./InternalDashboard";
 
 function getCachedInstantlyResult(client) {
   if (!client.instantly_api_key) return null;
@@ -35,7 +34,6 @@ export default function Dashboard() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("all"); // "all" | "escalated" | "awaiting_leads"
-  const [view, setView] = useState("clients"); // "clients" | "internal"
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -139,182 +137,141 @@ export default function Dashboard() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {view === "clients" ? "Client Dashboard" : "Internal Dashboard"}
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {view === "clients" ? "Live operational status" : "LinkedIn campaign status"}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Client Dashboard</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Live operational status</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* View toggle */}
-          {user?.role === "admin" && (
-            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-              <button
-                onClick={() => setView("clients")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  view === "clients"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                }`}
-              >
-                <LayoutDashboard className="w-3.5 h-3.5" /> Clients
-              </button>
-              <button
-                onClick={() => setView("internal")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  view === "internal"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                }`}
-              >
-                <Linkedin className="w-3.5 h-3.5" /> LinkedIn
-              </button>
-            </div>
-          )}
-          {view === "clients" && (
-            <>
-              <button
-                onClick={loadClients}
-                className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-              </button>
-              <button
-                onClick={() => navigate(createPageUrl("ClientDetail"))}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
-              >
-                <Plus className="w-4 h-4" /> Add Client
-              </button>
-            </>
-          )}
+          <button
+            onClick={loadClients}
+            className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={() => navigate(createPageUrl("ClientDetail"))}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Add Client
+          </button>
         </div>
       </div>
 
-      {view === "internal" ? (
-        <InternalDashboard />
-      ) : (
-        <>
-          {/* Slack auth warning (admin only) */}
-          {user?.role === "admin" && <SlackAuthBanner />}
+      {/* Slack auth warning (admin only) */}
+      {user?.role === "admin" && <SlackAuthBanner />}
 
-          {/* Summary */}
-          <SummaryBar clients={activeClients} computeAutoStatus={computeAutoStatus} />
+      {/* Summary */}
+      <SummaryBar clients={activeClients} computeAutoStatus={computeAutoStatus} />
 
-          {/* Tabs */}
-          <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800">
-            <button
-              onClick={() => setActiveTab("all")}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "all"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-              }`}
-            >
-              All Clients
-            </button>
-            <button
-              onClick={() => setActiveTab("escalated")}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "escalated"
-                  ? "border-red-500 text-red-500"
-                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-              }`}
-            >
-              🚨 Escalated
-              {escalatedClients.length > 0 && (
-                <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {escalatedClients.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("awaiting_leads")}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "awaiting_leads"
-                  ? "border-orange-500 text-orange-500"
-                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-              }`}
-            >
-              ⏳ Awaiting Leads
-              {awaitingLeadsClients.length > 0 && (
-                <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {awaitingLeadsClients.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("offboarding")}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "offboarding"
-                  ? "border-violet-500 text-violet-500"
-                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-              }`}
-            >
-              🚪 Off-Boarding
-              {offboardingClients.length > 0 && (
-                <span className="bg-violet-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {offboardingClients.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("archived")}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "archived"
-                  ? "border-red-500 text-red-500"
-                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-              }`}
-            >
-              📦 Archived
-              {terminatedClients.length > 0 && (
-                <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                  {terminatedClients.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Filters (only in all tab) */}
-          {activeTab === "all" && <ClientFilters filters={filters} onFiltersChange={setFilters} groups={groups} />}
-
-          {/* Awaiting Leads info banner */}
-          {activeTab === "awaiting_leads" && (
-            <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl px-4 py-3 text-sm text-orange-600 dark:text-orange-400">
-              ⏳ These clients have <strong>"Waiting on Leads"</strong> enabled on their profile. Review and follow up on lead list status.
-            </div>
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800">
+        <button
+          onClick={() => setActiveTab("all")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "all"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          All Clients
+        </button>
+        <button
+          onClick={() => setActiveTab("escalated")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "escalated"
+              ? "border-red-500 text-red-500"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          🚨 Escalated
+          {escalatedClients.length > 0 && (
+            <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {escalatedClients.length}
+            </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab("awaiting_leads")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "awaiting_leads"
+              ? "border-orange-500 text-orange-500"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          ⏳ Awaiting Leads
+          {awaitingLeadsClients.length > 0 && (
+            <span className="bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {awaitingLeadsClients.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("offboarding")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "offboarding"
+              ? "border-violet-500 text-violet-500"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          🚪 Off-Boarding
+          {offboardingClients.length > 0 && (
+            <span className="bg-violet-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {offboardingClients.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("archived")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "archived"
+              ? "border-red-500 text-red-500"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
+          }`}
+        >
+          📦 Archived
+          {terminatedClients.length > 0 && (
+            <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              {terminatedClients.length}
+            </span>
+          )}
+        </button>
+      </div>
 
-          {/* Table header */}
-          <ClientTableHeader />
+      {/* Filters (only in all tab) */}
+      {activeTab === "all" && <ClientFilters filters={filters} onFiltersChange={setFilters} groups={groups} />}
 
-          {/* Clients */}
-          <div className="space-y-2">
-            {loading ? (
-              Array(5).fill(0).map((_, i) => (
-                <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
-              ))
-            ) : filtered.length === 0 ? (
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                {clients.length === 0 ? "No clients yet. Add your first client." : "No clients match these filters."}
-              </div>
-            ) : filtered.map(c => (
-              <ClientRow
-                key={c.id}
-                client={c}
-                flags={computeRedFlags(c)}
-                status={computeAutoStatus(c)}
-                isOwn={user?.email === c.assigned_am}
-                onClick={() => navigate(createPageUrl(`ClientDetail?id=${c.id}`))}
-                instantlyResult={getCachedInstantlyResult(c)}
-              />
-            ))}
-          </div>
-        </>
+      {/* Awaiting Leads info banner */}
+      {activeTab === "awaiting_leads" && (
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl px-4 py-3 text-sm text-orange-600 dark:text-orange-400">
+          ⏳ These clients have <strong>"Waiting on Leads"</strong> enabled on their profile. Review and follow up on lead list status.
+        </div>
       )}
+
+      {/* Table header */}
+      <ClientTableHeader />
+
+      {/* Clients */}
+      <div className="space-y-2">
+        {loading ? (
+          Array(5).fill(0).map((_, i) => (
+            <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
+          ))
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            {clients.length === 0 ? "No clients yet. Add your first client." : "No clients match these filters."}
+          </div>
+        ) : filtered.map(c => (
+          <ClientRow
+            key={c.id}
+            client={c}
+            flags={computeRedFlags(c)}
+            status={computeAutoStatus(c)}
+            isOwn={user?.email === c.assigned_am}
+            onClick={() => navigate(createPageUrl(`ClientDetail?id=${c.id}`))}
+            instantlyResult={getCachedInstantlyResult(c)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
