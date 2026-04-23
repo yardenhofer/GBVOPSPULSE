@@ -56,12 +56,12 @@ function WorkspaceCard({ workspace, days }) {
         {!error && summary && (
           <div className="hidden md:flex items-center gap-6 text-xs mr-4">
             <div className="text-center">
-              <p className="text-gray-400">Connections Sent</p>
-              <p className="font-bold text-indigo-500">{(summary.total_connections || 0).toLocaleString()}</p>
-            </div>
-            <div className="text-center">
               <p className="text-gray-400">InMails Sent</p>
               <p className="font-bold text-emerald-500">{(summary.total_inmails || 0).toLocaleString()}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-400">Connections Sent</p>
+              <p className="font-bold text-indigo-500">{(summary.total_connections || 0).toLocaleString()}</p>
             </div>
             <div className="text-center">
               <p className="text-gray-400">In Progress</p>
@@ -382,7 +382,7 @@ export default function InternalDashboard() {
             { label: "LinkedIn Senders", value: totalAccounts, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
             { label: "Active Campaigns", value: totalActiveCampaigns, icon: BarChart3, color: "text-violet-500", bg: "bg-violet-500/10" },
             { label: `InMails Sent`, value: totalInmails.toLocaleString(), icon: Mail, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-            { label: `Connections Sent`, value: totalConnections.toLocaleString(), icon: MessageSquare, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+            { label: `Connections Sent`, value: totalConnections.toLocaleString(), icon: Link2, color: "text-indigo-500", bg: "bg-indigo-500/10" },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
               <div className="flex items-center gap-2 mb-1">
