@@ -286,19 +286,9 @@ export default function InternalDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Linkedin className="w-6 h-6 text-blue-600" /> Internal Dashboard
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            LinkedIn campaign status across all HeyReach workspaces
-            {syncing && <span className="ml-2 text-blue-500"> · Syncing from HeyReach…</span>}
-            {!syncing && lastUpdated && <span className="ml-2"> · Last synced {lastUpdated.toLocaleTimeString()}</span>}
-          </p>
-        </div>
-      </div>
+      {/* Sync status */}
+      {syncing && <p className="text-xs text-blue-500">Syncing from HeyReach…</p>}
+      {!syncing && lastUpdated && <p className="text-xs text-gray-400">Last synced {lastUpdated.toLocaleTimeString()}</p>}
 
       {/* Period filter */}
       <div className="flex flex-wrap items-center gap-2">
