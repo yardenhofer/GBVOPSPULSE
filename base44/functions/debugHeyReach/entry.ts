@@ -152,6 +152,43 @@ Deno.serve(async (req) => {
     });
   }
 
+  if (action === "per_account_stats") {
+    // Try fetching stats for a single account to see if byAccountStats appears
+    const days = body.days || 7;
+    const now = new Date();
+    const start = new Date(now.getTime() - days * 86400000).toISOString();
+    const end = now.toISOString();
+    const accountId = body.accountId;
+    
+    // Try with just one account ID
+    const res = await fetch(`${API_BASE}/stats/GetOverallStats`, {
+      method: "POST", headers: headers(),
+      body: JSON.stringify({ AccountIds: accountId ? [accountId] : [], CampaignIds: [], StartDate: start, EndDate: end }),
+    });
+    const data = await res.json();
+    
+    // Also try the per-account endpoint if it exists
+    let perAccountData = null;
+    if (accountId) {
+      const res2 = await fetch(`${API_BASE}/stats/GetAccountStats`, {
+        method: "POST", headers: headers(),
+        body: JSON.stringify({ AccountId: accountId, StartDate: start, EndDate: end }),
+      });
+      perAccountData = { status: res2.status, body: res2.ok ? await res2.json() : await res2.text() };
+    }
+    
+    // Also check byDayStats structure when IDs are passed
+    const byDaySample = data.byDayStats ? Object.entries(data.byDayStats).slice(0, 2).map(([k,v]) => ({ date: k, stats: v })) : null;
+    
+    return Response.json({ 
+      topLevelKeys: Object.keys(data),
+      overallStats: data.overallStats,
+      byDaySample,
+      byAccountStats: data.byAccountStats,
+      perAccountEndpoint: perAccountData,
+    });
+  }
+
   if (action === "test_stats_with_ids") {
     const days = body.days || 7;
     const now = new Date();
@@ -197,12 +234,18 @@ Deno.serve(async (req) => {
     const records = await base44.asServiceRole.entities.HeyReachCache.filter({ days: d });
     const summaries = records.map(r => {
       const ws = JSON.parse(r.workspace_data);
+      const acctSample = (ws.accounts || [])
+        .filter(a => a.connections > 0 || a.inmails > 0 || (a.messages || 0) > 0)
+        .slice(0, 5)
+        .map(a => ({ name: a.name, connections: a.connections, inmails: a.inmails, messages: a.messages || 0 }));
       return { 
         client_name: ws.client_name, 
         summary: ws.summary, 
         chartDataCount: ws.chartData?.length || 0,
         chartSample: (ws.chartData || []).slice(0, 3),
         accountsCount: ws.accounts?.length || 0,
+        accountsWithStats: (ws.accounts || []).filter(a => a.connections > 0 || a.inmails > 0).length,
+        accountSample: acctSample,
       };
     });
     return Response.json({ period: d, records: records.length, summaries });

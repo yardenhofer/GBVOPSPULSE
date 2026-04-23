@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const PERIODS = [1, 7, 14, 30, 60, 90];
 const API_BASE = "https://api.heyreach.io/api/public";
+const BATCH_SIZE = 10; // parallel API calls at a time
 
 function apiHeaders() {
   const key = Deno.env.get("HEYREACH_INTERNAL_API_KEY");
@@ -45,7 +46,28 @@ async function fetchOverallStats(accountIds, campaignIds, startDate, endDate) {
   return await res.json();
 }
 
-function buildWorkspaces(campaigns, senderAccounts, stats) {
+// Fetch stats for individual accounts in parallel batches
+async function fetchPerAccountStats(accountIds, start, end) {
+  const statsMap = {}; // accountId -> overallStats
+  const ids = [...accountIds];
+  
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = ids.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async (aid) => {
+        const data = await fetchOverallStats([aid], [], start, end);
+        return { id: aid, stats: data?.overallStats || null };
+      })
+    );
+    for (const r of results) {
+      if (r.stats) statsMap[r.id] = r.stats;
+    }
+  }
+  
+  return statsMap;
+}
+
+function buildWorkspaces(campaigns, senderAccounts, globalStats, perAccountStats) {
   const senderMap = {};
   for (const s of senderAccounts) {
     senderMap[s.id] = {
@@ -73,7 +95,7 @@ function buildWorkspaces(campaigns, senderAccounts, stats) {
     for (const sid of senderIds) {
       const info = senderMap[sid] || { name: `Sender ${sid}`, email: "" };
       if (!ws.accounts[sid]) {
-        ws.accounts[sid] = { id: sid, name: info.name, email: info.email, connections: 0, inmails: 0, total_leads: 0, finished_leads: 0, in_progress: 0, completion_pct: 0 };
+        ws.accounts[sid] = { id: sid, name: info.name, email: info.email, connections: 0, inmails: 0, messages: 0, total_leads: 0, finished_leads: 0, in_progress: 0, completion_pct: 0 };
       }
       const div = senderIds.length || 1;
       ws.accounts[sid].total_leads += Math.round(totalLeads / div);
@@ -89,8 +111,23 @@ function buildWorkspaces(campaigns, senderAccounts, stats) {
     ws.summary.finished_leads += finishedLeads;
   }
 
-  if (stats?.overallStats) {
-    const os = stats.overallStats;
+  // Apply per-account stats
+  if (perAccountStats) {
+    for (const ws of Object.values(workspaceMap)) {
+      for (const [sid, acc] of Object.entries(ws.accounts)) {
+        const as = perAccountStats[sid];
+        if (as) {
+          acc.connections = as.connectionsSent || 0;
+          acc.inmails = as.totalInmailStarted || as.inmailMessagesSent || 0;
+          acc.messages = as.totalMessageStarted || as.messagesSent || 0;
+        }
+      }
+    }
+  }
+
+  // Apply global overall stats to workspace summaries
+  if (globalStats?.overallStats) {
+    const os = globalStats.overallStats;
     for (const ws of Object.values(workspaceMap)) {
       ws.summary.total_connections = os.connectionsSent || 0;
       ws.summary.total_inmails = os.totalInmailStarted || os.inmailMessagesSent || 0;
@@ -101,8 +138,8 @@ function buildWorkspaces(campaigns, senderAccounts, stats) {
       ws.summary.profile_views = os.profileViews || 0;
     }
   }
-  if (stats?.byDayStats) {
-    for (const [dateKey, dayStats] of Object.entries(stats.byDayStats)) {
+  if (globalStats?.byDayStats) {
+    for (const [dateKey, dayStats] of Object.entries(globalStats.byDayStats)) {
       const date = dateKey.split("T")[0];
       for (const ws of Object.values(workspaceMap)) {
         if (!ws.dailyMap[date]) ws.dailyMap[date] = { date, connections: 0, inmails: 0, connectionsAccepted: 0, messages: 0 };
@@ -136,12 +173,12 @@ Deno.serve(async (req) => {
   ]);
   console.log(`[HEYREACH-SYNC] Fetched ${campaigns.length} campaigns, ${senderAccounts.length} accounts`);
 
-  const allAccountIds = new Set();
-  const allCampaignIds = [];
+  // Collect unique account IDs used in campaigns
+  const campaignAccountIds = new Set();
   for (const c of campaigns) {
-    allCampaignIds.push(c.id);
-    for (const aid of (c.campaignAccountIds || [])) allAccountIds.add(aid);
+    for (const aid of (c.campaignAccountIds || [])) campaignAccountIds.add(aid);
   }
+  console.log(`[HEYREACH-SYNC] ${campaignAccountIds.size} unique accounts in campaigns`);
 
   for (const days of PERIODS) {
     try {
@@ -150,9 +187,16 @@ Deno.serve(async (req) => {
       const start = new Date(now.getTime() - days * 86400000).toISOString();
       const end = now.toISOString();
 
-      // Fetch stats for this period with date range (empty arrays = all accounts/campaigns)
-      const stats = await fetchOverallStats([], [], start, end);
-      const workspaces = buildWorkspaces(campaigns, senderAccounts, stats);
+      // Fetch global stats (for totals + chart) and per-account stats (for leaderboard) in parallel
+      const [globalStats, perAccountStats] = await Promise.all([
+        fetchOverallStats([], [], start, end),
+        fetchPerAccountStats(campaignAccountIds, start, end),
+      ]);
+
+      const accountsWithStats = Object.keys(perAccountStats).length;
+      console.log(`[HEYREACH-SYNC] ${days}d: got per-account stats for ${accountsWithStats}/${campaignAccountIds.size} accounts`);
+
+      const workspaces = buildWorkspaces(campaigns, senderAccounts, globalStats, perAccountStats);
 
       if (workspaces.length === 0) {
         console.log(`[HEYREACH-SYNC] No workspaces for ${days}d, skipping`);

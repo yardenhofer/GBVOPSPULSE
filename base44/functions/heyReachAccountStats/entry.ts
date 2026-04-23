@@ -47,6 +47,25 @@ async function fetchOverallStats(accountIds, campaignIds, startDate, endDate) {
   return await res.json();
 }
 
+const BATCH_SIZE = 10;
+async function fetchPerAccountStats(accountIds, start, end) {
+  const statsMap = {};
+  const ids = [...accountIds];
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = ids.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async (aid) => {
+        const data = await fetchOverallStats([aid], [], start, end);
+        return { id: aid, stats: data?.overallStats || null };
+      })
+    );
+    for (const r of results) {
+      if (r.stats) statsMap[r.id] = r.stats;
+    }
+  }
+  return statsMap;
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   // Auth: allow admin users and service-role calls (from heyReachCacheSync)
@@ -82,18 +101,19 @@ Deno.serve(async (req) => {
     };
   }
 
-  // Collect all unique account IDs and campaign IDs
-  const allAccountIds = new Set();
-  const allCampaignIds = [];
+  // Collect all unique account IDs used in campaigns
+  const campaignAccountIds = new Set();
   for (const c of campaigns) {
-    allCampaignIds.push(c.id);
-    for (const aid of (c.campaignAccountIds || [])) {
-      allAccountIds.add(aid);
-    }
+    for (const aid of (c.campaignAccountIds || [])) campaignAccountIds.add(aid);
   }
 
-  // Fetch overall stats with date range (empty arrays = all accounts/campaigns for accurate aggregates)
-  const stats = await fetchOverallStats([], [], start, end);
+  // Fetch global stats and per-account stats in parallel
+  const [stats, perAccountStats] = await Promise.all([
+    fetchOverallStats([], [], start, end),
+    fetchPerAccountStats(campaignAccountIds, start, end),
+  ]);
+
+  console.log(`[HEYREACH] Per-account stats: ${Object.keys(perAccountStats).length}/${campaignAccountIds.size} accounts`);
 
   // Group campaigns by organizationUnitId (workspace)
   const workspaceMap = {};
@@ -123,7 +143,7 @@ Deno.serve(async (req) => {
     for (const sid of senderIds) {
       const info = senderMap[sid] || { name: `Sender ${sid}`, email: "" };
       if (!ws.accounts[sid]) {
-        ws.accounts[sid] = { id: sid, name: info.name, email: info.email, connections: 0, inmails: 0, total_leads: 0, finished_leads: 0, in_progress: 0, completion_pct: 0 };
+        ws.accounts[sid] = { id: sid, name: info.name, email: info.email, connections: 0, inmails: 0, messages: 0, total_leads: 0, finished_leads: 0, in_progress: 0, completion_pct: 0 };
       }
       const div = senderIds.length || 1;
       ws.accounts[sid].total_leads += Math.round(totalLeads / div);
@@ -147,6 +167,18 @@ Deno.serve(async (req) => {
     ws.summary.total_in_progress += inProgress;
     ws.summary.total_leads += totalLeads;
     ws.summary.finished_leads += finishedLeads;
+  }
+
+  // Apply per-account stats
+  for (const ws of Object.values(workspaceMap)) {
+    for (const [sid, acc] of Object.entries(ws.accounts)) {
+      const as = perAccountStats[sid];
+      if (as) {
+        acc.connections = as.connectionsSent || 0;
+        acc.inmails = as.totalInmailStarted || as.inmailMessagesSent || 0;
+        acc.messages = as.totalMessageStarted || as.messagesSent || 0;
+      }
+    }
   }
 
   // Apply overall stats to workspace summaries
