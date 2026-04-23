@@ -49,16 +49,14 @@ async function fetchOverallStats(accountIds, campaignIds) {
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
-  let isAuthorized = false;
+  // Auth: allow admin users and service-role calls (from heyReachCacheSync)
   try {
     const user = await base44.auth.me();
-    if (user?.role === "admin") isAuthorized = true;
+    if (user && user.role !== "admin") {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
   } catch {
-    // Service role calls (from heyReachCacheSync) don't have a user — allow them
-    isAuthorized = true;
-  }
-  if (!isAuthorized) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
+    // auth.me() throws when no user token (service-role call) — that's fine, allow it
   }
 
   const body = await req.json();
