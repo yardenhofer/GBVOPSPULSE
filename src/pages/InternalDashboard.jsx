@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { RefreshCw, Linkedin, AlertTriangle, ChevronDown, ChevronRight, Users, BarChart3, Mail, Link2, ChevronLeft, Calendar, MessageSquare } from "lucide-react";
 import OutreachChart from "@/components/internaldashboard/OutreachChart";
 import InMailLeaderboard from "@/components/internaldashboard/InMailLeaderboard";
+import DisconnectedAccountsBanner from "@/components/internaldashboard/DisconnectedAccountsBanner";
 
 const PERIOD_OPTIONS = [
   { label: "Today", days: 1 },
@@ -370,6 +371,9 @@ export default function InternalDashboard() {
           {syncing ? "Loading…" : "Reload"}
         </button>
       </div>
+
+      {/* Disconnected accounts alert */}
+      <DisconnectedAccountsBanner />
 
       {/* Summary stats */}
       {!loading && workspaces.length > 0 && (

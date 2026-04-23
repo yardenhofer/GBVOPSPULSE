@@ -39,11 +39,12 @@ Deno.serve(async (req) => {
       firstName: a.firstName,
       lastName: a.lastName,
       emailAddress: a.emailAddress,
-      linkedInName: a.linkedInName,
-      name: a.name,
-      fullName: a.fullName,
+      isActive: a.isActive,
+      authIsValid: a.authIsValid,
+      activeCampaigns: a.activeCampaigns,
     }));
-    return Response.json({ total: allItems.length, sampleKeys, accounts: summary.slice(0, 20), allIds: allItems.map(a => a.id) });
+    const disconnected = summary.filter(a => a.authIsValid === false || a.isActive === false);
+    return Response.json({ total: allItems.length, sampleKeys, disconnected, disconnectedCount: disconnected.length, accounts: summary.slice(0, 10), allIds: allItems.map(a => a.id) });
   }
 
   if (action === "campaign_detail") {
