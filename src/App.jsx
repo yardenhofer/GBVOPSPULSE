@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import LeadListApprovals from './pages/LeadListApprovals';
 import Pax8Orders from './pages/Pax8Orders';
+import InternalDashboard from './pages/InternalDashboard';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -68,6 +69,11 @@ const AuthenticatedApp = () => {
       <Route path="/Pax8Orders" element={
         <LayoutWrapper currentPageName="Pax8Orders">
           <Pax8Orders />
+        </LayoutWrapper>
+      } />
+      <Route path="/InternalDashboard" element={
+        <LayoutWrapper currentPageName="InternalDashboard">
+          <InternalDashboard />
         </LayoutWrapper>
       } />
       <Route path="*" element={<PageNotFound />} />

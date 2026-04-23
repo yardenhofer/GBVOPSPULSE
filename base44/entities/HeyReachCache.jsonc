@@ -1,0 +1,30 @@
+{
+  "name": "HeyReachCache",
+  "type": "object",
+  "properties": {
+    "days": {
+      "type": "number",
+      "description": "Period in days this cache entry covers (1, 7, 14, 30, 60, 90)"
+    },
+    "workspace_data": {
+      "type": "string",
+      "description": "JSON-stringified workspace stats object"
+    },
+    "synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this cache entry was last synced"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "HeyReach workspace/client ID"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "HeyReach workspace/client name"
+    }
+  },
+  "required": [
+    "days"
+  ]
+}
