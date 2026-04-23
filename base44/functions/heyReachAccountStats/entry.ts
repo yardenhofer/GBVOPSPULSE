@@ -81,8 +81,20 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const days = body.days || 1;
   const now = new Date();
-  const start = body.startDate || new Date(now.getTime() - days * 86400000).toISOString();
-  const end = body.endDate || now.toISOString();
+  let start, end;
+  if (body.startDate) {
+    start = body.startDate;
+    end = body.endDate || now.toISOString();
+  } else if (days === 1) {
+    // Use midnight UTC today → now, so we don't bleed into yesterday
+    const todayMidnight = new Date(now);
+    todayMidnight.setUTCHours(0, 0, 0, 0);
+    start = todayMidnight.toISOString();
+    end = now.toISOString();
+  } else {
+    start = new Date(now.getTime() - days * 86400000).toISOString();
+    end = now.toISOString();
+  }
 
   console.log(`[HEYREACH] Fetching stats for ${days}d window: ${start} → ${end}`);
 
