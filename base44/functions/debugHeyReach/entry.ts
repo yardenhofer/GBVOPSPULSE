@@ -48,21 +48,34 @@ Deno.serve(async (req) => {
   }
 
   if (action === "campaign_detail") {
-    // Get first campaign and show all its keys + check for account info
     const res = await fetch(`${API_BASE}/campaign/GetAll`, {
       method: "POST", headers: headers(), body: JSON.stringify({})
     });
     if (!res.ok) return Response.json({ error: res.status });
     const data = await res.json();
-    const camp = (data.items || [])[0];
-    if (!camp) return Response.json({ error: "No campaigns" });
-    return Response.json({ 
-      keys: Object.keys(camp),
-      campaignAccountIds: camp.campaignAccountIds,
-      campaignAccounts: camp.campaignAccounts,
-      senderAccounts: camp.senderAccounts,
-      accounts: camp.accounts,
-      sample: JSON.stringify(camp).substring(0, 4000)
+    const campaigns = data.items || [];
+    
+    const allAccountIds = new Set();
+    const activeAccountIds = new Set();
+    const summary = campaigns.map(c => {
+      const ids = c.campaignAccountIds || [];
+      ids.forEach(id => allAccountIds.add(id));
+      const isActive = (c.status || "").toUpperCase() === "IN_PROGRESS";
+      if (isActive) ids.forEach(id => activeAccountIds.add(id));
+      return {
+        id: c.id, name: c.name, status: c.status,
+        accountCount: ids.length,
+        totalLeads: c.progressStats?.totalUsers || 0,
+        finishedLeads: c.progressStats?.totalUsersFinished || 0,
+      };
+    });
+    
+    return Response.json({
+      totalCampaigns: campaigns.length,
+      activeCampaigns: summary.filter(c => c.status?.toUpperCase() === "IN_PROGRESS").length,
+      uniqueAccountIdsAllCampaigns: allAccountIds.size,
+      uniqueAccountIdsActiveCampaignsOnly: activeAccountIds.size,
+      campaigns: summary,
     });
   }
 
