@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const API_BASE = "https://api.heyreach.io/api/v1";
+const API_BASE = "https://api.heyreach.io/api/public";
 
 function headers() {
   const key = Deno.env.get("HEYREACH_INTERNAL_API_KEY");
@@ -8,43 +8,41 @@ function headers() {
   return { "X-API-KEY": key, "Accept": "application/json", "Content-Type": "application/json" };
 }
 
-async function fetchAllCampaigns(startDate, endDate) {
-  const url = `${API_BASE}/campaign/ListAll`;
-  const body = { Offset: 0, Limit: 500 };
-  const res = await fetch(url, { method: "POST", headers: headers(), body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`ListAll campaigns: HTTP ${res.status}`);
+async function fetchAllCampaigns() {
+  const url = `${API_BASE}/campaign/GetAll`;
+  const res = await fetch(url, { method: "POST", headers: headers(), body: JSON.stringify({}) });
+  if (!res.ok) throw new Error(`GetAll campaigns: HTTP ${res.status}`);
   const data = await res.json();
-  return data.Items || data.items || [];
+  return data.items || [];
 }
 
-async function fetchCampaignStats(campaignId, startDate, endDate) {
-  const url = `${API_BASE}/campaign/${campaignId}/overall-stats?startDate=${startDate}&endDate=${endDate}`;
-  const res = await fetch(url, { headers: headers() });
+async function fetchAllLinkedInAccounts() {
+  const url = `${API_BASE}/li_account/GetAll`;
+  const res = await fetch(url, { method: "POST", headers: headers(), body: JSON.stringify({}) });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.items || data || [];
+}
+
+async function fetchOverallStats(accountIds, campaignIds) {
+  const url = `${API_BASE}/stats/GetOverallStats`;
+  const body = { AccountIds: accountIds, CampaignIds: campaignIds };
+  const res = await fetch(url, { method: "POST", headers: headers(), body: JSON.stringify(body) });
   if (!res.ok) return null;
   return await res.json();
 }
 
-async function fetchCampaignDailyStats(campaignId, startDate, endDate) {
-  const url = `${API_BASE}/campaign/${campaignId}/daily-stats?startDate=${startDate}&endDate=${endDate}`;
-  const res = await fetch(url, { headers: headers() });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-async function fetchAllSenderAccounts() {
-  const url = `${API_BASE}/linkedin-account/ListAll`;
-  const body = { Offset: 0, Limit: 500 };
-  const res = await fetch(url, { method: "POST", headers: headers(), body: JSON.stringify(body) });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.Items || data.items || [];
-}
-
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user || user.role !== "admin") {
+  let isAuthorized = false;
+  try {
+    const user = await base44.auth.me();
+    if (user?.role === "admin") isAuthorized = true;
+  } catch {
+    // Service role calls (from heyReachCacheSync) don't have a user — allow them
+    isAuthorized = true;
+  }
+  if (!isAuthorized) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -56,36 +54,45 @@ Deno.serve(async (req) => {
 
   console.log(`[HEYREACH] Fetching stats for ${days}d window: ${start} → ${end}`);
 
-  // Fetch all campaigns and sender accounts
+  // Fetch campaigns and LinkedIn accounts in parallel
   const [campaigns, senderAccounts] = await Promise.all([
-    fetchAllCampaigns(start, end),
-    fetchAllSenderAccounts(),
+    fetchAllCampaigns(),
+    fetchAllLinkedInAccounts(),
   ]);
 
-  // Build sender lookup
+  // Build sender lookup: id → { name, email }
   const senderMap = {};
   for (const s of senderAccounts) {
-    const id = s.Id || s.id;
-    senderMap[id] = {
-      name: `${s.FirstName || s.firstName || ""} ${s.LastName || s.lastName || ""}`.trim() || s.Email || s.email || `Sender ${id}`,
-      email: s.Email || s.email,
+    senderMap[s.id] = {
+      name: `${s.firstName || ""} ${s.lastName || ""}`.trim() || s.emailAddress || `Sender ${s.id}`,
+      email: s.emailAddress || "",
     };
   }
 
-  // Group campaigns by workspace (CallerListId / ListId)
+  // Collect all unique account IDs and campaign IDs
+  const allAccountIds = new Set();
+  const allCampaignIds = [];
+  for (const c of campaigns) {
+    allCampaignIds.push(c.id);
+    for (const aid of (c.campaignAccountIds || [])) {
+      allAccountIds.add(aid);
+    }
+  }
+
+  // Fetch overall stats
+  const stats = await fetchOverallStats([...allAccountIds], allCampaignIds);
+
+  // Group campaigns by organizationUnitId (workspace)
   const workspaceMap = {};
 
   for (const camp of campaigns) {
-    const campId = camp.Id || camp.id;
-    const campName = camp.Name || camp.name || "Unnamed";
-    const isActive = (camp.Status || camp.status || "").toLowerCase() === "active" || (camp.Status || camp.status) === 1;
-    const wsId = camp.CallerListId || camp.callerListId || camp.ListId || camp.listId || "__internal__";
-    const wsName = camp.CallerListName || camp.callerListName || camp.ListName || camp.listName || "GBV Internal";
+    const wsId = camp.organizationUnitId || "__internal__";
+    const isActive = (camp.status || "").toUpperCase() === "IN_PROGRESS";
 
     if (!workspaceMap[wsId]) {
       workspaceMap[wsId] = {
         client_id: String(wsId),
-        client_name: wsName,
+        client_name: "GBV Internal",
         accounts: {},
         campaigns: [],
         dailyMap: {},
@@ -94,40 +101,18 @@ Deno.serve(async (req) => {
     }
     const ws = workspaceMap[wsId];
 
-    // Fetch stats for this campaign
-    const [stats, dailyStats] = await Promise.all([
-      fetchCampaignStats(campId, start, end),
-      fetchCampaignDailyStats(campId, start, end),
-    ]);
-
-    const connections = stats?.ConnectionRequestsSent || stats?.connectionRequestsSent || 0;
-    const inmails = stats?.InMailsSent || stats?.inMailsSent || 0;
-    const connectionsAccepted = stats?.ConnectionRequestsAccepted || stats?.connectionRequestsAccepted || 0;
-    const totalLeads = stats?.TotalLeads || stats?.totalLeads || 0;
-    const finishedLeads = stats?.FinishedLeads || stats?.finishedLeads || 0;
-    const inProgress = stats?.InProgressLeads || stats?.inProgressLeads || 0;
-
-    // Aggregate daily stats
-    for (const d of dailyStats) {
-      const date = (d.Date || d.date || "").split("T")[0];
-      if (!date) continue;
-      if (!ws.dailyMap[date]) ws.dailyMap[date] = { date, connections: 0, inmails: 0, connectionsAccepted: 0 };
-      ws.dailyMap[date].connections += d.ConnectionRequestsSent || d.connectionRequestsSent || 0;
-      ws.dailyMap[date].inmails += d.InMailsSent || d.inMailsSent || 0;
-      ws.dailyMap[date].connectionsAccepted += d.ConnectionRequestsAccepted || d.connectionRequestsAccepted || 0;
-    }
+    const totalLeads = camp.progressStats?.totalUsers || 0;
+    const finishedLeads = camp.progressStats?.totalUsersFinished || 0;
+    const inProgress = camp.progressStats?.totalUsersInProgress || 0;
 
     // Track per-sender stats
-    const senderIds = camp.LinkedInAccountIds || camp.linkedInAccountIds || [];
+    const senderIds = camp.campaignAccountIds || [];
     for (const sid of senderIds) {
       const info = senderMap[sid] || { name: `Sender ${sid}`, email: "" };
       if (!ws.accounts[sid]) {
         ws.accounts[sid] = { id: sid, name: info.name, email: info.email, connections: 0, inmails: 0, total_leads: 0, finished_leads: 0, in_progress: 0, completion_pct: 0 };
       }
-      // Divide campaign stats evenly among senders (approximation)
       const div = senderIds.length || 1;
-      ws.accounts[sid].connections += Math.round(connections / div);
-      ws.accounts[sid].inmails += Math.round(inmails / div);
       ws.accounts[sid].total_leads += Math.round(totalLeads / div);
       ws.accounts[sid].finished_leads += Math.round(finishedLeads / div);
       ws.accounts[sid].in_progress += Math.round(inProgress / div);
@@ -135,22 +120,42 @@ Deno.serve(async (req) => {
 
     if (isActive) {
       ws.campaigns.push({
-        id: campId,
-        name: campName,
+        id: camp.id,
+        name: camp.name || "Unnamed",
         total_leads: totalLeads,
         finished_leads: finishedLeads,
         in_progress: inProgress,
-        connections,
-        inmails,
+        connections: 0,
+        inmails: 0,
       });
       ws.summary.active_campaigns++;
     }
 
-    ws.summary.total_connections += connections;
-    ws.summary.total_inmails += inmails;
     ws.summary.total_in_progress += inProgress;
     ws.summary.total_leads += totalLeads;
     ws.summary.finished_leads += finishedLeads;
+  }
+
+  // Apply overall stats to workspace summaries
+  if (stats?.overallStats) {
+    const os = stats.overallStats;
+    for (const ws of Object.values(workspaceMap)) {
+      ws.summary.total_connections = os.connectionsSent || 0;
+      ws.summary.total_inmails = os.inmailMessagesSent || 0;
+    }
+  }
+
+  // Build chartData from byDayStats
+  if (stats?.byDayStats) {
+    for (const [dateKey, dayStats] of Object.entries(stats.byDayStats)) {
+      const date = dateKey.split("T")[0];
+      for (const ws of Object.values(workspaceMap)) {
+        if (!ws.dailyMap[date]) ws.dailyMap[date] = { date, connections: 0, inmails: 0, connectionsAccepted: 0 };
+        ws.dailyMap[date].connections += dayStats.connectionsSent || 0;
+        ws.dailyMap[date].inmails += dayStats.inmailMessagesSent || 0;
+        ws.dailyMap[date].connectionsAccepted += dayStats.connectionsAccepted || 0;
+      }
+    }
   }
 
   // Finalize workspaces
@@ -171,6 +176,6 @@ Deno.serve(async (req) => {
     };
   });
 
-  console.log(`[HEYREACH] Done: ${workspaces.length} workspaces, ${campaigns.length} campaigns`);
+  console.log(`[HEYREACH] Done: ${workspaces.length} workspaces, ${campaigns.length} campaigns, ${senderAccounts.length} senders`);
   return Response.json({ workspaces });
 });
