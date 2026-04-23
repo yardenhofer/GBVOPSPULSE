@@ -2,7 +2,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const PERIODS = [1, 7, 14, 30, 60, 90];
 const API_BASE = "https://api.heyreach.io/api/public";
-const BATCH_SIZE = 10; // parallel API calls at a time
+const BATCH_SIZE = 5; // parallel API calls at a time
+const RETRY_ATTEMPTS = 2;
+const BATCH_DELAY_MS = 300;
 
 function apiHeaders() {
   const key = Deno.env.get("HEYREACH_INTERNAL_API_KEY");
@@ -46,24 +48,58 @@ async function fetchOverallStats(accountIds, campaignIds, startDate, endDate) {
   return await res.json();
 }
 
-// Fetch stats for individual accounts in parallel batches
+async function fetchSingleAccountStats(aid, start, end) {
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      const url = `${API_BASE}/stats/GetOverallStats`;
+      const body = { AccountIds: [aid], CampaignIds: [], StartDate: start, EndDate: end };
+      const res = await fetch(url, { method: "POST", headers: apiHeaders(), body: JSON.stringify(body) });
+      if (res.status === 429) {
+        console.log(`[HEYREACH-SYNC] Rate limited on account ${aid}, attempt ${attempt}/${RETRY_ATTEMPTS}, waiting 2s…`);
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      if (!res.ok) {
+        console.log(`[HEYREACH-SYNC] HTTP ${res.status} for account ${aid}, attempt ${attempt}/${RETRY_ATTEMPTS}`);
+        if (attempt < RETRY_ATTEMPTS) { await new Promise(r => setTimeout(r, 500)); continue; }
+        return null;
+      }
+      const data = await res.json();
+      return data?.overallStats || null;
+    } catch (err) {
+      console.log(`[HEYREACH-SYNC] Error fetching account ${aid}, attempt ${attempt}/${RETRY_ATTEMPTS}: ${err.message}`);
+      if (attempt < RETRY_ATTEMPTS) await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  return null;
+}
+
+// Fetch stats for individual accounts in parallel batches with retry and throttling
 async function fetchPerAccountStats(accountIds, start, end) {
-  const statsMap = {}; // accountId -> overallStats
+  const statsMap = {};
   const ids = [...accountIds];
+  let successCount = 0;
+  let failCount = 0;
   
   for (let i = 0; i < ids.length; i += BATCH_SIZE) {
     const batch = ids.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(
       batch.map(async (aid) => {
-        const data = await fetchOverallStats([aid], [], start, end);
-        return { id: aid, stats: data?.overallStats || null };
+        const stats = await fetchSingleAccountStats(aid, start, end);
+        return { id: aid, stats };
       })
     );
     for (const r of results) {
-      if (r.stats) statsMap[r.id] = r.stats;
+      if (r.stats) { statsMap[r.id] = r.stats; successCount++; }
+      else { failCount++; }
+    }
+    // Small delay between batches to avoid rate limiting
+    if (i + BATCH_SIZE < ids.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
   
+  console.log(`[HEYREACH-SYNC] Per-account fetch: ${successCount} success, ${failCount} failed/empty out of ${ids.length}`);
   return statsMap;
 }
 
