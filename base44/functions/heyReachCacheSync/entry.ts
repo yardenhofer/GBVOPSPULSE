@@ -36,10 +36,10 @@ async function fetchAllLinkedInAccounts() {
   return allItems;
 }
 
-async function fetchOverallStats(accountIds, campaignIds) {
+async function fetchOverallStats(accountIds, campaignIds, startDate, endDate) {
   const res = await fetch(`${API_BASE}/stats/GetOverallStats`, {
     method: "POST", headers: apiHeaders(),
-    body: JSON.stringify({ AccountIds: accountIds, CampaignIds: campaignIds }),
+    body: JSON.stringify({ AccountIds: accountIds, CampaignIds: campaignIds, StartDate: startDate, EndDate: endDate }),
   });
   if (!res.ok) return null;
   return await res.json();
@@ -93,17 +93,23 @@ function buildWorkspaces(campaigns, senderAccounts, stats) {
     const os = stats.overallStats;
     for (const ws of Object.values(workspaceMap)) {
       ws.summary.total_connections = os.connectionsSent || 0;
-      ws.summary.total_inmails = os.inmailMessagesSent || 0;
+      ws.summary.total_inmails = os.totalInmailStarted || os.inmailMessagesSent || 0;
+      ws.summary.total_messages = os.totalMessageStarted || os.messagesSent || 0;
+      ws.summary.connections_accepted = os.connectionsAccepted || 0;
+      ws.summary.total_inmail_replies = os.totalInmailReplies || 0;
+      ws.summary.total_message_replies = os.totalMessageReplies || 0;
+      ws.summary.profile_views = os.profileViews || 0;
     }
   }
   if (stats?.byDayStats) {
     for (const [dateKey, dayStats] of Object.entries(stats.byDayStats)) {
       const date = dateKey.split("T")[0];
       for (const ws of Object.values(workspaceMap)) {
-        if (!ws.dailyMap[date]) ws.dailyMap[date] = { date, connections: 0, inmails: 0, connectionsAccepted: 0 };
+        if (!ws.dailyMap[date]) ws.dailyMap[date] = { date, connections: 0, inmails: 0, connectionsAccepted: 0, messages: 0 };
         ws.dailyMap[date].connections += dayStats.connectionsSent || 0;
-        ws.dailyMap[date].inmails += dayStats.inmailMessagesSent || 0;
+        ws.dailyMap[date].inmails += dayStats.totalInmailStarted || dayStats.inmailMessagesSent || 0;
         ws.dailyMap[date].connectionsAccepted += dayStats.connectionsAccepted || 0;
+        ws.dailyMap[date].messages += dayStats.totalMessageStarted || dayStats.messagesSent || 0;
       }
     }
   }
@@ -144,8 +150,8 @@ Deno.serve(async (req) => {
       const start = new Date(now.getTime() - days * 86400000).toISOString();
       const end = now.toISOString();
 
-      // Fetch stats for this period
-      const stats = await fetchOverallStats([...allAccountIds], allCampaignIds);
+      // Fetch stats for this period with date range (empty arrays = all accounts/campaigns)
+      const stats = await fetchOverallStats([], [], start, end);
       const workspaces = buildWorkspaces(campaigns, senderAccounts, stats);
 
       if (workspaces.length === 0) {

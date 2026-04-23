@@ -39,9 +39,9 @@ async function fetchAllLinkedInAccounts() {
   return allItems;
 }
 
-async function fetchOverallStats(accountIds, campaignIds) {
+async function fetchOverallStats(accountIds, campaignIds, startDate, endDate) {
   const url = `${API_BASE}/stats/GetOverallStats`;
-  const body = { AccountIds: accountIds, CampaignIds: campaignIds };
+  const body = { AccountIds: accountIds, CampaignIds: campaignIds, StartDate: startDate, EndDate: endDate };
   const res = await fetch(url, { method: "POST", headers: headers(), body: JSON.stringify(body) });
   if (!res.ok) return null;
   return await res.json();
@@ -92,8 +92,8 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Fetch overall stats
-  const stats = await fetchOverallStats([...allAccountIds], allCampaignIds);
+  // Fetch overall stats with date range (empty arrays = all accounts/campaigns for accurate aggregates)
+  const stats = await fetchOverallStats([], [], start, end);
 
   // Group campaigns by organizationUnitId (workspace)
   const workspaceMap = {};
