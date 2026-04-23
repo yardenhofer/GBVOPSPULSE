@@ -18,10 +18,25 @@ async function fetchAllCampaigns() {
 
 async function fetchAllLinkedInAccounts() {
   const url = `${API_BASE}/li_account/GetAll`;
-  const res = await fetch(url, { method: "POST", headers: headers(), body: JSON.stringify({}) });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.items || data || [];
+  const allItems = [];
+  let offset = 0;
+  const limit = 100;
+  while (true) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ Offset: offset, Limit: limit }),
+    });
+    if (!res.ok) break;
+    const data = await res.json();
+    const items = data.items || data || [];
+    if (!Array.isArray(items) || items.length === 0) break;
+    allItems.push(...items);
+    if (items.length < limit) break;
+    offset += limit;
+  }
+  console.log(`[HEYREACH] Fetched ${allItems.length} LinkedIn accounts across ${Math.ceil(allItems.length / limit) || 1} pages`);
+  return allItems;
 }
 
 async function fetchOverallStats(accountIds, campaignIds) {
@@ -175,6 +190,17 @@ Deno.serve(async (req) => {
       summary: { ...ws.summary, completion_pct: completionTotal },
     };
   });
+
+  // Debug: find campaign account IDs that aren't in the sender map
+  const missingIds = [];
+  for (const c of campaigns) {
+    for (const aid of (c.campaignAccountIds || [])) {
+      if (!senderMap[aid] && !missingIds.includes(aid)) missingIds.push(aid);
+    }
+  }
+  if (missingIds.length > 0) {
+    console.log(`[HEYREACH] WARNING: ${missingIds.length} campaign account IDs not found in li_account/GetAll: ${missingIds.slice(0, 20).join(", ")}`);
+  }
 
   console.log(`[HEYREACH] Done: ${workspaces.length} workspaces, ${campaigns.length} campaigns, ${senderAccounts.length} senders`);
   return Response.json({ workspaces });
