@@ -1,0 +1,38 @@
+{
+  "name": "CsvImportLog",
+  "type": "object",
+  "properties": {
+    "file_name": {
+      "type": "string",
+      "description": "Name of the uploaded CSV/TSV file"
+    },
+    "row_count": {
+      "type": "number",
+      "description": "Total rows in the file"
+    },
+    "success_count": {
+      "type": "number",
+      "description": "Number of successfully created companies"
+    },
+    "fail_count": {
+      "type": "number",
+      "description": "Number of failed rows"
+    },
+    "imported_by": {
+      "type": "string",
+      "description": "Email of the user who ran the import"
+    },
+    "company_names": {
+      "type": "string",
+      "description": "Comma-separated list of company names from the file"
+    },
+    "errors": {
+      "type": "string",
+      "description": "JSON array of error details for failed rows"
+    }
+  },
+  "required": [
+    "file_name",
+    "row_count"
+  ]
+}

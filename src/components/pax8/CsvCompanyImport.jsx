@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Upload, Play, CheckCircle2, XCircle, FileSpreadsheet, Trash2, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import CsvImportHistory from "./CsvImportHistory";
 
 const REQUIRED_COLUMNS = ["name"];
 const EXPECTED_COLUMNS = [
@@ -36,6 +37,7 @@ export default function CsvCompanyImport() {
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState(null);
   const [currentIdx, setCurrentIdx] = useState(-1);
+  const [historyKey, setHistoryKey] = useState(0);
   const fileRef = useRef(null);
 
   function handleFile(e) {
@@ -87,6 +89,24 @@ export default function CsvCompanyImport() {
 
     setCurrentIdx(-1);
     setRunning(false);
+
+    // Log this import
+    const sCount = allResults.filter(r => r.status === "success").length;
+    const fCount = allResults.filter(r => r.status === "failed").length;
+    const errorDetails = allResults
+      .map((r, i) => r.status === "failed" ? { row: i + 1, name: rows[i]?.name || "", error: r.error || "Unknown" } : null)
+      .filter(Boolean);
+    const user = await base44.auth.me().catch(() => null);
+    await base44.entities.CsvImportLog.create({
+      file_name: fileName,
+      row_count: rows.length,
+      success_count: sCount,
+      fail_count: fCount,
+      imported_by: user?.email || "unknown",
+      company_names: rows.map(r => r.name).join(", "),
+      errors: errorDetails.length > 0 ? JSON.stringify(errorDetails) : "",
+    }).catch(() => {});
+    setHistoryKey(k => k + 1);
   }
 
   const successCount = results?.filter(r => r.status === "success").length || 0;
@@ -205,6 +225,8 @@ export default function CsvCompanyImport() {
           No valid rows found. Make sure the file has a header row with at least a "name" column.
         </div>
       )}
+
+      <CsvImportHistory key={historyKey} />
     </div>
   );
 }
