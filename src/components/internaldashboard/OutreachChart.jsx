@@ -11,38 +11,30 @@ export default function OutreachChart({ chartData }) {
     label: format(parseISO(d.date), "MMM d"),
   }));
 
-  // Single data point — show a bar chart with labeled metrics instead of a broken line
+  // Single data point — use a proper Recharts BarChart
   if (formatted.length === 1) {
     const d = formatted[0];
     const barData = [
-      { name: "Connection Requests", value: d.connections, color: "#6366f1" },
-      { name: "InMails Sent", value: d.inmails, color: "#10b981" },
-      { name: "Conn. Accepted", value: d.connectionsAccepted || 0, color: "#a78bfa" },
+      { name: "Conn. Requests", value: d.connections },
+      { name: "InMails Sent", value: d.inmails },
+      { name: "Conn. Accepted", value: d.connectionsAccepted || 0 },
     ];
+    const COLORS = ["#6366f1", "#10b981", "#a78bfa"];
 
     return (
-      <div className="flex flex-col items-center gap-3 py-4">
-        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{d.label}</span>
-        <div className="flex gap-6">
-          {barData.map(item => (
-            <div key={item.name} className="flex flex-col items-center gap-1">
-              <span className="text-lg font-bold" style={{ color: item.color }}>
-                {item.value.toLocaleString()}
-              </span>
-              <div
-                className="rounded-full"
-                style={{
-                  width: "32px",
-                  height: `${Math.max(8, (item.value / Math.max(...barData.map(b => b.value), 1)) * 80)}px`,
-                  backgroundColor: item.color,
-                  opacity: 0.85,
-                }}
-              />
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 text-center max-w-[80px]">{item.name}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={barData} margin={{ top: 10, right: 10, left: -5, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} />
+          <Tooltip formatter={(v) => v.toLocaleString()} />
+          <Bar dataKey="value" name={d.label} radius={[4, 4, 0, 0]} barSize={48}>
+            {barData.map((_, i) => (
+              <Cell key={i} fill={COLORS[i]} fillOpacity={0.85} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     );
   }
 
