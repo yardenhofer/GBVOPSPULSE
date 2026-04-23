@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { RefreshCw, Linkedin, AlertTriangle, ChevronDown, ChevronRight, Users, BarChart3, Mail, Link2, ChevronLeft, Calendar, MessageSquare, UserCheck, Eye } from "lucide-react";
+import { RefreshCw, Linkedin, AlertTriangle, ChevronDown, ChevronRight, Users, BarChart3, Mail, Link2, ChevronLeft, Calendar, MessageSquare } from "lucide-react";
 import OutreachChart from "@/components/internaldashboard/OutreachChart";
 import InMailLeaderboard from "@/components/internaldashboard/InMailLeaderboard";
 
@@ -59,16 +59,12 @@ function WorkspaceCard({ workspace, days }) {
               <p className="font-bold text-indigo-500">{(summary.total_connections || 0).toLocaleString()}</p>
             </div>
             <div className="text-center">
-              <p className="text-gray-400">Accepted</p>
-              <p className="font-bold text-purple-500">{(summary.connections_accepted || 0).toLocaleString()}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-400">Messages</p>
-              <p className="font-bold text-amber-500">{(summary.total_messages || 0).toLocaleString()}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-400">InMails</p>
+              <p className="text-gray-400">InMails Sent</p>
               <p className="font-bold text-emerald-500">{(summary.total_inmails || 0).toLocaleString()}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-400">In Progress</p>
+              <p className="font-bold text-amber-500">{(summary.total_in_progress || 0).toLocaleString()}</p>
             </div>
             <div className="w-28">
               <p className="text-gray-400 mb-0.5">Completion</p>
@@ -286,8 +282,6 @@ export default function InternalDashboard() {
   const totalAccounts = workspaces.reduce((s, w) => s + (w.summary?.total_accounts || 0), 0);
   const totalConnections = workspaces.reduce((s, w) => s + (w.summary?.total_connections || 0), 0);
   const totalInmails = workspaces.reduce((s, w) => s + (w.summary?.total_inmails || 0), 0);
-  const totalMessages = workspaces.reduce((s, w) => s + (w.summary?.total_messages || 0), 0);
-  const totalAccepted = workspaces.reduce((s, w) => s + (w.summary?.connections_accepted || 0), 0);
   const totalActiveCampaigns = workspaces.reduce((s, w) => s + (w.summary?.active_campaigns || 0), 0);
 
   return (
@@ -379,14 +373,12 @@ export default function InternalDashboard() {
 
       {/* Summary stats */}
       {!loading && workspaces.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: "LinkedIn Senders", value: totalAccounts, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
             { label: "Active Campaigns", value: totalActiveCampaigns, icon: BarChart3, color: "text-violet-500", bg: "bg-violet-500/10" },
-            { label: `Connections Sent`, value: totalConnections.toLocaleString(), icon: Link2, color: "text-indigo-500", bg: "bg-indigo-500/10" },
-            { label: `Conn. Accepted`, value: totalAccepted.toLocaleString(), icon: UserCheck, color: "text-purple-500", bg: "bg-purple-500/10" },
-            { label: `Messages Sent`, value: totalMessages.toLocaleString(), icon: MessageSquare, color: "text-amber-500", bg: "bg-amber-500/10" },
             { label: `InMails Sent`, value: totalInmails.toLocaleString(), icon: Mail, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+            { label: `Connections Sent`, value: totalConnections.toLocaleString(), icon: MessageSquare, color: "text-indigo-500", bg: "bg-indigo-500/10" },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
               <div className="flex items-center gap-2 mb-1">

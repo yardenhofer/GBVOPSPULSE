@@ -1,12 +1,11 @@
 import { Mail, Link, MessageSquare } from "lucide-react";
 
 export default function InMailLeaderboard({ accounts, days }) {
-  // Sort by connections desc, then inmails, then messages
-  const sorted = [...accounts].sort((a, b) => b.connections - a.connections || b.inmails - a.inmails || (b.messages || 0) - (a.messages || 0));
+  // Sort by connections desc, then inmails
+  const sorted = [...accounts].sort((a, b) => b.connections - a.connections || b.inmails - a.inmails);
 
   const maxConn = Math.max(...sorted.map(a => a.connections), 1);
   const maxInmails = Math.max(...sorted.map(a => a.inmails), 1);
-  const maxMessages = Math.max(...sorted.map(a => a.messages || 0), 1);
 
   if (sorted.length === 0) {
     return (
@@ -32,15 +31,6 @@ export default function InMailLeaderboard({ accounts, days }) {
             <span className="w-8 text-right text-gray-600 dark:text-gray-400">{acc.connections}</span>
           </div>
 
-          {/* Messages bar */}
-          <div className="flex-1 flex items-center gap-1">
-            <MessageSquare className="w-3 h-3 text-amber-500 shrink-0" />
-            <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
-              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${((acc.messages || 0) / maxMessages) * 100}%` }} />
-            </div>
-            <span className="w-8 text-right text-gray-600 dark:text-gray-400">{acc.messages || 0}</span>
-          </div>
-
           {/* InMail bar */}
           <div className="flex-1 flex items-center gap-1">
             <Mail className="w-3 h-3 text-emerald-500 shrink-0" />
@@ -55,7 +45,6 @@ export default function InMailLeaderboard({ accounts, days }) {
       {/* Legend */}
       <div className="flex gap-4 pt-1 text-[10px] text-gray-500">
         <span className="flex items-center gap-1"><Link className="w-2.5 h-2.5 text-indigo-500" /> Connections</span>
-        <span className="flex items-center gap-1"><MessageSquare className="w-2.5 h-2.5 text-amber-500" /> Messages</span>
         <span className="flex items-center gap-1"><Mail className="w-2.5 h-2.5 text-emerald-500" /> InMails</span>
       </div>
     </div>

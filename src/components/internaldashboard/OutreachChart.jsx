@@ -16,9 +16,8 @@ export default function OutreachChart({ chartData }) {
     const d = formatted[0];
     const barData = [
       { name: "Connection Requests", value: d.connections, color: "#6366f1" },
+      { name: "InMails Sent", value: d.inmails, color: "#10b981" },
       { name: "Conn. Accepted", value: d.connectionsAccepted || 0, color: "#a78bfa" },
-      { name: "Messages", value: d.messages || 0, color: "#f59e0b" },
-      { name: "InMails", value: d.inmails, color: "#10b981" },
     ];
 
     return (
@@ -57,9 +56,8 @@ export default function OutreachChart({ chartData }) {
         <Tooltip />
         <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
         <Area type="monotone" dataKey="connections" name="Connections" stroke="#6366f1" fill="#6366f1" fillOpacity={0.15} strokeWidth={2} />
-        <Area type="monotone" dataKey="connectionsAccepted" name="Accepted" stroke="#a78bfa" fill="#a78bfa" fillOpacity={0.1} strokeWidth={1.5} />
-        <Area type="monotone" dataKey="messages" name="Messages" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} strokeWidth={1.5} />
         <Area type="monotone" dataKey="inmails" name="InMails" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} />
+        <Area type="monotone" dataKey="connectionsAccepted" name="Accepted" stroke="#a78bfa" fill="#a78bfa" fillOpacity={0.1} strokeWidth={1.5} />
       </AreaChart>
     </ResponsiveContainer>
   );
