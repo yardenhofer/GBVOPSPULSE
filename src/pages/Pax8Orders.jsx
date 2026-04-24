@@ -43,6 +43,7 @@ export default function Pax8Orders() {
   // Mock state
   const [mockResults, setMockResults] = useState(null);
   const [mockLoading, setMockLoading] = useState(false);
+  const [mockProgress, setMockProgress] = useState(null);
 
   // Client selection
   const [selectedClientIds, setSelectedClientIds] = useState(new Set());
@@ -96,21 +97,34 @@ export default function Pax8Orders() {
 
   const cappedEligible = preflightData?.eligible?.filter(c => selectedClientIds.has(c.companyId)) || [];
 
-  // ── Step 3: Mock Orders ──
+  // ── Step 3: Mock Orders (batched from frontend to avoid timeout) ──
   async function runMockOrders() {
     if (!product?.productId || !cappedEligible.length) return;
     setMockLoading(true);
     setLiveResults([]);
     setHalted(false);
     setCumulativeCost(0);
-    const res = await base44.functions.invoke("pax8Auth", {
-      action: "mockOrders",
-      productId: product.productId,
-      eligible: cappedEligible.map(c => ({ ...c, domain: c.domain || null })),
-    });
-    if (res.data.mockResults) {
-      setMockResults(res.data.mockResults);
+    setMockResults(null);
+    setMockProgress({ current: 0, total: cappedEligible.length });
+
+    const BATCH_SIZE = 10;
+    const allResults = [];
+
+    for (let i = 0; i < cappedEligible.length; i += BATCH_SIZE) {
+      const batch = cappedEligible.slice(i, i + BATCH_SIZE);
+      const res = await base44.functions.invoke("pax8Auth", {
+        action: "mockOrders",
+        productId: product.productId,
+        eligible: batch.map(c => ({ ...c, domain: c.domain || null })),
+      });
+      if (res.data.mockResults) {
+        allResults.push(...res.data.mockResults);
+      }
+      setMockProgress({ current: Math.min(i + BATCH_SIZE, cappedEligible.length), total: cappedEligible.length });
     }
+
+    setMockResults(allResults);
+    setMockProgress(null);
     setMockLoading(false);
   }
 
@@ -341,10 +355,20 @@ export default function Pax8Orders() {
 
           {preflightData && cappedEligible.length > 0 && !mockResults && (
             <div className="flex justify-center">
-              <button onClick={runMockOrders} disabled={mockLoading} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium disabled:opacity-50">
-                <Play className="w-4 h-4" />
-                {mockLoading ? "Running Mock Orders…" : "Run Mock Orders (Dry Run)"}
-              </button>
+              <div className="flex flex-col items-center gap-2">
+                <button onClick={runMockOrders} disabled={mockLoading} className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium disabled:opacity-50">
+                  <Play className="w-4 h-4" />
+                  {mockLoading ? "Running Mock Orders…" : "Run Mock Orders (Dry Run)"}
+                </button>
+                {mockLoading && mockProgress && (
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${Math.round((mockProgress.current / mockProgress.total) * 100)}%` }} />
+                    </div>
+                    {mockProgress.current}/{mockProgress.total} processed
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
