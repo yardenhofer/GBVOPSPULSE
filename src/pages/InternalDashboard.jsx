@@ -150,9 +150,6 @@ function WorkspaceCard({ workspace, days }) {
   );
 }
 
-// Session-level cache to avoid re-fetching from DB on period switch
-const sessionCache = {};
-
 function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
@@ -167,13 +164,7 @@ export default function InternalDashboard() {
   const [specificDate, setSpecificDate] = useState(null);
 
   async function loadFromDB(d) {
-    if (sessionCache[d]) {
-      setWorkspaces(sessionCache[d].workspaces);
-      setLastUpdated(sessionCache[d].lastUpdated);
-      setLoading(false);
-      return true;
-    }
-    const records = await base44.entities.HeyReachCache.filter({ days: d }, '-created_date', 50);
+    const records = await base44.entities.HeyReachCache.filter({ days: d });
     if (!records || records.length === 0) return false;
 
     // Separate main workspace records from account chunks
@@ -205,8 +196,7 @@ export default function InternalDashboard() {
 
     mainRecords.sort((a, b) => (a.client_name || '').localeCompare(b.client_name || ''));
 
-    const syncedAt = new Date(records[0].synced_at);
-    sessionCache[d] = { workspaces: mainRecords, lastUpdated: syncedAt };
+    const syncedAt = records[0].synced_at ? new Date(records[0].synced_at) : new Date(records[0].updated_date);
     setWorkspaces(mainRecords);
     setLastUpdated(syncedAt);
     return true;
@@ -215,13 +205,6 @@ export default function InternalDashboard() {
   async function loadForDate(dateStr) {
     setLoading(true);
     setError(null);
-    const cacheKey = `date_${dateStr}`;
-    if (sessionCache[cacheKey]) {
-      setWorkspaces(sessionCache[cacheKey].workspaces);
-      setLastUpdated(sessionCache[cacheKey].lastUpdated);
-      setLoading(false);
-      return;
-    }
     const startDate = new Date(dateStr + 'T00:00:00.000Z').toISOString();
     const endDate = new Date(dateStr + 'T23:59:59.999Z').toISOString();
     try {
@@ -231,10 +214,8 @@ export default function InternalDashboard() {
         if (b.client_id === '__internal__') return 1;
         return (a.client_name || '').localeCompare(b.client_name || '');
       });
-      const updatedAt = new Date();
-      sessionCache[cacheKey] = { workspaces: ws, lastUpdated: updatedAt };
       setWorkspaces(ws);
-      setLastUpdated(updatedAt);
+      setLastUpdated(new Date());
     } catch (err) {
       setError("Failed to load data for that date: " + (err?.message || err));
     }
@@ -251,7 +232,6 @@ export default function InternalDashboard() {
 
   async function refresh() {
     setSyncing(true);
-    for (const k of Object.keys(sessionCache)) delete sessionCache[k];
     if (specificDate) {
       await loadForDate(specificDate);
     } else {
@@ -267,10 +247,8 @@ export default function InternalDashboard() {
   async function handlePeriodChange(d) {
     setSpecificDate(null);
     setDays(d);
-    setError(null);
-    // Always re-fetch from DB
-    delete sessionCache[d];
     setLoading(true);
+    setError(null);
     const hit = await loadFromDB(d);
     if (!hit) setError(`No data cached for ${d}d period yet.`);
     setLoading(false);
