@@ -12,11 +12,31 @@ function apiHeaders() {
   return { "X-API-KEY": key, "Accept": "application/json", "Content-Type": "application/json" };
 }
 
+async function fetchWithRetry(url, options, label, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, options);
+    if (res.ok) return res;
+    if (res.status === 429) {
+      const wait = attempt * 3000; // 3s, 6s, 9s backoff
+      console.log(`[RETRY] ${label}: 429 rate limited, waiting ${wait / 1000}s (attempt ${attempt}/${maxRetries})`);
+      await new Promise(r => setTimeout(r, wait));
+      continue;
+    }
+    if (attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, 1000));
+      continue;
+    }
+    throw new Error(`${label}: HTTP ${res.status}`);
+  }
+  throw new Error(`${label}: max retries exceeded`);
+}
+
 async function fetchAllCampaigns() {
-  const res = await fetch(`${API_BASE}/campaign/GetAll`, {
-    method: "POST", headers: apiHeaders(), body: JSON.stringify({})
-  });
-  if (!res.ok) throw new Error(`GetAll campaigns: HTTP ${res.status}`);
+  const res = await fetchWithRetry(
+    `${API_BASE}/campaign/GetAll`,
+    { method: "POST", headers: apiHeaders(), body: JSON.stringify({}) },
+    "GetAll campaigns"
+  );
   return (await res.json()).items || [];
 }
 
@@ -24,11 +44,11 @@ async function fetchAllLinkedInAccounts() {
   const allItems = [];
   let offset = 0;
   while (true) {
-    const res = await fetch(`${API_BASE}/li_account/GetAll`, {
-      method: "POST", headers: apiHeaders(),
-      body: JSON.stringify({ Offset: offset, Limit: 100 }),
-    });
-    if (!res.ok) break;
+    const res = await fetchWithRetry(
+      `${API_BASE}/li_account/GetAll`,
+      { method: "POST", headers: apiHeaders(), body: JSON.stringify({ Offset: offset, Limit: 100 }) },
+      `GetAll li_accounts (offset ${offset})`
+    );
     const data = await res.json();
     const items = data.items || data || [];
     if (!Array.isArray(items) || items.length === 0) break;
@@ -40,12 +60,16 @@ async function fetchAllLinkedInAccounts() {
 }
 
 async function fetchOverallStats(startDate, endDate) {
-  const res = await fetch(`${API_BASE}/stats/GetOverallStats`, {
-    method: "POST", headers: apiHeaders(),
-    body: JSON.stringify({ AccountIds: [], CampaignIds: [], StartDate: startDate, EndDate: endDate }),
-  });
-  if (!res.ok) return null;
-  return await res.json();
+  try {
+    const res = await fetchWithRetry(
+      `${API_BASE}/stats/GetOverallStats`,
+      { method: "POST", headers: apiHeaders(), body: JSON.stringify({ AccountIds: [], CampaignIds: [], StartDate: startDate, EndDate: endDate }) },
+      "GetOverallStats"
+    );
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 function buildWorkspaces(campaigns, senderAccounts, globalStats) {
