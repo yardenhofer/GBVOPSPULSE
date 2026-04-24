@@ -252,7 +252,7 @@ Deno.serve(async (req) => {
       await savePeriod(base44, days, trimmed, syncedAt);
     }
 
-    console.log(`[SYNC-ALL] All periods saved successfully`);
+    console.log(`[SYNC-ALL] All periods saved`);
     return Response.json({ success: true, periods: ALL_PERIODS.length, campaigns: campaigns.length, accounts: senderAccounts.length });
   } catch (err) {
     console.error(`[SYNC-ALL] Fatal: ${err.message}`);
