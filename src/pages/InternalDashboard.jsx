@@ -176,19 +176,42 @@ export default function InternalDashboard() {
     const records = await base44.entities.HeyReachCache.filter({ days: d });
     if (!records || records.length === 0) return false;
 
-    const ws = records
-      .filter(r => r.workspace_data)
-      .map(r => JSON.parse(r.workspace_data));
+    // Separate main workspace records from account chunks
+    const mainRecords = [];
+    const accountChunks = [];
+    for (const r of records) {
+      if (!r.workspace_data) continue;
+      const parsed = JSON.parse(r.workspace_data);
+      if (parsed._type === "accounts_chunk") {
+        accountChunks.push(parsed);
+      } else {
+        mainRecords.push(parsed);
+      }
+    }
 
-    ws.sort((a, b) => {
+    // Merge account chunks into their parent workspace
+    for (const ws of mainRecords) {
+      const chunks = accountChunks.filter(c => c.parent_client_id === ws.client_id);
+      if (chunks.length > 0) {
+        const mergedAccounts = [];
+        for (const chunk of chunks) {
+          mergedAccounts.push(...(chunk.accounts || []));
+        }
+        ws.accounts = mergedAccounts;
+        ws.summary = ws.summary || {};
+        ws.summary.total_accounts = mergedAccounts.length;
+      }
+    }
+
+    mainRecords.sort((a, b) => {
       if (a.client_id === '__internal__') return -1;
       if (b.client_id === '__internal__') return 1;
       return (a.client_name || '').localeCompare(b.client_name || '');
     });
 
     const syncedAt = new Date(records[0].synced_at);
-    sessionCache[d] = { workspaces: ws, lastUpdated: syncedAt };
-    setWorkspaces(ws);
+    sessionCache[d] = { workspaces: mainRecords, lastUpdated: syncedAt };
+    setWorkspaces(mainRecords);
     setLastUpdated(syncedAt);
     return true;
   }
