@@ -44,17 +44,22 @@ async function fetchAllLinkedInAccounts() {
   const allItems = [];
   let offset = 0;
   while (true) {
-    const res = await fetchWithRetry(
-      `${API_BASE}/li_account/GetAll`,
-      { method: "POST", headers: apiHeaders(), body: JSON.stringify({ Offset: offset, Limit: 100 }) },
-      `GetAll li_accounts (offset ${offset})`
-    );
-    const data = await res.json();
-    const items = data.items || data || [];
-    if (!Array.isArray(items) || items.length === 0) break;
-    allItems.push(...items);
-    if (items.length < 100) break;
-    offset += 100;
+    try {
+      const res = await fetchWithRetry(
+        `${API_BASE}/li_account/GetAll`,
+        { method: "POST", headers: apiHeaders(), body: JSON.stringify({ Offset: offset, Limit: 100 }) },
+        `GetAll li_accounts (offset ${offset})`
+      );
+      const data = await res.json();
+      const items = data.items || data || [];
+      if (!Array.isArray(items) || items.length === 0) break;
+      allItems.push(...items);
+      if (items.length < 100) break;
+      offset += 100;
+    } catch (err) {
+      console.log(`[SYNC] li_account pagination failed at offset ${offset} after retries: ${err.message}. Got ${allItems.length} accounts so far.`);
+      break;
+    }
   }
   return allItems;
 }
