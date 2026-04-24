@@ -154,6 +154,9 @@ function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
+// Session cache — survives tab switches, cleared on manual reload
+const cache = {};
+
 export default function InternalDashboard() {
   const [workspaces, setWorkspaces] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -163,41 +166,22 @@ export default function InternalDashboard() {
   const [syncing, setSyncing] = useState(false);
   const [specificDate, setSpecificDate] = useState(null);
 
-  async function loadFromDB(d) {
-    const records = await base44.entities.HeyReachCache.filter({ days: d });
-    if (!records || records.length === 0) return false;
-
-    // Separate main workspace records from account chunks
-    const mainRecords = [];
-    const accountChunks = [];
-    for (const r of records) {
-      if (!r.workspace_data) continue;
-      const parsed = JSON.parse(r.workspace_data);
-      if (parsed._type === "accounts_chunk") {
-        accountChunks.push(parsed);
-      } else {
-        mainRecords.push(parsed);
-      }
+  async function fetchPeriod(d, skipCache) {
+    // Check session cache first (data is max 30 min old from background sync)
+    if (!skipCache && cache[d]) {
+      setWorkspaces(cache[d].workspaces);
+      setLastUpdated(cache[d].syncedAt);
+      return true;
     }
 
-    // Merge account chunks into their parent workspace
-    for (const ws of mainRecords) {
-      const chunks = accountChunks.filter(c => c.parent_client_id === ws.client_id);
-      if (chunks.length > 0) {
-        const mergedAccounts = [];
-        for (const chunk of chunks) {
-          mergedAccounts.push(...(chunk.accounts || []));
-        }
-        ws.accounts = mergedAccounts;
-        ws.summary = ws.summary || {};
-        ws.summary.total_accounts = mergedAccounts.length;
-      }
-    }
+    // Use backend function to read + assemble the cached data server-side
+    const resp = await base44.functions.invoke('heyReachGetCached', { days: d });
+    const data = resp.data;
+    if (!data?.workspaces || data.workspaces.length === 0) return false;
 
-    mainRecords.sort((a, b) => (a.client_name || '').localeCompare(b.client_name || ''));
-
-    const syncedAt = records[0].synced_at ? new Date(records[0].synced_at) : new Date(records[0].updated_date);
-    setWorkspaces(mainRecords);
+    const syncedAt = data.synced_at ? new Date(data.synced_at) : null;
+    cache[d] = { workspaces: data.workspaces, syncedAt };
+    setWorkspaces(data.workspaces);
     setLastUpdated(syncedAt);
     return true;
   }
@@ -205,6 +189,13 @@ export default function InternalDashboard() {
   async function loadForDate(dateStr) {
     setLoading(true);
     setError(null);
+    const cacheKey = `date_${dateStr}`;
+    if (cache[cacheKey]) {
+      setWorkspaces(cache[cacheKey].workspaces);
+      setLastUpdated(cache[cacheKey].syncedAt);
+      setLoading(false);
+      return;
+    }
     const startDate = new Date(dateStr + 'T00:00:00.000Z').toISOString();
     const endDate = new Date(dateStr + 'T23:59:59.999Z').toISOString();
     try {
@@ -214,18 +205,20 @@ export default function InternalDashboard() {
         if (b.client_id === '__internal__') return 1;
         return (a.client_name || '').localeCompare(b.client_name || '');
       });
+      const syncedAt = new Date();
+      cache[cacheKey] = { workspaces: ws, syncedAt };
       setWorkspaces(ws);
-      setLastUpdated(new Date());
+      setLastUpdated(syncedAt);
     } catch (err) {
       setError("Failed to load data for that date: " + (err?.message || err));
     }
     setLoading(false);
   }
 
-  async function load(d) {
+  async function load(d, skipCache) {
     setLoading(true);
     setError(null);
-    const hit = await loadFromDB(d);
+    const hit = await fetchPeriod(d, skipCache);
     if (!hit) setError("No data cached yet — the background sync runs every 30 minutes. Please check back shortly.");
     setLoading(false);
   }
@@ -233,9 +226,10 @@ export default function InternalDashboard() {
   async function refresh() {
     setSyncing(true);
     if (specificDate) {
+      delete cache[`date_${specificDate}`];
       await loadForDate(specificDate);
     } else {
-      await load(days);
+      await load(days, true);
     }
     setSyncing(false);
   }
@@ -249,7 +243,7 @@ export default function InternalDashboard() {
     setDays(d);
     setLoading(true);
     setError(null);
-    const hit = await loadFromDB(d);
+    const hit = await fetchPeriod(d);
     if (!hit) setError(`No data cached for ${d}d period yet.`);
     setLoading(false);
   }
