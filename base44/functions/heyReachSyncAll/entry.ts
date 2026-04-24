@@ -183,35 +183,40 @@ async function savePeriod(base44, days, workspace, syncedAt) {
   // Load existing cache to preserve enriched per-account stats
   const existing = await base44.asServiceRole.entities.HeyReachCache.filter({ days });
   
-  // Build a map of existing enriched account stats
-  const enrichedStatsMap = {};
-  for (const rec of existing) {
-    if (!rec.workspace_data) continue;
-    try {
-      const parsed = JSON.parse(rec.workspace_data);
-      if (parsed._type === "accounts_chunk") {
-        for (const acc of (parsed.accounts || [])) {
-          if (acc._enriched) {
-            enrichedStatsMap[acc.id] = { connections: acc.connections, inmails: acc.inmails, messages: acc.messages };
+  // For days=1 ("Today"), do NOT preserve old enriched stats — they cover a different
+  // time window and would show stale per-account numbers in the leaderboard/chart.
+  // Only preserve enriched stats for longer periods (7d+).
+  if (days > 1) {
+    const enrichedStatsMap = {};
+    for (const rec of existing) {
+      if (!rec.workspace_data) continue;
+      try {
+        const parsed = JSON.parse(rec.workspace_data);
+        if (parsed._type === "accounts_chunk") {
+          for (const acc of (parsed.accounts || [])) {
+            if (acc._enriched) {
+              enrichedStatsMap[acc.id] = { connections: acc.connections, inmails: acc.inmails, messages: acc.messages };
+            }
           }
         }
-      }
-    } catch {}
-  }
+      } catch {}
+    }
 
-  // Merge enriched stats back into new workspace accounts
-  const enrichedCount = Object.keys(enrichedStatsMap).length;
-  if (enrichedCount > 0) {
-    console.log(`[SYNC-ALL] Preserving enriched stats for ${enrichedCount} accounts (${days}d)`);
-    for (const acc of (workspace.accounts || [])) {
-      const es = enrichedStatsMap[acc.id];
-      if (es) {
-        acc.connections = es.connections;
-        acc.inmails = es.inmails;
-        acc.messages = es.messages;
-        acc._enriched = true;
+    const enrichedCount = Object.keys(enrichedStatsMap).length;
+    if (enrichedCount > 0) {
+      console.log(`[SYNC-ALL] Preserving enriched stats for ${enrichedCount} accounts (${days}d)`);
+      for (const acc of (workspace.accounts || [])) {
+        const es = enrichedStatsMap[acc.id];
+        if (es) {
+          acc.connections = es.connections;
+          acc.inmails = es.inmails;
+          acc.messages = es.messages;
+          acc._enriched = true;
+        }
       }
     }
+  } else {
+    console.log(`[SYNC-ALL] Skipping enriched stats preservation for 1d (today-only window)`);
   }
 
   // Delete old records
