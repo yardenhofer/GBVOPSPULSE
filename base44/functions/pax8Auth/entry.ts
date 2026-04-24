@@ -609,7 +609,7 @@ Deno.serve(async (req) => {
     return Response.json({ results, found: results.filter(r => r.found).length, notFound: results.filter(r => !r.found).length });
   }
 
-  // ── deleteCompanies (remove companies by ID) ──
+  // ── deleteCompanies (set company status to Deleted via PATCH) ──
   if (action === "deleteCompanies") {
     const { companies } = body;
     if (!companies || !Array.isArray(companies)) return Response.json({ error: "companies array required" });
@@ -618,23 +618,40 @@ Deno.serve(async (req) => {
     const results = [];
 
     for (const company of companies) {
+      // First fetch the current company data (required for PATCH)
+      let current;
+      try {
+        current = await pax8Get(token, `/companies/${company.companyId}`);
+      } catch (e) {
+        results.push({ companyId: company.companyId, companyName: company.companyName, status: "failed", httpStatus: 0, error: `Fetch failed: ${e.message}` });
+        continue;
+      }
+
+      // PATCH with status: "Deleted"
+      const patchBody = { ...current, status: "Deleted" };
+      delete patchBody.id;
+      delete patchBody.updatedDate;
+      delete patchBody.createdDate;
+
       const url = `${PAX8_API_BASE}/companies/${company.companyId}`;
       const res = await fetch(url, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(patchBody),
       });
       const text = await res.text();
       let json;
       try { json = JSON.parse(text); } catch { json = null; }
 
-      console.log(`[DELETE] ${company.companyName}: status=${res.status}`);
+      const newStatus = json?.status;
+      console.log(`[DELETE] ${company.companyName}: httpStatus=${res.status}, newStatus=${newStatus}`);
 
       results.push({
         companyId: company.companyId,
         companyName: company.companyName,
-        status: res.ok || res.status === 204 ? "deleted" : "failed",
+        status: res.ok && newStatus === "Deleted" ? "deleted" : res.ok ? "deleted" : "failed",
         httpStatus: res.status,
-        error: res.ok || res.status === 204 ? null : (json?.message || text || `HTTP ${res.status}`),
+        error: res.ok ? null : (json?.message || text || `HTTP ${res.status}`),
       });
 
       await new Promise(r => setTimeout(r, 300));
