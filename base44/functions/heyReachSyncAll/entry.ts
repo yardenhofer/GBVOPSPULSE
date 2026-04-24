@@ -180,8 +180,41 @@ function trimForStorage(wsData) {
 }
 
 async function savePeriod(base44, days, workspace, syncedAt) {
-  // Delete old records for this period
+  // Load existing cache to preserve enriched per-account stats
   const existing = await base44.asServiceRole.entities.HeyReachCache.filter({ days });
+  
+  // Build a map of existing enriched account stats
+  const enrichedStatsMap = {};
+  for (const rec of existing) {
+    if (!rec.workspace_data) continue;
+    try {
+      const parsed = JSON.parse(rec.workspace_data);
+      if (parsed._type === "accounts_chunk") {
+        for (const acc of (parsed.accounts || [])) {
+          if (acc._enriched) {
+            enrichedStatsMap[acc.id] = { connections: acc.connections, inmails: acc.inmails, messages: acc.messages };
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // Merge enriched stats back into new workspace accounts
+  const enrichedCount = Object.keys(enrichedStatsMap).length;
+  if (enrichedCount > 0) {
+    console.log(`[SYNC-ALL] Preserving enriched stats for ${enrichedCount} accounts (${days}d)`);
+    for (const acc of (workspace.accounts || [])) {
+      const es = enrichedStatsMap[acc.id];
+      if (es) {
+        acc.connections = es.connections;
+        acc.inmails = es.inmails;
+        acc.messages = es.messages;
+        acc._enriched = true;
+      }
+    }
+  }
+
+  // Delete old records
   for (const rec of existing) {
     await base44.asServiceRole.entities.HeyReachCache.delete(rec.id);
   }
