@@ -173,7 +173,7 @@ export default function InternalDashboard() {
       setLoading(false);
       return true;
     }
-    const records = await base44.entities.HeyReachCache.filter({ days: d });
+    const records = await base44.entities.HeyReachCache.filter({ days: d }, '-created_date', 50);
     if (!records || records.length === 0) return false;
 
     // Separate main workspace records from account chunks
@@ -203,11 +203,7 @@ export default function InternalDashboard() {
       }
     }
 
-    mainRecords.sort((a, b) => {
-      if (a.client_id === '__internal__') return -1;
-      if (b.client_id === '__internal__') return 1;
-      return (a.client_name || '').localeCompare(b.client_name || '');
-    });
+    mainRecords.sort((a, b) => (a.client_name || '').localeCompare(b.client_name || ''));
 
     const syncedAt = new Date(records[0].synced_at);
     sessionCache[d] = { workspaces: mainRecords, lastUpdated: syncedAt };
@@ -249,7 +245,7 @@ export default function InternalDashboard() {
     setLoading(true);
     setError(null);
     const hit = await loadFromDB(d);
-    if (!hit) setError("No data cached yet — the background sync runs every 15 minutes. Please check back shortly.");
+    if (!hit) setError("No data cached yet — the background sync runs every 30 minutes. Please check back shortly.");
     setLoading(false);
   }
 
@@ -271,14 +267,12 @@ export default function InternalDashboard() {
   async function handlePeriodChange(d) {
     setSpecificDate(null);
     setDays(d);
-    if (sessionCache[d]) {
-      setWorkspaces(sessionCache[d].workspaces);
-      setLastUpdated(sessionCache[d].lastUpdated);
-      return;
-    }
+    setError(null);
+    // Always re-fetch from DB
+    delete sessionCache[d];
     setLoading(true);
     const hit = await loadFromDB(d);
-    if (!hit) setError("No data cached for this period yet.");
+    if (!hit) setError(`No data cached for ${d}d period yet.`);
     setLoading(false);
   }
 
