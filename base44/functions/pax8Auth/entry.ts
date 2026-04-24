@@ -585,6 +585,30 @@ Deno.serve(async (req) => {
     return Response.json({ results, totalPatched: results.filter(r => r.status === "success").length, totalFailed: results.filter(r => r.status === "failed").length });
   }
 
+  // ── findCompaniesByName (look up Pax8 company IDs from names) ──
+  if (action === "findCompaniesByName") {
+    const { names } = body;
+    if (!names || !Array.isArray(names)) return Response.json({ error: "names array required" });
+
+    const token = await getPax8Token();
+    const allCompanies = await pax8GetAll(token, "/companies", {}, 50);
+    const results = [];
+
+    for (const name of names) {
+      const trimmed = name.trim();
+      if (!trimmed) continue;
+      const match = allCompanies.find(c => c.name && c.name.trim().toLowerCase() === trimmed.toLowerCase());
+      results.push({
+        name: trimmed,
+        found: !!match,
+        companyId: match?.id || null,
+        companyName: match?.name || trimmed,
+      });
+    }
+
+    return Response.json({ results, found: results.filter(r => r.found).length, notFound: results.filter(r => !r.found).length });
+  }
+
   // ── deleteCompanies (remove companies by ID) ──
   if (action === "deleteCompanies") {
     const { companies } = body;
