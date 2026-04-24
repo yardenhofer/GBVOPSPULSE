@@ -264,8 +264,17 @@ Deno.serve(async (req) => {
       // Delay between periods to avoid rate limits
       await new Promise(r => setTimeout(r, DELAY_BETWEEN_PERIODS));
 
-      const start = new Date(now.getTime() - days * 86400000).toISOString();
-      const end = now.toISOString();
+      let start, end;
+      if (days === 1) {
+        // "Today" = midnight UTC today → now (don't bleed into yesterday)
+        const todayMidnight = new Date(now);
+        todayMidnight.setUTCHours(0, 0, 0, 0);
+        start = todayMidnight.toISOString();
+        end = now.toISOString();
+      } else {
+        start = new Date(now.getTime() - days * 86400000).toISOString();
+        end = now.toISOString();
+      }
 
       console.log(`[SYNC-ALL] Fetching stats for ${days}d period...`);
       const globalStats = await fetchOverallStats(start, end, `GetOverallStats ${days}d`);
