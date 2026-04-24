@@ -190,12 +190,32 @@ export default function InternalDashboard() {
     setLoading(true);
     setError(null);
     const cacheKey = `date_${dateStr}`;
+
+    // 1. Check in-memory session cache
     if (cache[cacheKey]) {
       setWorkspaces(cache[cacheKey].workspaces);
       setLastUpdated(cache[cacheKey].syncedAt);
       setLoading(false);
       return;
     }
+
+    // 2. Check server-side daily snapshot (instant for past dates)
+    try {
+      const snapResp = await base44.functions.invoke('heyReachGetDaily', { date: dateStr });
+      if (snapResp.data?.workspaces) {
+        const ws = snapResp.data.workspaces;
+        const syncedAt = snapResp.data.synced_at ? new Date(snapResp.data.synced_at) : null;
+        cache[cacheKey] = { workspaces: ws, syncedAt };
+        setWorkspaces(ws);
+        setLastUpdated(syncedAt);
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // Snapshot not available, fall through to live fetch
+    }
+
+    // 3. Fallback: fetch live from HeyReach API (only for dates with no snapshot)
     const startDate = new Date(dateStr + 'T00:00:00.000Z').toISOString();
     const endDate = new Date(dateStr + 'T23:59:59.999Z').toISOString();
     try {
@@ -260,13 +280,10 @@ export default function InternalDashboard() {
   }
 
   function handleTodayClick() {
-    if (specificDate) {
-      setSpecificDate(todayStr());
-      setDays(null);
-      loadForDate(todayStr());
-    } else {
-      handlePeriodChange(1);
-    }
+    // Always go back to the period-1d cached view (no API call needed if cached)
+    setSpecificDate(null);
+    setDays(1);
+    load(1);
   }
 
   const totalAccounts = workspaces.reduce((s, w) => s + (w.summary?.total_accounts || 0), 0);

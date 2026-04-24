@@ -1,0 +1,30 @@
+{
+  "name": "HeyReachDailySnapshot",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "description": "Date string YYYY-MM-DD"
+    },
+    "workspace_data": {
+      "type": "string",
+      "description": "JSON-stringified workspace array for this date"
+    },
+    "snapshot_type": {
+      "type": "string",
+      "enum": [
+        "summary",
+        "accounts_chunk"
+      ],
+      "default": "summary",
+      "description": "Whether this is the main summary or an accounts chunk"
+    },
+    "chunk_index": {
+      "type": "number",
+      "description": "Chunk index for accounts_chunk type"
+    }
+  },
+  "required": [
+    "date"
+  ]
+}
