@@ -106,6 +106,9 @@ Deno.serve(async (req) => {
       }
 
       // Update the account chunk records
+      // Wrapped in try/catch per-record because the sync function may have
+      // deleted and recreated cache records while we were fetching stats (race condition).
+      let updatedCount = 0;
       for (const rec of chunkRecords) {
         const data = JSON.parse(rec.workspace_data);
         let changed = false;
@@ -115,19 +118,24 @@ Deno.serve(async (req) => {
             acc.connections = s._empty ? 0 : (s.connectionsSent || 0);
             acc.inmails = s._empty ? 0 : (s.totalInmailStarted || s.inmailMessagesSent || 0);
             acc.messages = s._empty ? 0 : (s.totalMessageStarted || s.messagesSent || 0);
-            // Mark as enriched even if zero, so we don't re-fetch
             acc._enriched = true;
             changed = true;
           }
         }
         if (changed) {
-          await base44.asServiceRole.entities.HeyReachCache.update(rec.id, {
-            workspace_data: JSON.stringify(data),
-          });
+          try {
+            await base44.asServiceRole.entities.HeyReachCache.update(rec.id, {
+              workspace_data: JSON.stringify(data),
+            });
+            updatedCount++;
+          } catch (updateErr) {
+            // Record was deleted by a concurrent sync — skip, next run will use new records
+            console.log(`[ENRICH-${days}d] Skipped stale record ${rec.id}: ${updateErr.message}`);
+          }
         }
       }
 
-      console.log(`[ENRICH-${days}d] Updated chunk records`);
+      console.log(`[ENRICH-${days}d] Updated ${updatedCount}/${chunkRecords.length} chunk records`);
     }
 
     return Response.json({ success: true });
