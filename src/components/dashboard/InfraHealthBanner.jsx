@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { AlertTriangle, ChevronDown, ChevronUp, X } from "lucide-react";
 
-const THRESHOLD_PCT = 10;
+const THRESHOLD_PCT = 5;
 const DISMISSED_KEY = "infra_health_dismissed";
 
 function getDismissed() {
