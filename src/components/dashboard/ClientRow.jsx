@@ -46,12 +46,12 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
       )}
 
-      <div className="px-4 py-5 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[minmax(220px,1.5fr)_90px_120px_80px_100px_90px_90px_90px_auto] lg:gap-4 lg:items-start">
+      <div className="px-4 py-3 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[minmax(220px,1.5fr)_90px_120px_80px_100px_90px_90px_90px_auto] lg:gap-4 items-center">
         {/* Name + AM */}
         <div className="min-w-0">
           <div>
             <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
-            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+            <div className="flex items-center gap-1 mt-0.5 overflow-hidden max-h-5">
               {(() => {
                 const ref = client.start_date
                   ? new Date(client.start_date + "T00:00:00")
@@ -92,14 +92,14 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
 
         {/* Package */}
-        <div className="hidden lg:flex items-center pt-0.5">
+        <div className="hidden lg:flex items-center">
           <span className={`inline-flex text-xs font-medium px-2 py-0.5 rounded-full ${pkgCfg.bg} ${pkgCfg.color}`}>
             {client.package_type || "—"}
           </span>
         </div>
 
         {/* Status badge */}
-        <div className="hidden lg:flex items-center pt-0.5">
+        <div className="hidden lg:flex items-center">
           <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border} ${STATUS_GLOW[status]}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
             {status}
@@ -107,7 +107,7 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
 
         {/* Sequence % */}
-        <div className="hidden lg:flex items-start justify-center pt-0.5">
+        <div className="hidden lg:flex items-center justify-center">
           {client.instantly_api_key ? (
             instantlyError ? (
               <div className="flex flex-col items-center gap-0.5 flag-chip" data-tip={instantlyError}>
@@ -144,7 +144,7 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
 
         {/* Leads this week */}
-        <div className="hidden lg:flex lg:flex-col lg:items-end pt-0.5">
+        <div className="hidden lg:flex lg:flex-col lg:items-end">
           <p className="text-sm font-bold text-gray-900 dark:text-white">{client.leads_this_week ?? "—"}</p>
           <p className="text-xs text-gray-500">
             {leadsChange !== null ? (
@@ -156,12 +156,12 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
 
         {/* Sentiment */}
-        <div className={`hidden lg:inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full mt-0.5 ${sentCfg.bg} ${sentCfg.color}`}>
+        <div className={`hidden lg:inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${sentCfg.bg} ${sentCfg.color}`}>
           {sentCfg.emoji} {client.client_sentiment?.split(" ").slice(-1)[0] || "—"}
         </div>
 
         {/* Last touchpoint */}
-        <div className="hidden lg:flex lg:justify-end pt-0.5">
+        <div className="hidden lg:flex lg:justify-end">
           {touchpointDays !== null ? (
             <span className={`text-xs font-medium ${touchpointDays >= 5 ? "text-red-400" : touchpointDays >= 3 ? "text-yellow-400" : "text-gray-400"}`}>
               {touchpointDays}d ago
@@ -170,7 +170,7 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
 
         {/* Waiting */}
-        <div className="hidden lg:flex lg:justify-center pt-0.5">
+        <div className="hidden lg:flex lg:justify-center">
           {client.waiting_on_leads ? (
             <span className="text-xs font-semibold text-orange-400">
               {client.waiting_since ? `${differenceInDays(today, new Date(client.waiting_since + "T00:00:00"))}d` : "Yes"}
