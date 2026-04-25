@@ -47,39 +47,37 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
       )}
 
       <div className="px-4 py-3 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[minmax(220px,1.5fr)_90px_120px_80px_100px_90px_90px_90px_auto] lg:gap-4 items-center">
-        {/* Name + AM */}
-        <div className="min-w-0">
-          <div>
-            <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
-            <div className="flex items-center gap-1 mt-0.5 overflow-hidden max-h-5">
-              {(() => {
-                const ref = client.start_date
-                  ? new Date(client.start_date + "T00:00:00")
-                  : client.created_date ? new Date(client.created_date) : null;
-                return ref && differenceInDays(today, ref) <= 10;
-              })() && (
-                <span className="shrink-0 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Sparkles className="w-2.5 h-2.5" />NEW
-                </span>
-              )}
-              {client.group != null && (
-                <span className="shrink-0 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full">G{client.group}</span>
-              )}
-              {client.instantly_api_key && (
-                <span className="shrink-0 text-[10px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Zap className="w-2.5 h-2.5" />Instantly
-                </span>
-              )}
-              {isOnboardingStageVisible(client) && (
-                <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  client.onboarding_stage === "Infrastructure Live"
-                    ? "text-green-400 bg-green-500/10"
-                    : "text-blue-400 bg-blue-500/10"
-                }`}>
-                  {client.onboarding_stage?.replace("Infrastructure ", "") || ""}
-                </span>
-              )}
-            </div>
+        {/* Name + AM — fixed height so all rows are identical */}
+        <div className="min-w-0 lg:h-[52px] lg:flex lg:flex-col lg:justify-center overflow-hidden">
+          <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
+          <div className="flex items-center gap-1 mt-0.5">
+            {(() => {
+              const ref = client.start_date
+                ? new Date(client.start_date + "T00:00:00")
+                : client.created_date ? new Date(client.created_date) : null;
+              return ref && differenceInDays(today, ref) <= 10;
+            })() && (
+              <span className="shrink-0 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                <Sparkles className="w-2.5 h-2.5" />NEW
+              </span>
+            )}
+            {client.group != null && (
+              <span className="shrink-0 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full">G{client.group}</span>
+            )}
+            {client.instantly_api_key && (
+              <span className="shrink-0 text-[10px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                <Zap className="w-2.5 h-2.5" />Instantly
+              </span>
+            )}
+            {isOnboardingStageVisible(client) && (
+              <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                client.onboarding_stage === "Infrastructure Live"
+                  ? "text-green-400 bg-green-500/10"
+                  : "text-blue-400 bg-blue-500/10"
+              }`}>
+                {client.onboarding_stage?.replace("Infrastructure ", "") || ""}
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
             {client.assigned_am || "—"}
