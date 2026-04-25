@@ -275,6 +275,7 @@ export default function Dashboard() {
             isOwn={user?.email === c.assigned_am}
             onClick={() => navigate(createPageUrl(`ClientDetail?id=${c.id}`))}
             instantlyResult={getCachedInstantlyResult(c)}
+            sortBy={filters.sort}
           />
         ))}
       </div>

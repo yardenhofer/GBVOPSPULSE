@@ -12,7 +12,7 @@ const STATUS_GLOW = {
   Terminated: "status-glow-critical",
 };
 
-export default function ClientRow({ client, flags, status, isOwn, onClick, instantlyResult }) {
+export default function ClientRow({ client, flags, status, isOwn, onClick, instantlyResult, sortBy }) {
   const seqPct = instantlyResult?.pct;
   const instantlyError = instantlyResult?.error;
   const noActive = instantlyResult?.noActive;
@@ -79,7 +79,14 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.assigned_am || "—"}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.assigned_am || "—"}</p>
+            {(sortBy === "revenue_desc" || sortBy === "revenue_asc") && (
+              <span className="text-[10px] font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-full shrink-0">
+                {client.revenue ? `$${client.revenue.toLocaleString()}/mo` : "No rev"}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Package */}
