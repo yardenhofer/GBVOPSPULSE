@@ -7,6 +7,7 @@ import { differenceInDays } from "date-fns";
 
 import SummaryBar from "../components/dashboard/SummaryBar";
 import SlackAuthBanner from "../components/dashboard/SlackAuthBanner";
+import InfraHealthBanner from "../components/dashboard/InfraHealthBanner";
 import ClientFilters from "../components/dashboard/ClientFilters";
 import ClientRow from "../components/dashboard/ClientRow";
 import ClientTableHeader from "../components/dashboard/ClientTableHeader";
@@ -159,6 +160,9 @@ export default function Dashboard() {
 
       {/* Slack auth warning (admin only) */}
       {user?.role === "admin" && <SlackAuthBanner />}
+
+      {/* Infra health alert — clients with ≥10% Instantly inboxes disconnected */}
+      <InfraHealthBanner />
 
       {/* Summary */}
       <SummaryBar clients={activeClients} computeAutoStatus={computeAutoStatus} />
