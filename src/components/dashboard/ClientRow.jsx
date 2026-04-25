@@ -46,11 +46,11 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
       )}
 
-      <div className="px-4 py-3 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[1fr_80px_100px_70px_80px_90px_80px_70px_auto] lg:gap-3 items-center lg:h-[72px]">
+      <div className="px-4 py-3 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[minmax(0,1fr)_80px_100px_70px_80px_90px_80px_70px_auto] lg:gap-3 items-center lg:h-[72px]">
         {/* Name + AM */}
         <div className="min-w-0 overflow-hidden">
           <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
-          <div className="flex items-center gap-1 mt-0.5 overflow-hidden">
+          <div className="flex items-center gap-1 mt-0.5 overflow-hidden flex-nowrap">
             {(() => {
               const ref = client.start_date
                 ? new Date(client.start_date + "T00:00:00")
