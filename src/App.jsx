@@ -10,7 +10,6 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import LeadListApprovals from './pages/LeadListApprovals';
 import Pax8Orders from './pages/Pax8Orders';
 import InternalDashboard from './pages/InternalDashboard';
-import AIAssistant from './pages/AIAssistant';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -75,11 +74,6 @@ const AuthenticatedApp = () => {
       <Route path="/InternalDashboard" element={
         <LayoutWrapper currentPageName="InternalDashboard">
           <InternalDashboard />
-        </LayoutWrapper>
-      } />
-      <Route path="/AIAssistant" element={
-        <LayoutWrapper currentPageName="AIAssistant">
-          <AIAssistant />
         </LayoutWrapper>
       } />
       <Route path="*" element={<PageNotFound />} />
