@@ -86,14 +86,6 @@ export default function Dashboard() {
         if (filters.sequence === "red_orange" && !(pct != null && pct >= 60)) return false;
         if (filters.sequence === "green" && !(pct != null && pct < 60)) return false;
       }
-      if (filters.revenue && filters.revenue !== "All") {
-        const rev = c.revenue;
-        if (filters.revenue === "5000+" && !(rev != null && rev >= 5000)) return false;
-        if (filters.revenue === "3000-4999" && !(rev != null && rev >= 3000 && rev < 5000)) return false;
-        if (filters.revenue === "1000-2999" && !(rev != null && rev >= 1000 && rev < 3000)) return false;
-        if (filters.revenue === "under1000" && !(rev != null && rev > 0 && rev < 1000)) return false;
-        if (filters.revenue === "none" && rev != null && rev > 0) return false;
-      }
       if (filters.newClient && filters.newClient !== "All") {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -131,6 +123,8 @@ export default function Dashboard() {
         const pb = getCachedInstantlyResult(b)?.pct ?? -1;
         return pb - pa;
       }
+      if (filters.sort === "revenue_desc") return (b.revenue || 0) - (a.revenue || 0);
+      if (filters.sort === "revenue_asc") return (a.revenue || 0) - (b.revenue || 0);
       if (filters.sort === "am") return (a.assigned_am || "").localeCompare(b.assigned_am || "");
       if (filters.sort === "leads_drop") {
         const da = (a.target_leads_per_week || 1) > 0

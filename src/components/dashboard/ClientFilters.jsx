@@ -6,6 +6,8 @@ const SORT_OPTIONS = [
   { value: "risk", label: "Risk Level" },
   { value: "am", label: "Account Manager" },
   { value: "leads_drop", label: "Lead Volume Drop" },
+  { value: "revenue_desc", label: "Revenue ↓ High→Low" },
+  { value: "revenue_asc", label: "Revenue ↑ Low→High" },
   { value: "name", label: "Client Name" },
 ];
 
@@ -38,14 +40,7 @@ const SEQUENCE_OPTIONS = [
   { value: "green", label: "🟢 Healthy (<60%)" },
 ];
 
-const REVENUE_OPTIONS = [
-  { value: "All", label: "All Revenue" },
-  { value: "5000+", label: "$5,000+" },
-  { value: "3000-4999", label: "$3,000–$4,999" },
-  { value: "1000-2999", label: "$1,000–$2,999" },
-  { value: "under1000", label: "Under $1,000" },
-  { value: "none", label: "No Revenue Set" },
-];
+
 
 function FilterPill({ value, options, onChange, icon: Icon }) {
   const selected = options.find(o => o.value === value) || options[0];
@@ -126,13 +121,6 @@ export default function ClientFilters({ filters, onFiltersChange, groups = [] })
         value={filters.sequence || "All"}
         options={SEQUENCE_OPTIONS}
         onChange={v => onFiltersChange({ ...filters, sequence: v })}
-      />
-
-      {/* Revenue */}
-      <FilterPill
-        value={filters.revenue || "All"}
-        options={REVENUE_OPTIONS}
-        onChange={v => onFiltersChange({ ...filters, revenue: v })}
       />
 
       {/* Group */}
