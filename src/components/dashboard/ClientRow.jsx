@@ -142,9 +142,9 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
 
         {/* Leads this week */}
-        <div className="hidden lg:flex lg:flex-col lg:items-end">
-          <p className="text-sm font-bold text-gray-900 dark:text-white">{client.leads_this_week ?? "—"}</p>
-          <p className="text-xs text-gray-500">
+        <div className="hidden lg:flex lg:flex-col lg:items-end lg:overflow-hidden">
+          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{client.leads_this_week ?? "—"}</p>
+          <p className="text-xs text-gray-500 truncate">
             {leadsChange !== null ? (
               <span className={leadsChange < 0 ? "text-red-400" : leadsChange > 0 ? "text-green-400" : "text-gray-400"}>
                 {leadsChange > 0 ? "+" : ""}{leadsChange}%
@@ -154,21 +154,23 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
 
         {/* Sentiment */}
-        <div className={`hidden lg:inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${sentCfg.bg} ${sentCfg.color}`}>
-          {sentCfg.emoji} {client.client_sentiment?.split(" ").slice(-1)[0] || "—"}
+        <div className="hidden lg:flex items-center overflow-hidden">
+          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${sentCfg.bg} ${sentCfg.color}`}>
+            {sentCfg.emoji} {client.client_sentiment?.split(" ").slice(-1)[0] || "—"}
+          </span>
         </div>
 
         {/* Last touchpoint */}
-        <div className="hidden lg:flex lg:justify-end">
+        <div className="hidden lg:flex lg:justify-end lg:overflow-hidden">
           {touchpointDays !== null ? (
-            <span className={`text-xs font-medium ${touchpointDays >= 5 ? "text-red-400" : touchpointDays >= 3 ? "text-yellow-400" : "text-gray-400"}`}>
+            <span className={`text-xs font-medium whitespace-nowrap ${touchpointDays >= 5 ? "text-red-400" : touchpointDays >= 3 ? "text-yellow-400" : "text-gray-400"}`}>
               {touchpointDays}d ago
             </span>
           ) : <span className="text-xs text-gray-400">—</span>}
         </div>
 
         {/* Waiting */}
-        <div className="hidden lg:flex lg:justify-center">
+        <div className="hidden lg:flex lg:justify-center lg:overflow-hidden">
           {client.waiting_on_leads ? (
             <span className="text-xs font-semibold text-orange-400">
               {client.waiting_since ? `${differenceInDays(today, new Date(client.waiting_since + "T00:00:00"))}d` : "Yes"}
