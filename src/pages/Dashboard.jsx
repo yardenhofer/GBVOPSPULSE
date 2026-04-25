@@ -257,7 +257,7 @@ export default function Dashboard() {
       <ClientTableHeader />
 
       {/* Clients */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {loading ? (
           Array(5).fill(0).map((_, i) => (
             <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
