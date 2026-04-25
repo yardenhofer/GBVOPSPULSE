@@ -50,7 +50,7 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         {/* Name + AM */}
         <div className="min-w-0 overflow-hidden">
           <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
-          <div className="flex items-center gap-1 mt-0.5">
+          <div className="flex items-center gap-1 mt-0.5 overflow-hidden">
             {(() => {
               const ref = client.start_date
                 ? new Date(client.start_date + "T00:00:00")
