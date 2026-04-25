@@ -69,7 +69,7 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
                 <Zap className="w-2.5 h-2.5" />Instantly
               </span>
             )}
-            {isOnboardingStageVisible(client) && (
+            {sortBy !== "revenue_desc" && sortBy !== "revenue_asc" && isOnboardingStageVisible(client) && (
               <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                 client.onboarding_stage === "Infrastructure Live"
                   ? "text-green-400 bg-green-500/10"
