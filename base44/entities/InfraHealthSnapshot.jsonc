@@ -1,0 +1,31 @@
+{
+  "name": "InfraHealthSnapshot",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "Client record ID"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Snapshot date YYYY-MM-DD"
+    },
+    "total_accounts": {
+      "type": "number"
+    },
+    "error_accounts": {
+      "type": "number"
+    },
+    "error_pct": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "client_id",
+    "date"
+  ]
+}
