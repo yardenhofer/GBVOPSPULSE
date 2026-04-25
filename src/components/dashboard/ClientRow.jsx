@@ -46,9 +46,9 @@ export default function ClientRow({ client, flags, status, isOwn, onClick, insta
         </div>
       )}
 
-      <div className="px-4 py-3 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[minmax(220px,1.5fr)_90px_120px_80px_100px_90px_90px_90px_auto] lg:gap-4 items-center">
-        {/* Name + AM — fixed height so all rows are identical */}
-        <div className="min-w-0 lg:h-[52px] lg:flex lg:flex-col lg:justify-center overflow-hidden">
+      <div className="px-4 py-3 grid grid-cols-[1fr_auto] gap-2 lg:grid-cols-[minmax(220px,1.5fr)_90px_120px_80px_100px_90px_90px_90px_auto] lg:gap-4 items-center lg:h-[72px]">
+        {/* Name + AM */}
+        <div className="min-w-0 overflow-hidden">
           <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{client.name}</p>
           <div className="flex items-center gap-1 mt-0.5">
             {(() => {
