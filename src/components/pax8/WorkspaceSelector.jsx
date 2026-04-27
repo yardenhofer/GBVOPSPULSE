@@ -43,10 +43,6 @@ export default function WorkspaceSelector({ value, onChange }) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-            <button onClick={() => { onChange(null); setOpen(false); }}
-              className="w-full text-left px-3 py-2 text-sm text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
-              None (skip upload)
-            </button>
             {workspaces.map(ws => (
               <button key={ws.id} onClick={() => { onChange(ws.id); setOpen(false); }}
                 className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between ${

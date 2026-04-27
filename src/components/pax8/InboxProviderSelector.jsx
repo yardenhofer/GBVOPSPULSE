@@ -44,7 +44,7 @@ export default function InboxProviderSelector({ value, onChange }) {
         onChange={e => onChange(e.target.value || null)}
         className="w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
       >
-        <option value="">None (skip inboxProvider)</option>
+        <option value="" disabled>Select a provider…</option>
         {providers.map((p, i) => (
           <option key={i} value={JSON.stringify({ name: p.name, provider: p.provider })}>
             {p.name} ({p.provider})
