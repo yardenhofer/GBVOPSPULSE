@@ -300,7 +300,7 @@ Deno.serve(async (req) => {
 
   // ── submit: submit a single tenant to Scalesends ──
   if (action === "submit") {
-    const { tenantId, triggerType, workspaceId, inboxProviderId } = body;
+    const { tenantId, triggerType, workspaceId, inboxProviderName, inboxProviderType, inboxProviderId } = body;
     if (!tenantId) return Response.json({ error: "tenantId required" }, { status: 400 });
 
     const paused = await getSettingValue(base44, "pause_scalesends", "false");
@@ -344,9 +344,11 @@ Deno.serve(async (req) => {
       if (wsList.length > 0) workspaceName = wsList[0].name;
     }
 
-    // Resolve inbox provider
+    // Resolve inbox provider (prefer direct name/type, fallback to entity lookup for backwards compat)
     let inboxProvider = null;
-    if (inboxProviderId) {
+    if (inboxProviderName) {
+      inboxProvider = { name: inboxProviderName, provider: inboxProviderType || "instantly" };
+    } else if (inboxProviderId) {
       const provList = await base44.asServiceRole.entities.InboxProvider.filter({ id: inboxProviderId });
       if (provList.length > 0) {
         inboxProvider = { name: provList[0].provider_name, provider: provList[0].provider_type };
@@ -510,7 +512,7 @@ Deno.serve(async (req) => {
 
   // ── bulkSubmit: submit multiple tenants with delay between calls ──
   if (action === "bulkSubmit") {
-    const { tenantIds, workspaceId: bulkWorkspaceId, inboxProviderId: bulkInboxProviderId } = body;
+    const { tenantIds, workspaceId: bulkWorkspaceId, inboxProviderName: bulkProvName, inboxProviderType: bulkProvType, inboxProviderId: bulkInboxProviderId } = body;
     if (!tenantIds || !Array.isArray(tenantIds)) return Response.json({ error: "tenantIds array required" }, { status: 400 });
 
     const paused = await getSettingValue(base44, "pause_scalesends", "false");
@@ -524,9 +526,11 @@ Deno.serve(async (req) => {
       const wsList = await base44.asServiceRole.entities.InstantlyWorkspace.filter({ id: bulkWorkspaceId });
       if (wsList.length > 0) bulkWorkspaceName = wsList[0].name;
     }
-    // Resolve inbox provider for bulk
+    // Resolve inbox provider for bulk (prefer direct name/type, fallback to entity lookup)
     let bulkInboxProvider = null;
-    if (bulkInboxProviderId) {
+    if (bulkProvName) {
+      bulkInboxProvider = { name: bulkProvName, provider: bulkProvType || "instantly" };
+    } else if (bulkInboxProviderId) {
       const provList = await base44.asServiceRole.entities.InboxProvider.filter({ id: bulkInboxProviderId });
       if (provList.length > 0) {
         bulkInboxProvider = { name: provList[0].provider_name, provider: provList[0].provider_type };
@@ -1040,6 +1044,25 @@ Deno.serve(async (req) => {
   if (action === "clearNamePool") {
     await setSettingValue(base44, "scalesends_name_pool", "[]");
     return Response.json({ success: true });
+  }
+
+  // ── listInboxProviders: fetch providers from Scalesends API ──
+  if (action === "listInboxProviders") {
+    const { apiKey, customerId } = getApiCredentials();
+    const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/inbox-providers/get/`;
+    console.log(`[SCALESENDS] GET ${url}`);
+    const res = await fetch(url, { headers: getHeaders(apiKey) });
+    const text = await res.text();
+    console.log(`[SCALESENDS] inbox-providers/get response: HTTP ${res.status} — ${text.substring(0, 500)}`);
+    if (!res.ok) {
+      return Response.json({ error: `Failed to fetch inbox providers: HTTP ${res.status}` }, { status: 500 });
+    }
+    let json = null;
+    try { json = JSON.parse(text); } catch {}
+    const rawProviders = json?.data || json || [];
+    // Strip sensitive fields before sending to frontend
+    const providers = rawProviders.map(p => ({ name: p.name, provider: p.provider }));
+    return Response.json({ providers });
   }
 
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });

@@ -27,7 +27,7 @@ export default function ScalesendsQueueTab() {
   const [confirmDialog, setConfirmDialog] = useState(null); // { type: 'single'|'bulk', tenantIds: [], tenantDomain?: '' }
   const [manualDialog, setManualDialog] = useState(null); // { type: 'single'|'bulk', tenantIds: [] }
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
-  const [selectedInboxProviderId, setSelectedInboxProviderId] = useState(null);
+  const [selectedInboxProvider, setSelectedInboxProvider] = useState(null); // JSON string: {name, provider}
   const [uploadingTenantId, setUploadingTenantId] = useState(null);
   const [activeView, setActiveView] = useState("ready");
   const [syncing, setSyncing] = useState(false);
@@ -54,11 +54,12 @@ export default function ScalesendsQueueTab() {
 
   async function handleSubmitSingle(tenantId, tenantDomain) {
     setSubmitting(tenantId);
-    const res = await base44.functions.invoke("scalesendsSubmit", { action: "submit", tenantId, triggerType: "manual", workspaceId: selectedWorkspaceId, inboxProviderId: selectedInboxProviderId });
+    const inboxProvider = selectedInboxProvider ? JSON.parse(selectedInboxProvider) : null;
+    const res = await base44.functions.invoke("scalesendsSubmit", { action: "submit", tenantId, triggerType: "manual", workspaceId: selectedWorkspaceId, inboxProviderName: inboxProvider?.name, inboxProviderType: inboxProvider?.provider });
     setSubmitting(null);
     setConfirmDialog(null);
     setSelectedWorkspaceId(null);
-    setSelectedInboxProviderId(null);
+    setSelectedInboxProvider(null);
     if (res.data.error) {
       alert(`Submit failed: ${res.data.error}`);
     } else if (res.data.linked) {
@@ -69,12 +70,13 @@ export default function ScalesendsQueueTab() {
 
   async function handleBulkSubmit() {
     setBulkSubmitting(true);
-    const res = await base44.functions.invoke("scalesendsSubmit", { action: "bulkSubmit", tenantIds: Array.from(selectedIds), workspaceId: selectedWorkspaceId, inboxProviderId: selectedInboxProviderId });
+    const inboxProvider = selectedInboxProvider ? JSON.parse(selectedInboxProvider) : null;
+    const res = await base44.functions.invoke("scalesendsSubmit", { action: "bulkSubmit", tenantIds: Array.from(selectedIds), workspaceId: selectedWorkspaceId, inboxProviderName: inboxProvider?.name, inboxProviderType: inboxProvider?.provider });
     setBulkSubmitting(false);
     setConfirmDialog(null);
     setSelectedIds(new Set());
     setSelectedWorkspaceId(null);
-    setSelectedInboxProviderId(null);
+    setSelectedInboxProvider(null);
     const results = res.data.results || [];
     const failed = results.filter(r => r.status === "failed");
     const linked = results.filter(r => r.status === "linked");
@@ -419,13 +421,13 @@ export default function ScalesendsQueueTab() {
           tenantDomain={confirmDialog.tenantDomain}
           workspaceId={selectedWorkspaceId}
           onWorkspaceChange={setSelectedWorkspaceId}
-          inboxProviderId={selectedInboxProviderId}
-          onInboxProviderChange={setSelectedInboxProviderId}
+          inboxProvider={selectedInboxProvider}
+          onInboxProviderChange={setSelectedInboxProvider}
           onConfirm={() => {
             if (confirmDialog.type === "single") handleSubmitSingle(confirmDialog.tenantIds[0], confirmDialog.tenantDomain);
             else handleBulkSubmit();
           }}
-          onCancel={() => { setConfirmDialog(null); setSelectedWorkspaceId(null); setSelectedInboxProviderId(null); }}
+          onCancel={() => { setConfirmDialog(null); setSelectedWorkspaceId(null); setSelectedInboxProvider(null); }}
           submitting={submitting !== null || bulkSubmitting}
         />
       )}
