@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
 
   // ── placeOrder (LIVE — single client with domain retry) ──
   if (action === "placeOrder") {
-    const { companyId, companyName, runId, maxDomainRetries, workspaceId, workspaceName, sendingDomain: explicitDomain } = body;
+    const { companyId, companyName, runId, maxDomainRetries, workspaceId, workspaceName, sendingDomain: explicitDomain, inboxProviderName, inboxProviderType } = body;
     if (!companyId) return Response.json({ error: "companyId required" });
 
     const token = await getPax8Token();
@@ -416,6 +416,10 @@ Deno.serve(async (req) => {
           tenantData.instantly_workspace_id = workspaceId;
           tenantData.instantly_workspace_name = workspaceName || null;
           tenantData.instantly_upload_status = "pending";
+        }
+        // Save selected inbox provider from Scalesends
+        if (inboxProviderName) {
+          tenantData.flags = [tenantData.flags, `provider:${inboxProviderName}`].filter(Boolean).join(",");
         }
         const tenantRecord = await base44.asServiceRole.entities.TenantLifecycle.create(tenantData);
         console.log(`[LIVE ORDER] Created TenantLifecycle ${tenantRecord.id} for ${companyName}`);
