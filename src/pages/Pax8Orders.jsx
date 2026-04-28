@@ -13,6 +13,7 @@ import CsvCompanyImport from "../components/pax8/CsvCompanyImport.jsx";
 import TenantListTab from "../components/pax8/TenantListTab.jsx";
 import ScalesendsQueueTab from "../components/pax8/ScalesendsQueueTab.jsx";
 import InboxProviderSelector from "../components/pax8/InboxProviderSelector.jsx";
+import PorkbunCheckResults from "../components/pax8/PorkbunCheckResults.jsx";
 
 const SPEND_CAP = 1000; // $1000/month spend cap per run
 const ESTIMATED_MONTHLY_COST_PER_LICENSE = 4.2; // Exchange Online Plan 1 actual cost
@@ -60,6 +61,10 @@ export default function Pax8Orders() {
   // Inbox provider selection (from Scalesends API)
   const [selectedInboxProvider, setSelectedInboxProvider] = useState(null); // JSON string: {name, provider}
 
+  // Porkbun check state
+  const [porkbunCheckData, setPorkbunCheckData] = useState(null);
+  const [porkbunCheckLoading, setPorkbunCheckLoading] = useState(false);
+
   useEffect(() => {
     base44.auth.me().then(u => setUser(u)).catch(() => {});
   }, []);
@@ -96,6 +101,22 @@ export default function Pax8Orders() {
   }
 
   const cappedEligible = preflightData?.eligible?.filter(c => selectedClientIds.has(c.companyId)) || [];
+
+  // ── Porkbun API access check ──
+  async function runPorkbunCheck() {
+    const eligible = preflightData?.eligible || [];
+    if (eligible.length === 0) return;
+    setPorkbunCheckLoading(true);
+    setPorkbunCheckData(null);
+    // Derive sending domains from company names (same logic as live orders)
+    const domains = eligible.map(c => {
+      if (c.domain && c.domain.includes(".")) return c.domain;
+      return (c.companyName || "").toLowerCase().replace(/[^a-z0-9]/g, "") + ".info";
+    });
+    const res = await base44.functions.invoke("pax8Auth", { action: "checkPorkbunAccess", domains });
+    setPorkbunCheckData(res.data);
+    setPorkbunCheckLoading(false);
+  }
 
   // ── Step 3: Mock Orders (batched from frontend to avoid timeout) ──
   async function runMockOrders() {
@@ -330,6 +351,10 @@ export default function Pax8Orders() {
           )}
 
           {preflightData && <PreflightResults data={preflightData} mockResults={mockResults} />}
+
+          {preflightData && preflightData.eligible?.length > 0 && (
+            <PorkbunCheckResults data={porkbunCheckData} loading={porkbunCheckLoading} onRun={runPorkbunCheck} />
+          )}
 
           {preflightData && preflightData.eligible.length > 0 && (
             <ClientGroupSelector eligible={preflightData.eligible} selectedIds={selectedClientIds} onSelectionChange={(ids) => { setSelectedClientIds(ids); setMockResults(null); }} />

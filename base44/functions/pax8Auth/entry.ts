@@ -714,5 +714,58 @@ Deno.serve(async (req) => {
     return Response.json({ error: "Provide step: provisionDetails | fetchSubscription | domainCounter" });
   }
 
+  // ── checkPorkbunAccess (verify domains have API access at Porkbun) ──
+  if (action === "checkPorkbunAccess") {
+    const { domains } = body;
+    if (!domains || !Array.isArray(domains)) return Response.json({ error: "domains array required" });
+
+    const porkbunApiKey = Deno.env.get("PORKBUN_API_KEY");
+    const porkbunSecretApiKey = Deno.env.get("PORKBUN_SECRET_API_KEY");
+    if (!porkbunApiKey || !porkbunSecretApiKey) {
+      return Response.json({ error: "PORKBUN_API_KEY or PORKBUN_SECRET_API_KEY not configured" });
+    }
+
+    const results = [];
+    for (const domain of domains) {
+      const trimmed = (domain || "").trim();
+      if (!trimmed) continue;
+
+      const url = `https://api.porkbun.com/api/json/v3/domain/getNs/${trimmed}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apikey: porkbunApiKey, secretapikey: porkbunSecretApiKey }),
+      });
+      const text = await res.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch {}
+
+      const isSuccess = json?.status === "SUCCESS";
+      const isApiDisabled = (json?.message || "").includes("API access");
+      const isNotFound = (json?.message || "").toLowerCase().includes("not found") || (json?.message || "").toLowerCase().includes("invalid domain");
+
+      results.push({
+        domain: trimmed,
+        ok: isSuccess,
+        apiDisabled: isApiDisabled,
+        notFound: isNotFound,
+        error: isSuccess ? null : (json?.message || `HTTP ${res.status}`),
+        ns: isSuccess ? (json?.ns || []) : null,
+      });
+
+      // Rate limit protection
+      if (domains.indexOf(domain) < domains.length - 1) {
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+
+    const okCount = results.filter(r => r.ok).length;
+    const apiDisabledCount = results.filter(r => r.apiDisabled).length;
+    const notFoundCount = results.filter(r => r.notFound).length;
+    const otherErrorCount = results.filter(r => !r.ok && !r.apiDisabled && !r.notFound).length;
+
+    return Response.json({ results, okCount, apiDisabledCount, notFoundCount, otherErrorCount, total: results.length });
+  }
+
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
 });
