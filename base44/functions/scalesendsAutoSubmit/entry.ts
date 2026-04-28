@@ -80,16 +80,25 @@ Deno.serve(async (req) => {
   const BASE_URL = "https://cloud-api.plugsaas.com";
   const headers = { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json", "Content-Type": "application/json" };
 
-  // Only resolve inbox provider if the tenant already has a workspace assigned (respects "Skip" choice)
+  // Resolve inbox provider: try to extract from tenant flags first, then fall back to default InboxProvider entity
   let inboxProvider = null;
-  if (tenant.instantly_workspace_id) {
+  const providerFlag = (tenant.flags || "").split(",").map(f => f.trim()).find(f => f.startsWith("provider:"));
+  if (providerFlag) {
+    const providerName = providerFlag.replace("provider:", "").trim();
+    if (providerName) {
+      inboxProvider = { name: providerName, provider: "instantly" };
+      console.log(`[SCALESENDS-AUTO] Using provider from tenant flags: ${providerName}`);
+    }
+  }
+  if (!inboxProvider) {
     const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
     if (defaultProviders.length > 0) {
       inboxProvider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
       console.log(`[SCALESENDS-AUTO] Using default inbox provider: ${JSON.stringify(inboxProvider)}`);
     }
-  } else {
-    console.log(`[SCALESENDS-AUTO] No workspace assigned on tenant — skipping provider assignment`);
+  }
+  if (!inboxProvider) {
+    console.log(`[SCALESENDS-AUTO] No inbox provider found — will skip provider assignment`);
   }
 
   let existingOrders = [];
