@@ -21,6 +21,7 @@ import InboxHealthSection from "../components/clientdetail/InboxHealthSection";
 import AIInsightsPanel from "../components/clientdetail/AIInsightsPanel";
 import DQLinkSection from "../components/clientdetail/DQLinkSection";
 import EmailSequenceSection from "../components/clientdetail/EmailSequenceSection";
+import InboxPlacementSection from "../components/clientdetail/InboxPlacementSection";
 
 export default function ClientDetail() {
   const [client, setClient] = useState(null);
@@ -202,7 +203,10 @@ export default function ClientDetail() {
         <div />
       </div>
 
-      <EmailSequenceSection client={client} onClientUpdate={handleClientUpdate} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <EmailSequenceSection client={client} onClientUpdate={handleClientUpdate} />
+        <InboxPlacementSection client={client} onClientUpdate={handleClientUpdate} />
+      </div>
 
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-5 flex items-center justify-between">
         <div className="flex items-center gap-3">

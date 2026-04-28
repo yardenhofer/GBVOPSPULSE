@@ -196,6 +196,19 @@
       "type": "string",
       "description": "Current email sequence copy for reference"
     },
+    "inbox_placement_screenshot": {
+      "type": "string",
+      "description": "URL of the most recent inbox placement test screenshot"
+    },
+    "inbox_placement_uploaded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the inbox placement screenshot was last uploaded"
+    },
+    "inbox_placement_uploaded_by": {
+      "type": "string",
+      "description": "Email of user who uploaded the screenshot"
+    },
     "terminated_date": {
       "type": "string",
       "format": "date",
