@@ -109,6 +109,11 @@ async function setDomainCounter(base44, newVal) {
 
 // ── Build order payload ──
 function buildOrderPayload(companyId, domainN) {
+  const provisioningDetails = [
+    ...STATIC_PROVISIONING,
+    { key: "msDomain", values: [`GrowBig${domainN}`] },
+  ];
+  console.log(`[BUILD] Provisioning details for GrowBig${domainN}:`, JSON.stringify(provisioningDetails.map(p => p.key)));
   return {
     companyId,
     orderedBy: "Pax8 Partner",
@@ -118,11 +123,7 @@ function buildOrderPayload(companyId, domainN) {
       quantity: 1,
       billingTerm: "Monthly",
       commitmentTermId: COMMITMENT_TERM_ID,
-      provisioningDetails: [
-        { key: "msCustExists", values: ["No, the customer does not have a Microsoft account"] },
-        { key: "msDomain", values: [`GrowBig${domainN}`] },
-        ...STATIC_PROVISIONING.filter(p => p.key !== "msCustExists"),
-      ],
+      provisioningDetails,
     }],
   };
 }
@@ -388,19 +389,19 @@ Deno.serve(async (req) => {
     if (!companyId) return Response.json({ error: "companyId required" });
 
     const token = await getPax8Token();
-    let currentN = await getDomainCounter(base44);
     const retryLimit = maxDomainRetries || DOMAIN_RETRY_LIMIT;
 
     for (let attempt = 0; attempt < retryLimit; attempt++) {
-      const domainN = currentN + attempt;
+      const domainN = await getDomainCounter(base44);
       const payload = buildOrderPayload(companyId, domainN);
+
+      // Always advance the counter immediately so the next call never reuses this domain
+      await setDomainCounter(base44, domainN + 1);
 
       console.log(`[LIVE ORDER] Attempt ${attempt + 1} for ${companyName} with GrowBig${domainN}`);
       const res = await pax8Post(token, "/orders", payload);
 
       if (res.ok) {
-        // Success — increment counter past this domain
-        await setDomainCounter(base44, domainN + 1);
         console.log(`[LIVE ORDER] Success for ${companyName}, order ID: ${res.data?.id}, domain: GrowBig${domainN}`);
 
         // Use explicit sending domain from CSV if provided, otherwise derive from company name
@@ -464,10 +465,10 @@ Deno.serve(async (req) => {
     }
 
     // Exhausted retries
-    await setDomainCounter(base44, currentN + retryLimit);
+    const finalCounter = await getDomainCounter(base44);
     return Response.json({
       status: "failed",
-      reason: `Domain collision: exhausted ${retryLimit} attempts (GrowBig${currentN} through GrowBig${currentN + retryLimit - 1})`,
+      reason: `Domain collision: exhausted ${retryLimit} attempts ending at GrowBig${finalCounter - 1}`,
     });
   }
 
