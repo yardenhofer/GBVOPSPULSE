@@ -2,8 +2,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Scheduled catch-up: finds tenants stuck at tenant_provisioned with no scalesends_status
 // and triggers auto-submit for them. Runs every 5 minutes as a safety net.
+// Processes up to BATCH_LIMIT tenants per invocation to avoid timeouts.
 
 const BASE_URL = "https://cloud-api.plugsaas.com";
+const BATCH_LIMIT = 10; // max tenants per run
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -94,8 +96,9 @@ Deno.serve(async (req) => {
 
   const results = [];
   const remaining = dailyCap - todaySubmissions;
+  const maxToProcess = Math.min(stuck.length, remaining, BATCH_LIMIT);
 
-  for (let i = 0; i < Math.min(stuck.length, remaining); i++) {
+  for (let i = 0; i < maxToProcess; i++) {
     const tenant = stuck[i];
     const adminEmail = (tenant.ms_admin_username || "").toLowerCase();
     const tenantDomain = (tenant.ms_tenant_domain || "").toLowerCase();
@@ -208,14 +211,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Assign inbox provider name as tag (for organization in Scalesends dashboard)
-      const providerTag = inboxProvider?.name || null;
-      if (orderId && providerTag) {
-        const tagUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/tags/add/`;
-        console.log(`[CATCHUP] Assigning tag "${providerTag}" to order ${orderId}`);
-        const tagRes = await fetch(tagUrl, { method: "POST", headers, body: JSON.stringify({ tag: providerTag }) });
-        if (!tagRes.ok) console.log(`[CATCHUP] Tag assignment failed for order ${orderId}: HTTP ${tagRes.status}`);
-      }
+      // Tag assignment skipped in catch-up to save time (can be done later via sync)
 
       const updateData = {
         scalesends_status: "processing", scalesends_job_id: orderId,
@@ -233,36 +229,31 @@ Deno.serve(async (req) => {
     } else {
       const errMsg = json?.error || json?.message || text.substring(0, 200) || `HTTP ${res.status}`;
 
-      // Check if it's a duplicate (500 error)
+      // Check if it's a duplicate (500 error) — reuse cached order list + check by email
       if (res.status === 500) {
-        const retryListRes = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, { headers });
-        if (retryListRes.ok) {
-          const retryData = await retryListRes.json();
-          const retryOrders = Array.isArray(retryData.data) ? retryData.data : [];
-          const dup = retryOrders.find(o => (o.email || "").toLowerCase() === adminEmail);
-          if (dup) {
-            const mCount = dup.mailboxes?.length || 0;
-            const onboard = (dup.onboardStatus || "").toLowerCase();
-            const isComplete = mCount > 0 && (onboard === "complete" || onboard === "onboarded" || onboard === "ready");
-            const updateData = {
-              scalesends_status: isComplete ? "complete" : "processing",
-              scalesends_job_id: dup._id, overall_status: isComplete ? "inboxes_ready" : "inboxes_creating",
-              scalesends_inbox_count: mCount,
-            };
-            if (isComplete) {
-              updateData.scalesends_completed_at = dup.updatedAt || new Date().toISOString();
-              updateData.scalesends_inbox_details = JSON.stringify((dup.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
-            }
-            if (tenantWorkspaceId) { updateData.instantly_workspace_id = tenantWorkspaceId; updateData.instantly_workspace_name = tenantWorkspaceName; updateData.instantly_upload_status = "pending"; }
-            await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
-            await base44.asServiceRole.entities.TenantAuditLog.create({
-              action: "email_linked", tenant_lifecycle_id: tenant.id,
-              detail: `Catch-up: API 500 (duplicate). Linked to existing order ${dup._id}`,
-            });
-            results.push({ tenantId: tenant.id, domain: tenant.ms_tenant_domain, action: "linked_duplicate", orderId: dup._id });
-            console.log(`[CATCHUP] Duplicate detected for ${tenant.ms_tenant_domain}, linked to ${dup._id}`);
-            continue;
+        const dup = existingOrders.find(o => (o.email || "").toLowerCase() === adminEmail);
+        if (dup) {
+          const mCount = dup.mailboxes?.length || 0;
+          const onboard = (dup.onboardStatus || "").toLowerCase();
+          const isComplete = mCount > 0 && (onboard === "complete" || onboard === "onboarded" || onboard === "ready");
+          const updateData = {
+            scalesends_status: isComplete ? "complete" : "processing",
+            scalesends_job_id: dup._id, overall_status: isComplete ? "inboxes_ready" : "inboxes_creating",
+            scalesends_inbox_count: mCount,
+          };
+          if (isComplete) {
+            updateData.scalesends_completed_at = dup.updatedAt || new Date().toISOString();
+            updateData.scalesends_inbox_details = JSON.stringify((dup.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
           }
+          if (tenantWorkspaceId) { updateData.instantly_workspace_id = tenantWorkspaceId; updateData.instantly_workspace_name = tenantWorkspaceName; updateData.instantly_upload_status = "pending"; }
+          await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
+          await base44.asServiceRole.entities.TenantAuditLog.create({
+            action: "email_linked", tenant_lifecycle_id: tenant.id,
+            detail: `Catch-up: API 500 (duplicate). Linked to existing order ${dup._id}`,
+          });
+          results.push({ tenantId: tenant.id, domain: tenant.ms_tenant_domain, action: "linked_duplicate", orderId: dup._id });
+          console.log(`[CATCHUP] Duplicate detected for ${tenant.ms_tenant_domain}, linked to ${dup._id}`);
+          continue;
         }
       }
 
@@ -275,12 +266,13 @@ Deno.serve(async (req) => {
       console.log(`[CATCHUP] Failed for ${tenant.ms_tenant_domain}: ${errMsg}`);
     }
 
-    // Delay between submissions
-    if (i < Math.min(stuck.length, remaining) - 1) {
-      await new Promise(r => setTimeout(r, 5000));
+    // Brief delay between submissions
+    if (i < maxToProcess - 1) {
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
 
-  console.log(`[CATCHUP] Done. Processed ${results.length} tenant(s).`);
-  return Response.json({ processed: results.length, results });
+  const stillStuck = stuck.length - maxToProcess;
+  console.log(`[CATCHUP] Done. Processed ${results.length} tenant(s). ${stillStuck > 0 ? `${stillStuck} still remaining.` : "All caught up."}`);
+  return Response.json({ processed: results.length, totalStuck: stuck.length, remaining: stillStuck, results });
 });
