@@ -178,8 +178,8 @@ export default function Pax8Orders() {
       total_monthly_cost: eligible.length * ESTIMATED_MONTHLY_COST_PER_LICENSE,
       confirmation_amount_typed: amountTyped,
       confirmation_word_typed: confirmWord,
-      eligible_clients: JSON.stringify(eligible),
-      skipped_clients: JSON.stringify(preflightData.skipped),
+      eligible_clients: JSON.stringify(eligible.map(c => c.companyName)).substring(0, 5000),
+      skipped_clients: JSON.stringify(preflightData.skipped.map(c => ({ name: c.companyName, reason: c.reason }))).substring(0, 5000),
     });
 
     const allResults = [];
