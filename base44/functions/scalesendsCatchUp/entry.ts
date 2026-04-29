@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     existingOrders = Array.isArray(listData.data) ? listData.data : (Array.isArray(listData) ? listData : []);
   }
 
-  // Default provider and workspace — only used if the tenant already has a workspace assigned
+  // Default provider and workspace
   let defaultInboxProvider = null;
   const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
   if (defaultProviders.length > 0) {
@@ -113,10 +113,18 @@ Deno.serve(async (req) => {
       if (tenantDomain && oEnd && tenantDomain.includes(oEnd)) { existing = order; break; }
     }
 
-    // Determine workspace and provider for this tenant — only use defaults if tenant already has a workspace
-    const tenantWorkspaceId = tenant.instantly_workspace_id || null;
-    const tenantWorkspaceName = tenant.instantly_workspace_name || null;
-    const inboxProvider = tenantWorkspaceId ? defaultInboxProvider : null;
+    // Determine workspace and provider for this tenant
+    const tenantWorkspaceId = tenant.instantly_workspace_id || defaultWorkspaceId || null;
+    const tenantWorkspaceName = tenant.instantly_workspace_name || defaultWorkspaceName || null;
+    
+    // Resolve inbox provider: check tenant flags first, then use default
+    let inboxProvider = null;
+    const providerFlag = (tenant.flags || "").split(",").map(f => f.trim()).find(f => f.startsWith("provider:"));
+    if (providerFlag) {
+      const providerName = providerFlag.replace("provider:", "").trim();
+      if (providerName) inboxProvider = { name: providerName, provider: "instantly" };
+    }
+    if (!inboxProvider) inboxProvider = defaultInboxProvider;
 
     if (existing) {
       // Link to existing order
@@ -131,6 +139,15 @@ Deno.serve(async (req) => {
         updateData.scalesends_inbox_details = JSON.stringify((existing.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
       }
       if (tenantWorkspaceId) { updateData.instantly_workspace_id = tenantWorkspaceId; updateData.instantly_workspace_name = tenantWorkspaceName; updateData.instantly_upload_status = "pending"; }
+
+      // Assign inbox provider and tag to linked order
+      if (inboxProvider && existing._id) {
+        const provUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${existing._id}/inbox-providers/add/`;
+        await fetch(provUrl, { method: "POST", headers, body: JSON.stringify({ name: inboxProvider.name, provider: inboxProvider.provider }) });
+        const tagUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${existing._id}/tags/add/`;
+        await fetch(tagUrl, { method: "POST", headers, body: JSON.stringify({ tag: inboxProvider.name }) });
+      }
+
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
       await base44.asServiceRole.entities.TenantAuditLog.create({
         action: "email_linked", tenant_lifecycle_id: tenant.id,
@@ -189,6 +206,15 @@ Deno.serve(async (req) => {
             });
           }
         }
+      }
+
+      // Assign inbox provider name as tag (for organization in Scalesends dashboard)
+      const providerTag = inboxProvider?.name || null;
+      if (orderId && providerTag) {
+        const tagUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/tags/add/`;
+        console.log(`[CATCHUP] Assigning tag "${providerTag}" to order ${orderId}`);
+        const tagRes = await fetch(tagUrl, { method: "POST", headers, body: JSON.stringify({ tag: providerTag }) });
+        if (!tagRes.ok) console.log(`[CATCHUP] Tag assignment failed for order ${orderId}: HTTP ${tagRes.status}`);
       }
 
       const updateData = {
