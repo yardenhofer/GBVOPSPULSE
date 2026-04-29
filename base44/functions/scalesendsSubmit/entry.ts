@@ -465,17 +465,12 @@ Deno.serve(async (req) => {
         if (!registrarResult.success) console.log(`[SCALESENDS] Warning: registrar assignment deferred for order ${result.orderId}: ${registrarResult.error}`);
       }
 
-      // Step 4: Assign tags — always tag with company name, plus workspace name if available
+      // Step 4: Assign inbox provider name as tag (for organization in Scalesends dashboard)
       let tagResult = null;
-      const companyTag = tenant.pax8_company_name;
-      if (result.orderId && companyTag) {
-        tagResult = await assignTag(apiKey, customerId, result.orderId, companyTag);
-        if (!tagResult.success) console.log(`[SCALESENDS] Warning: company tag assignment failed for order ${result.orderId}: ${tagResult.error}`);
-      }
-      let wsTagResult = null;
-      if (result.orderId && workspaceName && workspaceName !== companyTag) {
-        wsTagResult = await assignTag(apiKey, customerId, result.orderId, workspaceName);
-        if (!wsTagResult.success) console.log(`[SCALESENDS] Warning: workspace tag assignment failed for order ${result.orderId}: ${wsTagResult.error}`);
+      const providerTag = inboxProvider?.name || null;
+      if (result.orderId && providerTag) {
+        tagResult = await assignTag(apiKey, customerId, result.orderId, providerTag);
+        if (!tagResult.success) console.log(`[SCALESENDS] Warning: tag assignment failed for order ${result.orderId}: ${tagResult.error}`);
       }
 
       const updateData = {
@@ -495,7 +490,7 @@ Deno.serve(async (req) => {
 
       const providerInfo = providerResult?.success ? `. Provider: ${inboxProvider.name}` : "";
       const registrarInfo = registrarResult?.success ? `. Registrar: ${registrarResult.registrar?.name}` : "";
-      const tagInfo = tagResult?.success ? `. Tag: ${companyTag}` : "";
+      const tagInfo = tagResult?.success ? `. Tag: ${providerTag}` : "";
       await base44.asServiceRole.entities.TenantAuditLog.create({
         action: "email_parsed",
         tenant_lifecycle_id: tenant.id,
@@ -636,15 +631,11 @@ Deno.serve(async (req) => {
           if (!regRes.success) console.log(`[SCALESENDS] Bulk: registrar deferred for order ${result.orderId}: ${regRes.error}`);
         }
 
-        // Step 4: Assign tags — always tag with company name, plus workspace name if available
-        const bulkCompanyTag = tenant.pax8_company_name;
-        if (result.orderId && bulkCompanyTag) {
-          const tagRes = await assignTag(apiKey, customerId, result.orderId, bulkCompanyTag);
-          if (!tagRes.success) console.log(`[SCALESENDS] Bulk: company tag assignment failed for order ${result.orderId}: ${tagRes.error}`);
-        }
-        if (result.orderId && bulkWorkspaceName && bulkWorkspaceName !== bulkCompanyTag) {
-          const wsTagRes = await assignTag(apiKey, customerId, result.orderId, bulkWorkspaceName);
-          if (!wsTagRes.success) console.log(`[SCALESENDS] Bulk: workspace tag assignment failed for order ${result.orderId}: ${wsTagRes.error}`);
+        // Step 4: Assign inbox provider name as tag
+        const bulkProviderTag = bulkInboxProvider?.name || null;
+        if (result.orderId && bulkProviderTag) {
+          const tagRes = await assignTag(apiKey, customerId, result.orderId, bulkProviderTag);
+          if (!tagRes.success) console.log(`[SCALESENDS] Bulk: tag assignment failed for order ${result.orderId}: ${tagRes.error}`);
         }
 
         const bulkUpdate = {
