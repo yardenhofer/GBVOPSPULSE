@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Shield, Eye, EyeOff, Copy, RefreshCw, Pause, Play, Mail, AlertTriangle, CheckCircle2, XCircle, Clock, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { Shield, Eye, EyeOff, Copy, RefreshCw, Pause, Play, Mail, AlertTriangle, CheckCircle2, XCircle, Clock, Search, ChevronDown, ChevronUp, Download } from "lucide-react";
 import PorkbunNameserverPanel from "./PorkbunNameserverPanel";
 
 const STATUS_COLORS = {
@@ -36,6 +36,8 @@ export default function TenantListTab() {
   const [revealingId, setRevealingId] = useState(null);
   const [emailLogs, setEmailLogs] = useState([]);
   const [showEmailLogs, setShowEmailLogs] = useState(false);
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillResult, setBackfillResult] = useState(null);
 
   async function loadData() {
     setLoading(true);
@@ -52,6 +54,15 @@ export default function TenantListTab() {
     const logs = await base44.entities.GmailEmailLog.list("-created_date", 50);
     setEmailLogs(logs);
     setShowEmailLogs(true);
+  }
+
+  async function runBackfill() {
+    setBackfillRunning(true);
+    setBackfillResult(null);
+    const res = await base44.functions.invoke("gmailBackfill", { maxResults: 200 });
+    setBackfillResult(res.data);
+    setBackfillRunning(false);
+    loadData(); // refresh tenant list
   }
 
   useEffect(() => { loadData(); }, []);
@@ -123,6 +134,15 @@ export default function TenantListTab() {
           <Mail className="w-3 h-3" /> Email Log
         </button>
 
+        <button
+          onClick={runBackfill}
+          disabled={backfillRunning}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50"
+        >
+          {backfillRunning ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+          {backfillRunning ? "Scanning Gmail…" : "Backfill Missed Emails"}
+        </button>
+
         {paused && (
           <div className="flex items-center gap-1.5 text-xs text-red-500">
             <AlertTriangle className="w-3 h-3" />
@@ -130,6 +150,26 @@ export default function TenantListTab() {
           </div>
         )}
       </div>
+
+      {/* Backfill Result */}
+      {backfillResult && (
+        <div className={`rounded-xl border p-3 text-xs ${backfillResult.error ? "bg-red-500/10 border-red-500/20 text-red-500" : "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400"}`}>
+          {backfillResult.error ? (
+            <p>{backfillResult.error}</p>
+          ) : (
+            <div className="space-y-1">
+              <p className="font-semibold">
+                Backfill complete: found {backfillResult.found} emails, {backfillResult.newMessages} were unprocessed.
+              </p>
+              {backfillResult.summary && (
+                <p>
+                  Linked: {backfillResult.summary.linked} · Unmatched: {backfillResult.summary.unmatched} · Duplicates: {backfillResult.summary.duplicates} · Awaiting Parser: {backfillResult.summary.awaitingParser} · Errors: {backfillResult.summary.errors}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
