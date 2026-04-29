@@ -472,6 +472,133 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ── placeOrders (LIVE — batch of clients, avoids frontend timeout) ──
+  if (action === "placeOrders") {
+    const { clients, runId, maxDomainRetries, inboxProviderName, inboxProviderType } = body;
+    if (!clients || !Array.isArray(clients)) return Response.json({ error: "clients array required" }, { status: 400 });
+
+    const token = await getPax8Token();
+    const retryLimit = maxDomainRetries || DOMAIN_RETRY_LIMIT;
+    const results = [];
+
+    for (let i = 0; i < clients.length; i++) {
+      const client = clients[i];
+      let succeeded = false;
+      let lastError = null;
+
+      for (let attempt = 0; attempt < retryLimit; attempt++) {
+        const domainN = await getDomainCounter(base44);
+        const payload = buildOrderPayload(client.companyId, domainN);
+        await setDomainCounter(base44, domainN + 1);
+
+        console.log(`[BATCH LIVE] ${client.companyName} attempt ${attempt + 1} with GrowBig${domainN}`);
+        const res = await pax8Post(token, "/orders", payload);
+
+        if (res.ok) {
+          const sendingDomain = client.domain || (client.companyName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info");
+          const tenantData = {
+            pax8_company_id: client.companyId,
+            pax8_company_name: client.companyName,
+            sending_domain: sendingDomain,
+            ms_domain: `GrowBig${domainN}`,
+            overall_status: "ordered",
+          };
+          if (inboxProviderName) {
+            tenantData.flags = `provider:${inboxProviderName}`;
+          }
+          const tenantRecord = await base44.asServiceRole.entities.TenantLifecycle.create(tenantData);
+
+          results.push({
+            companyId: client.companyId,
+            companyName: client.companyName,
+            status: "success",
+            orderId: res.data?.id,
+            domainUsed: `GrowBig${domainN}`,
+            tenantLifecycleId: tenantRecord.id,
+          });
+          succeeded = true;
+          break;
+        }
+
+        const errText = (res.data?.message || res.text || "").toLowerCase();
+        const detailsText = JSON.stringify(res.data?.details || []).toLowerCase();
+        const combined = errText + " " + detailsText;
+        const isDomainCollision = combined.includes("domain") && (combined.includes("taken") || combined.includes("exists") || combined.includes("already") || combined.includes("unavailable"));
+
+        if (isDomainCollision) {
+          console.log(`[BATCH LIVE] Domain GrowBig${domainN} collision for ${client.companyName}, retrying...`);
+          lastError = `Domain collision at GrowBig${domainN}`;
+          continue;
+        }
+
+        // Non-domain error — fail this client, include full detail
+        lastError = combined.length > 200 ? combined.substring(0, 200) : (res.data?.message || res.text || `HTTP ${res.status}`);
+        // Include details array for richer error messages
+        if (res.data?.details?.length) {
+          lastError = res.data.details.map(d => d.message).filter(Boolean).join("; ") || lastError;
+        }
+        break;
+      }
+
+      if (!succeeded) {
+        results.push({
+          companyId: client.companyId,
+          companyName: client.companyName,
+          status: "failed",
+          error: lastError,
+        });
+      }
+
+      // 2-second delay between orders
+      if (i < clients.length - 1) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
+    return Response.json({ results });
+  }
+
+  // ── validateAddresses (check company addresses validate with Microsoft via mock order) ──
+  if (action === "validateAddresses") {
+    const { companies } = body;
+    if (!companies || !Array.isArray(companies)) return Response.json({ error: "companies array required" }, { status: 400 });
+
+    const token = await getPax8Token();
+    // We use a single domain counter value for all validation mocks (we won't advance it — just peek)
+    const domainN = await getDomainCounter(base44);
+    const results = [];
+
+    for (let i = 0; i < companies.length; i++) {
+      const client = companies[i];
+      const payload = buildOrderPayload(client.companyId, domainN + 90000 + i); // use far-ahead domain to avoid collision
+      const res = await pax8Post(token, "/orders", payload, { isMock: "true" });
+
+      if (res.ok) {
+        results.push({ companyId: client.companyId, companyName: client.companyName, valid: true, error: null });
+      } else {
+        const detailMsgs = (res.data?.details || []).map(d => d.message).filter(Boolean);
+        const isAddressError = detailMsgs.some(m => m.toLowerCase().includes("address") || m.toLowerCase().includes("city") || m.toLowerCase().includes("postal"));
+        results.push({
+          companyId: client.companyId,
+          companyName: client.companyName,
+          valid: !isAddressError,
+          isAddressError,
+          error: detailMsgs.join("; ") || res.data?.message || `HTTP ${res.status}`,
+        });
+      }
+
+      if (i < companies.length - 1) {
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+
+    const validCount = results.filter(r => r.valid).length;
+    const invalidCount = results.filter(r => !r.valid).length;
+    const addressErrors = results.filter(r => r.isAddressError).length;
+
+    return Response.json({ results, validCount, invalidCount, addressErrors, total: results.length });
+  }
+
   // ── createCompanies (bulk from CSV data) ──
   if (action === "createCompanies") {
     const { companies } = body;

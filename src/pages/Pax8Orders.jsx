@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ShieldAlert, Play, Zap, RefreshCw, Server, Upload, Shield } from "lucide-react";
+import { ShieldAlert, Play, Zap, RefreshCw, Server, Upload, Shield, MapPin } from "lucide-react";
 
 import Pax8PasswordGate from "../components/pax8/Pax8PasswordGate.jsx";
 import ProductVerification from "../components/pax8/ProductVerification.jsx";
@@ -64,6 +64,10 @@ export default function Pax8Orders() {
   // Porkbun check state
   const [porkbunCheckData, setPorkbunCheckData] = useState(null);
   const [porkbunCheckLoading, setPorkbunCheckLoading] = useState(false);
+
+  // Address validation state
+  const [addressCheckData, setAddressCheckData] = useState(null);
+  const [addressCheckLoading, setAddressCheckLoading] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(u => setUser(u)).catch(() => {});
@@ -149,7 +153,29 @@ export default function Pax8Orders() {
     setMockLoading(false);
   }
 
-  // ── Step 4+5: Live Orders ──
+  // ── Address Validation ──
+  async function runAddressValidation() {
+    if (!cappedEligible.length) return;
+    setAddressCheckLoading(true);
+    setAddressCheckData(null);
+
+    const BATCH_SIZE = 10;
+    const allResults = [];
+
+    for (let i = 0; i < cappedEligible.length; i += BATCH_SIZE) {
+      const batch = cappedEligible.slice(i, i + BATCH_SIZE);
+      const res = await base44.functions.invoke("pax8Auth", {
+        action: "validateAddresses",
+        companies: batch.map(c => ({ companyId: c.companyId, companyName: c.companyName })),
+      });
+      if (res.data.results) allResults.push(...res.data.results);
+    }
+
+    setAddressCheckData(allResults);
+    setAddressCheckLoading(false);
+  }
+
+  // ── Step 4+5: Live Orders (batched to avoid timeout) ──
   async function startLiveRun(amountTyped, confirmWord) {
     setShowConfirmModal(false);
     setLiveRunning(true);
@@ -180,14 +206,12 @@ export default function Pax8Orders() {
       skipped_clients: JSON.stringify(preflightData.skipped),
     });
 
-    const results = [];
+    const allResults = [];
     let totalSpend = 0;
+    const BATCH_SIZE = 10;
 
-    for (let i = 0; i < eligible.length; i++) {
+    for (let i = 0; i < eligible.length; i += BATCH_SIZE) {
       if (haltRef.current) break;
-
-      const client = eligible[i];
-      setCurrentClient(client.companyName);
 
       // Spend guard
       if (totalSpend >= SPEND_CAP) {
@@ -195,37 +219,25 @@ export default function Pax8Orders() {
         break;
       }
 
+      const batch = eligible.slice(i, i + BATCH_SIZE);
+      setCurrentClient(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch[0].companyName}…`);
+
       const res = await base44.functions.invoke("pax8Auth", {
-        action: "placeOrder",
-        companyId: client.companyId,
-        companyName: client.companyName,
+        action: "placeOrders",
+        clients: batch.map(c => ({ companyId: c.companyId, companyName: c.companyName, domain: c.domain || null })),
         runId,
         maxDomainRetries: MAX_DOMAIN_RETRIES,
         inboxProviderName: inboxProvider?.name || null,
         inboxProviderType: inboxProvider?.provider || null,
-        sendingDomain: client.domain || null,
       });
 
-      const result = {
-        companyId: client.companyId,
-        companyName: client.companyName,
-        status: res.data.status || "failed",
-        error: res.data.error || res.data.reason || null,
-        response: res.data.response,
-        apiLog: res.data.apiLog || null,
-      };
-      results.push(result);
-      setLiveResults([...results]);
+      const batchResults = res.data.results || [];
+      allResults.push(...batchResults);
+      setLiveResults([...allResults]);
 
-      if (result.status === "success") {
-        totalSpend += ESTIMATED_MONTHLY_COST_PER_LICENSE;
-        setCumulativeCost(totalSpend);
-      }
-
-      // 2-second pause between orders
-      if (i < eligible.length - 1 && !haltRef.current) {
-        await new Promise(r => setTimeout(r, 2000));
-      }
+      const batchSuccess = batchResults.filter(r => r.status === "success").length;
+      totalSpend += batchSuccess * ESTIMATED_MONTHLY_COST_PER_LICENSE;
+      setCumulativeCost(totalSpend);
     }
 
     setCurrentClient(null);
@@ -236,19 +248,16 @@ export default function Pax8Orders() {
     // Update audit log
     const logs = await base44.entities.Pax8AuditLog.filter({ run_id: runId });
     if (logs[0]) {
-      const apiLogs = results.map(r => r.apiLog).filter(Boolean);
       await base44.entities.Pax8AuditLog.update(logs[0].id, {
         status: finalStatus,
-        success_count: results.filter(r => r.status === "success").length,
-        failed_count: results.filter(r => r.status === "failed").length,
-        results: JSON.stringify(results),
-        api_log: apiLogs.length > 0 ? JSON.stringify(apiLogs) : null,
+        success_count: allResults.filter(r => r.status === "success").length,
+        failed_count: allResults.filter(r => r.status === "failed").length,
+        results: JSON.stringify(allResults),
       });
     }
 
-    const successCount = results.filter(r => r.status === "success").length;
-    const failCount = results.filter(r => r.status === "failed").length;
-    const skipCount = results.filter(r => r.status === "skipped").length;
+    const successCount = allResults.filter(r => r.status === "success").length;
+    const failCount = allResults.filter(r => r.status === "failed").length;
 
     base44.integrations.Core.SendEmail({
       to: user?.email,
@@ -261,10 +270,9 @@ export default function Pax8Orders() {
         <ul>
           <li>✅ Successful: ${successCount}</li>
           <li>❌ Failed: ${failCount}</li>
-          <li>⏭ Skipped: ${skipCount}</li>
         </ul>
-        <p><strong>Total monthly spend:</strong> $${totalSpend}</p>
-        ${failCount > 0 ? `<h3>Failed Orders:</h3><ul>${results.filter(r => r.status === "failed").map(r => `<li>${r.companyName}: ${r.error}</li>`).join("")}</ul>` : ""}
+        <p><strong>Total monthly spend:</strong> $${totalSpend.toFixed(2)}</p>
+        ${failCount > 0 ? `<h3>Failed Orders:</h3><ul>${allResults.filter(r => r.status === "failed").map(r => `<li>${r.companyName}: ${r.error}</li>`).join("")}</ul>` : ""}
       `,
     }).catch(() => {});
   }
@@ -368,6 +376,51 @@ export default function Pax8Orders() {
               <div className="max-w-xs mx-auto">
                 <InboxProviderSelector value={selectedInboxProvider} onChange={setSelectedInboxProvider} />
               </div>
+            </div>
+          )}
+
+          {/* Address Validation */}
+          {preflightData && cappedEligible.length > 0 && (
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-orange-500" />
+                  <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Address Validation</h3>
+                </div>
+                <button onClick={runAddressValidation} disabled={addressCheckLoading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-medium disabled:opacity-50">
+                  <RefreshCw className={`w-3 h-3 ${addressCheckLoading ? "animate-spin" : ""}`} />
+                  {addressCheckLoading ? "Checking…" : "Validate Addresses"}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">Runs a mock order to verify each company's address validates with Microsoft before live ordering.</p>
+
+              {addressCheckData && (() => {
+                const valid = addressCheckData.filter(r => r.valid);
+                const invalid = addressCheckData.filter(r => !r.valid);
+                return (
+                  <div className="space-y-2">
+                    <div className="flex gap-3 text-xs">
+                      <span className="text-green-600 font-medium">✓ {valid.length} valid</span>
+                      {invalid.length > 0 && <span className="text-red-500 font-medium">✕ {invalid.length} failed</span>}
+                    </div>
+                    {invalid.length > 0 && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1">
+                        {invalid.map(r => (
+                          <div key={r.companyId} className="text-xs">
+                            <span className="font-medium text-red-500">{r.companyName}</span>
+                            <span className="text-red-400 ml-1">— {r.error}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {invalid.length === 0 && (
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-xs text-green-600 font-medium">
+                        All addresses validated successfully with Microsoft.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
