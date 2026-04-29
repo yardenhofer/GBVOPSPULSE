@@ -558,47 +558,6 @@ Deno.serve(async (req) => {
     return Response.json({ results });
   }
 
-  // ── validateAddresses (check company addresses validate with Microsoft via mock order) ──
-  if (action === "validateAddresses") {
-    const { companies } = body;
-    if (!companies || !Array.isArray(companies)) return Response.json({ error: "companies array required" }, { status: 400 });
-
-    const token = await getPax8Token();
-    // We use a single domain counter value for all validation mocks (we won't advance it — just peek)
-    const domainN = await getDomainCounter(base44);
-    const results = [];
-
-    for (let i = 0; i < companies.length; i++) {
-      const client = companies[i];
-      const payload = buildOrderPayload(client.companyId, domainN + 90000 + i); // use far-ahead domain to avoid collision
-      const res = await pax8Post(token, "/orders", payload, { isMock: "true" });
-
-      if (res.ok) {
-        results.push({ companyId: client.companyId, companyName: client.companyName, valid: true, error: null });
-      } else {
-        const detailMsgs = (res.data?.details || []).map(d => d.message).filter(Boolean);
-        const isAddressError = detailMsgs.some(m => m.toLowerCase().includes("address") || m.toLowerCase().includes("city") || m.toLowerCase().includes("postal"));
-        results.push({
-          companyId: client.companyId,
-          companyName: client.companyName,
-          valid: !isAddressError,
-          isAddressError,
-          error: detailMsgs.join("; ") || res.data?.message || `HTTP ${res.status}`,
-        });
-      }
-
-      if (i < companies.length - 1) {
-        await new Promise(r => setTimeout(r, 300));
-      }
-    }
-
-    const validCount = results.filter(r => r.valid).length;
-    const invalidCount = results.filter(r => !r.valid).length;
-    const addressErrors = results.filter(r => r.isAddressError).length;
-
-    return Response.json({ results, validCount, invalidCount, addressErrors, total: results.length });
-  }
-
   // ── createCompanies (bulk from CSV data) ──
   if (action === "createCompanies") {
     const { companies } = body;

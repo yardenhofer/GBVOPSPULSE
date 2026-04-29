@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ShieldAlert, Play, Zap, RefreshCw, Server, Upload, Shield, MapPin } from "lucide-react";
+import { ShieldAlert, Play, Zap, RefreshCw, Server, Upload, Shield } from "lucide-react";
 
 import Pax8PasswordGate from "../components/pax8/Pax8PasswordGate.jsx";
 import ProductVerification from "../components/pax8/ProductVerification.jsx";
@@ -65,9 +65,6 @@ export default function Pax8Orders() {
   const [porkbunCheckData, setPorkbunCheckData] = useState(null);
   const [porkbunCheckLoading, setPorkbunCheckLoading] = useState(false);
 
-  // Address validation state
-  const [addressCheckData, setAddressCheckData] = useState(null);
-  const [addressCheckLoading, setAddressCheckLoading] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(u => setUser(u)).catch(() => {});
@@ -151,28 +148,6 @@ export default function Pax8Orders() {
     setMockResults(allResults);
     setMockProgress(null);
     setMockLoading(false);
-  }
-
-  // ── Address Validation ──
-  async function runAddressValidation() {
-    if (!cappedEligible.length) return;
-    setAddressCheckLoading(true);
-    setAddressCheckData(null);
-
-    const BATCH_SIZE = 10;
-    const allResults = [];
-
-    for (let i = 0; i < cappedEligible.length; i += BATCH_SIZE) {
-      const batch = cappedEligible.slice(i, i + BATCH_SIZE);
-      const res = await base44.functions.invoke("pax8Auth", {
-        action: "validateAddresses",
-        companies: batch.map(c => ({ companyId: c.companyId, companyName: c.companyName })),
-      });
-      if (res.data.results) allResults.push(...res.data.results);
-    }
-
-    setAddressCheckData(allResults);
-    setAddressCheckLoading(false);
   }
 
   // ── Step 4+5: Live Orders (batched to avoid timeout) ──
@@ -376,51 +351,6 @@ export default function Pax8Orders() {
               <div className="max-w-xs mx-auto">
                 <InboxProviderSelector value={selectedInboxProvider} onChange={setSelectedInboxProvider} />
               </div>
-            </div>
-          )}
-
-          {/* Address Validation */}
-          {preflightData && cappedEligible.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-orange-500" />
-                  <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Address Validation</h3>
-                </div>
-                <button onClick={runAddressValidation} disabled={addressCheckLoading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-medium disabled:opacity-50">
-                  <RefreshCw className={`w-3 h-3 ${addressCheckLoading ? "animate-spin" : ""}`} />
-                  {addressCheckLoading ? "Checking…" : "Validate Addresses"}
-                </button>
-              </div>
-              <p className="text-xs text-gray-500">Runs a mock order to verify each company's address validates with Microsoft before live ordering.</p>
-
-              {addressCheckData && (() => {
-                const valid = addressCheckData.filter(r => r.valid);
-                const invalid = addressCheckData.filter(r => !r.valid);
-                return (
-                  <div className="space-y-2">
-                    <div className="flex gap-3 text-xs">
-                      <span className="text-green-600 font-medium">✓ {valid.length} valid</span>
-                      {invalid.length > 0 && <span className="text-red-500 font-medium">✕ {invalid.length} failed</span>}
-                    </div>
-                    {invalid.length > 0 && (
-                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1">
-                        {invalid.map(r => (
-                          <div key={r.companyId} className="text-xs">
-                            <span className="font-medium text-red-500">{r.companyName}</span>
-                            <span className="text-red-400 ml-1">— {r.error}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {invalid.length === 0 && (
-                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-xs text-green-600 font-medium">
-                        All addresses validated successfully with Microsoft.
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
             </div>
           )}
 
