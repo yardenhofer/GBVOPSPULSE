@@ -243,18 +243,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Step 4: Assign workspace name as tag
+    // Step 4: Assign tags — always tag with company name, plus workspace name if available
     let tagInfo = "";
-    const wsName = tenant.instantly_workspace_name;
-    if (orderId && wsName) {
+    const companyTag = tenant.pax8_company_name;
+    if (orderId && companyTag) {
       const tagUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/tags/add/`;
-      console.log(`[SCALESENDS-AUTO] Assigning tag for order ${orderId}: ${wsName}`);
-      const tagRes = await fetch(tagUrl, { method: "POST", headers, body: JSON.stringify({ tag: wsName }) });
+      console.log(`[SCALESENDS-AUTO] Assigning company tag for order ${orderId}: ${companyTag}`);
+      const tagRes = await fetch(tagUrl, { method: "POST", headers, body: JSON.stringify({ tag: companyTag }) });
       if (tagRes.ok) {
-        tagInfo = `. Tag: ${wsName}`;
-        console.log(`[SCALESENDS-AUTO] Tag assigned: ${wsName}`);
+        tagInfo = `. Tag: ${companyTag}`;
+        console.log(`[SCALESENDS-AUTO] Company tag assigned: ${companyTag}`);
       } else {
-        console.log(`[SCALESENDS-AUTO] Tag assignment failed: HTTP ${tagRes.status}`);
+        console.log(`[SCALESENDS-AUTO] Company tag assignment failed: HTTP ${tagRes.status}`);
+      }
+    }
+    const wsName = tenant.instantly_workspace_name;
+    if (orderId && wsName && wsName !== companyTag) {
+      const wsTagUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/tags/add/`;
+      console.log(`[SCALESENDS-AUTO] Assigning workspace tag for order ${orderId}: ${wsName}`);
+      const wsTagRes = await fetch(wsTagUrl, { method: "POST", headers, body: JSON.stringify({ tag: wsName }) });
+      if (wsTagRes.ok) {
+        tagInfo += `. WS Tag: ${wsName}`;
+        console.log(`[SCALESENDS-AUTO] Workspace tag assigned: ${wsName}`);
+      } else {
+        console.log(`[SCALESENDS-AUTO] Workspace tag assignment failed: HTTP ${wsTagRes.status}`);
       }
     }
 
