@@ -853,5 +853,187 @@ Deno.serve(async (req) => {
     return Response.json({ results, okCount, apiDisabledCount, notFoundCount, otherErrorCount, total: results.length });
   }
 
+  // ── fixAddressAndRetry: fix address validation errors and retry orders ──
+  if (action === "fixAddressAndRetry") {
+    const { failedClients, runId, maxDomainRetries, inboxProviderName, inboxProviderType } = body;
+    if (!failedClients || !Array.isArray(failedClients)) return Response.json({ error: "failedClients array required" }, { status: 400 });
+
+    const token = await getPax8Token();
+    const retryLimit = maxDomainRetries || DOMAIN_RETRY_LIMIT;
+    const results = [];
+
+    for (let i = 0; i < failedClients.length; i++) {
+      const client = failedClients[i];
+      const { companyId, companyName } = client;
+
+      // Step 1: Fetch current company data from Pax8
+      let current;
+      try {
+        current = await pax8Get(token, `/companies/${companyId}`);
+      } catch (e) {
+        results.push({ companyId, companyName, step: "fetch", status: "failed", error: `Could not fetch company: ${e.message}` });
+        continue;
+      }
+
+      const addr = current.address || {};
+      const oldCity = addr.city || "";
+      const oldState = addr.stateOrProvince || "";
+      const oldZip = addr.postalCode || "";
+      const oldStreet = addr.street || "";
+      console.log(`[FIX-ADDRESS] ${companyName}: current address — ${oldStreet}, ${oldCity}, ${oldState} ${oldZip}`);
+
+      // Step 2: Use LLM to determine valid city/state/zip
+      let fixedAddress;
+      try {
+        fixedAddress = await base44.asServiceRole.integrations.Core.InvokeLLM({
+          prompt: `I have a US company address that Microsoft rejected because the city/state/postal code combination is invalid. Fix ONLY the city, state, and postal code to be a valid USPS combination. Keep it as close to the original as possible — just correct the mismatch.
+
+Original address:
+- Street: ${oldStreet}
+- City: ${oldCity}
+- State: ${oldState}
+- Postal Code: ${oldZip}
+- Country: US
+
+Company name for context: ${companyName}
+
+Return the corrected city, state (2-letter code), and postal code that form a valid US address combination.`,
+          response_json_schema: {
+            type: "object",
+            properties: {
+              city: { type: "string", description: "Corrected city name" },
+              state: { type: "string", description: "Corrected 2-letter state code" },
+              postalCode: { type: "string", description: "Corrected 5-digit postal code" },
+              explanation: { type: "string", description: "Brief explanation of what was wrong and what you fixed" },
+            },
+            required: ["city", "state", "postalCode"],
+          },
+        });
+      } catch (e) {
+        results.push({ companyId, companyName, step: "llm", status: "failed", error: `LLM lookup failed: ${e.message}` });
+        continue;
+      }
+
+      console.log(`[FIX-ADDRESS] ${companyName}: LLM fix — ${fixedAddress.city}, ${fixedAddress.state} ${fixedAddress.postalCode} (${fixedAddress.explanation})`);
+
+      // Step 3: Patch the company address in Pax8
+      const patchBody = { ...current };
+      delete patchBody.id;
+      delete patchBody.updatedDate;
+      delete patchBody.createdDate;
+      patchBody.address = {
+        ...patchBody.address,
+        city: fixedAddress.city,
+        stateOrProvince: fixedAddress.state,
+        postalCode: fixedAddress.postalCode,
+      };
+
+      const patchUrl = `${PAX8_API_BASE}/companies/${companyId}`;
+      const patchRes = await fetch(patchUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(patchBody),
+      });
+      const patchText = await patchRes.text();
+      let patchJson;
+      try { patchJson = JSON.parse(patchText); } catch { patchJson = null; }
+
+      if (!patchRes.ok) {
+        results.push({
+          companyId, companyName, step: "patch", status: "failed",
+          error: `Address patch failed: ${patchJson?.message || patchText || `HTTP ${patchRes.status}`}`,
+          oldAddress: { city: oldCity, state: oldState, postalCode: oldZip },
+          newAddress: fixedAddress,
+        });
+        continue;
+      }
+
+      console.log(`[FIX-ADDRESS] ${companyName}: address patched successfully`);
+
+      // Step 4: Retry the order
+      let orderSucceeded = false;
+      let orderResult = null;
+
+      for (let attempt = 0; attempt < retryLimit; attempt++) {
+        const domainN = await getDomainCounter(base44);
+        const payload = buildOrderPayload(companyId, domainN);
+        await setDomainCounter(base44, domainN + 1);
+
+        console.log(`[FIX-ADDRESS] ${companyName}: retry order attempt ${attempt + 1} with GrowBig${domainN}`);
+        const res = await pax8Post(token, "/orders", payload);
+
+        if (res.ok) {
+          const sendingDomain = client.domain || (companyName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".info");
+          const tenantData = {
+            pax8_company_id: companyId,
+            pax8_company_name: companyName,
+            sending_domain: sendingDomain,
+            ms_domain: `GrowBig${domainN}`,
+            overall_status: "ordered",
+          };
+          if (inboxProviderName) {
+            tenantData.flags = `provider:${inboxProviderName}`;
+          }
+          const tenantRecord = await base44.asServiceRole.entities.TenantLifecycle.create(tenantData);
+
+          orderResult = {
+            companyId, companyName, step: "complete", status: "success",
+            orderId: res.data?.id,
+            domainUsed: `GrowBig${domainN}`,
+            tenantLifecycleId: tenantRecord.id,
+            oldAddress: { city: oldCity, state: oldState, postalCode: oldZip },
+            newAddress: fixedAddress,
+          };
+          orderSucceeded = true;
+          break;
+        }
+
+        const errText = (res.data?.message || res.text || "").toLowerCase();
+        const detailsText = JSON.stringify(res.data?.details || []).toLowerCase();
+        const combined = errText + " " + detailsText;
+        const isDomainCollision = combined.includes("domain") && (combined.includes("taken") || combined.includes("exists") || combined.includes("already") || combined.includes("unavailable"));
+
+        if (isDomainCollision) {
+          console.log(`[FIX-ADDRESS] Domain GrowBig${domainN} collision for ${companyName}, retrying...`);
+          continue;
+        }
+
+        // Non-domain error
+        let errMsg = res.data?.details?.map(d => d.message).filter(Boolean).join("; ") || res.data?.message || res.text || `HTTP ${res.status}`;
+        orderResult = {
+          companyId, companyName, step: "retry_order", status: "failed",
+          error: errMsg,
+          oldAddress: { city: oldCity, state: oldState, postalCode: oldZip },
+          newAddress: fixedAddress,
+        };
+        break;
+      }
+
+      if (!orderSucceeded && !orderResult) {
+        const finalCounter = await getDomainCounter(base44);
+        orderResult = {
+          companyId, companyName, step: "retry_order", status: "failed",
+          error: `Domain collision: exhausted ${retryLimit} attempts ending at GrowBig${finalCounter - 1}`,
+          oldAddress: { city: oldCity, state: oldState, postalCode: oldZip },
+          newAddress: fixedAddress,
+        };
+      }
+
+      results.push(orderResult);
+
+      // 2-second delay between clients
+      if (i < failedClients.length - 1) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
+    return Response.json({
+      results,
+      fixed: results.filter(r => r.status === "success").length,
+      stillFailed: results.filter(r => r.status === "failed").length,
+      total: failedClients.length,
+    });
+  }
+
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
 });
