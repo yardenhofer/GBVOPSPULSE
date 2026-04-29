@@ -133,24 +133,12 @@ Deno.serve(async (req) => {
       return Response.json({ processed: 0, note: "Processing paused by admin" });
     }
 
-    // Rate limit check
+    // Rate limit warning (no auto-pause)
     const tenMinAgo = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
     const recentLogs = await base44.asServiceRole.entities.GmailEmailLog.filter({ matched: true });
     const recentMatched = recentLogs.filter(l => l.created_date > tenMinAgo).length;
     if (recentMatched >= RATE_LIMIT_MAX) {
-      console.log("[GMAIL] Rate limit hit. Pausing processing.");
-      await base44.asServiceRole.entities.TenantAuditLog.create({
-        action: "rate_limit_triggered",
-        detail: `${recentMatched} matched emails in last 10 minutes. Processing paused.`,
-      });
-      // Auto-enable kill switch
-      const existing = await base44.asServiceRole.entities.AppSettings.filter({ key: "gmail_processing_paused" });
-      if (existing.length > 0) {
-        await base44.asServiceRole.entities.AppSettings.update(existing[0].id, { value: "true" });
-      } else {
-        await base44.asServiceRole.entities.AppSettings.create({ key: "gmail_processing_paused", value: "true" });
-      }
-      return Response.json({ processed: 0, note: "Rate limit triggered" });
+      console.log(`[GMAIL] High volume: ${recentMatched} matched emails in last 10 minutes. Continuing processing.`);
     }
 
     const { accessToken } = await base44.asServiceRole.connectors.getConnection("gmail");
