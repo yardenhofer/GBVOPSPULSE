@@ -1020,6 +1020,31 @@ Deno.serve(async (req) => {
     return Response.json({ total: allOrders.length, assigned: successCount, provider, results });
   }
 
+  // ── removeProviderFromOrders: remove a specific inbox provider from specified orders ──
+  if (action === "removeProviderFromOrders") {
+    const { orderIds, providerName } = body;
+    if (!orderIds || !Array.isArray(orderIds) || !providerName) {
+      return Response.json({ error: "orderIds array and providerName required" }, { status: 400 });
+    }
+    const { apiKey, customerId } = getApiCredentials();
+    const results = [];
+    for (const orderId of orderIds) {
+      const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/inbox-providers/remove/`;
+      console.log(`[SCALESENDS] POST ${url} — removing provider: ${providerName}`);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: getHeaders(apiKey),
+        body: JSON.stringify({ name: providerName }),
+      });
+      const text = await res.text();
+      console.log(`[SCALESENDS] inbox-providers/remove response: HTTP ${res.status} — ${text.substring(0, 300)}`);
+      let json = null;
+      try { json = JSON.parse(text); } catch {}
+      results.push({ orderId, success: res.ok, httpStatus: res.status, data: json, error: res.ok ? null : text.substring(0, 200) });
+    }
+    return Response.json({ results, removed: results.filter(r => r.success).length, total: orderIds.length });
+  }
+
   // ── getNamePool: return stored names ──
   if (action === "getNamePool") {
     const setting = await getSetting(base44, "scalesends_name_pool");
