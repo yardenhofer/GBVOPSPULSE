@@ -5,7 +5,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 // Processes up to BATCH_LIMIT tenants per invocation to avoid timeouts.
 
 const BASE_URL = "https://cloud-api.plugsaas.com";
-const BATCH_LIMIT = 10; // max tenants per run
+const BATCH_LIMIT = 3; // max tenants per run (Scalesends API ~20-30s per create)
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -64,13 +64,7 @@ Deno.serve(async (req) => {
 
   const headers = { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json", "Content-Type": "application/json" };
 
-  // Fetch all existing Scalesends orders once
-  let existingOrders = [];
-  const listRes = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, { headers });
-  if (listRes.ok) {
-    const listData = await listRes.json();
-    existingOrders = Array.isArray(listData.data) ? listData.data : (Array.isArray(listData) ? listData : []);
-  }
+  // Skip pre-fetching existing orders to save time — duplicates are handled via API error
 
   // Default provider and workspace
   let defaultInboxProvider = null;
@@ -104,17 +98,7 @@ Deno.serve(async (req) => {
     const tenantDomain = (tenant.ms_tenant_domain || "").toLowerCase();
     const msDomain = (tenant.ms_domain || "").toLowerCase();
 
-    // Check if already exists in Scalesends
-    let existing = null;
-    for (const order of existingOrders) {
-      const oEmail = (order.email || "").toLowerCase();
-      const oDomain = (order.domain || "").toLowerCase();
-      const oEnd = (order.endDomain || "").toLowerCase();
-      if (adminEmail && oEmail && oEmail === adminEmail) { existing = order; break; }
-      if (tenantDomain && oDomain && tenantDomain.includes(oDomain)) { existing = order; break; }
-      if (msDomain && oDomain && oDomain.includes(msDomain.toLowerCase())) { existing = order; break; }
-      if (tenantDomain && oEnd && tenantDomain.includes(oEnd)) { existing = order; break; }
-    }
+    // No pre-check — just try creating; API returns error if duplicate
 
     // Determine workspace and provider for this tenant
     const tenantWorkspaceId = tenant.instantly_workspace_id || defaultWorkspaceId || null;
@@ -128,38 +112,6 @@ Deno.serve(async (req) => {
       if (providerName) inboxProvider = { name: providerName, provider: "instantly" };
     }
     if (!inboxProvider) inboxProvider = defaultInboxProvider;
-
-    if (existing) {
-      // Link to existing order
-      const mCount = existing.mailboxes?.length || 0;
-      const onboard = (existing.onboardStatus || "").toLowerCase();
-      const isComplete = mCount > 0 && (onboard === "complete" || onboard === "onboarded" || onboard === "ready");
-      const sStatus = isComplete ? "complete" : "processing";
-      const oStatus = isComplete ? "inboxes_ready" : "inboxes_creating";
-      const updateData = { scalesends_status: sStatus, scalesends_job_id: existing._id, overall_status: oStatus, scalesends_inbox_count: mCount };
-      if (isComplete) {
-        updateData.scalesends_completed_at = existing.updatedAt || new Date().toISOString();
-        updateData.scalesends_inbox_details = JSON.stringify((existing.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
-      }
-      if (tenantWorkspaceId) { updateData.instantly_workspace_id = tenantWorkspaceId; updateData.instantly_workspace_name = tenantWorkspaceName; updateData.instantly_upload_status = "pending"; }
-
-      // Assign inbox provider and tag to linked order
-      if (inboxProvider && existing._id) {
-        const provUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${existing._id}/inbox-providers/add/`;
-        await fetch(provUrl, { method: "POST", headers, body: JSON.stringify({ name: inboxProvider.name, provider: inboxProvider.provider }) });
-        const tagUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${existing._id}/tags/add/`;
-        await fetch(tagUrl, { method: "POST", headers, body: JSON.stringify({ tag: inboxProvider.name }) });
-      }
-
-      await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
-      await base44.asServiceRole.entities.TenantAuditLog.create({
-        action: "email_linked", tenant_lifecycle_id: tenant.id,
-        detail: `Catch-up: Linked to existing Scalesends order ${existing._id} (status: ${sStatus})`,
-      });
-      results.push({ tenantId: tenant.id, domain: tenant.ms_tenant_domain, action: "linked", orderId: existing._id });
-      console.log(`[CATCHUP] Linked ${tenant.ms_tenant_domain} to existing order ${existing._id}`);
-      continue;
-    }
 
     // Create new order
     const names = namePool.length > 0 ? [...namePool].sort(() => Math.random() - 0.5).slice(0, 100) : [];
@@ -179,37 +131,14 @@ Deno.serve(async (req) => {
       const order = json?.data || json;
       let orderId = order?._id || order?.id || null;
 
-      // Fallback lookup if no ID returned
+      // If no orderId returned, log it but continue (syncOrders will find it later)
       if (!orderId) {
-        const lookupRes = await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/`, { headers });
-        if (lookupRes.ok) {
-          const lookupData = await lookupRes.json();
-          const allOrders = Array.isArray(lookupData.data) ? lookupData.data : [];
-          const found = allOrders.find(o => (o.email || "").toLowerCase() === adminEmail);
-          if (found) orderId = found._id;
-        }
+        console.log(`[CATCHUP] Warning: No order ID returned for ${tenant.ms_tenant_domain}`);
       }
 
-      // Assign inbox provider
-      if (orderId && inboxProvider) {
-        const provUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/inbox-providers/add/`;
-        await fetch(provUrl, { method: "POST", headers, body: JSON.stringify({ name: inboxProvider.name, provider: inboxProvider.provider }) });
-      }
+      // Inbox provider assignment skipped in catch-up to save time (done later via syncOrders/fixAllProviders)
 
-      // Assign registrar
-      if (orderId) {
-        const nsUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/nameservers/`;
-        const nsRes = await fetch(nsUrl, { headers });
-        if (nsRes.ok) {
-          const nsData = await nsRes.json();
-          const registrars = (nsData.data || nsData).availableRegistrars || [];
-          if (registrars.length > 0) {
-            await fetch(`${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/set-registrar/`, {
-              method: "POST", headers, body: JSON.stringify({ registrarName: registrars[0].name }),
-            });
-          }
-        }
-      }
+      // Registrar assignment skipped in catch-up to save time (done later via syncOrders)
 
       // Tag assignment skipped in catch-up to save time (can be done later via sync)
 
@@ -228,34 +157,6 @@ Deno.serve(async (req) => {
       console.log(`[CATCHUP] Submitted ${tenant.ms_tenant_domain}, order ${orderId}`);
     } else {
       const errMsg = json?.error || json?.message || text.substring(0, 200) || `HTTP ${res.status}`;
-
-      // Check if it's a duplicate (500 error) — reuse cached order list + check by email
-      if (res.status === 500) {
-        const dup = existingOrders.find(o => (o.email || "").toLowerCase() === adminEmail);
-        if (dup) {
-          const mCount = dup.mailboxes?.length || 0;
-          const onboard = (dup.onboardStatus || "").toLowerCase();
-          const isComplete = mCount > 0 && (onboard === "complete" || onboard === "onboarded" || onboard === "ready");
-          const updateData = {
-            scalesends_status: isComplete ? "complete" : "processing",
-            scalesends_job_id: dup._id, overall_status: isComplete ? "inboxes_ready" : "inboxes_creating",
-            scalesends_inbox_count: mCount,
-          };
-          if (isComplete) {
-            updateData.scalesends_completed_at = dup.updatedAt || new Date().toISOString();
-            updateData.scalesends_inbox_details = JSON.stringify((dup.mailboxes || []).map(m => ({ name: m.name, email: m.email, password: m.password })));
-          }
-          if (tenantWorkspaceId) { updateData.instantly_workspace_id = tenantWorkspaceId; updateData.instantly_workspace_name = tenantWorkspaceName; updateData.instantly_upload_status = "pending"; }
-          await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, updateData);
-          await base44.asServiceRole.entities.TenantAuditLog.create({
-            action: "email_linked", tenant_lifecycle_id: tenant.id,
-            detail: `Catch-up: API 500 (duplicate). Linked to existing order ${dup._id}`,
-          });
-          results.push({ tenantId: tenant.id, domain: tenant.ms_tenant_domain, action: "linked_duplicate", orderId: dup._id });
-          console.log(`[CATCHUP] Duplicate detected for ${tenant.ms_tenant_domain}, linked to ${dup._id}`);
-          continue;
-        }
-      }
 
       await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
         scalesends_status: "failed", scalesends_failure_reason: errMsg,
