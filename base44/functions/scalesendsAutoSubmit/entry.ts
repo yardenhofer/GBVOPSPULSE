@@ -243,6 +243,21 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Step 4: Assign workspace name as tag
+    let tagInfo = "";
+    const wsName = tenant.instantly_workspace_name;
+    if (orderId && wsName) {
+      const tagUrl = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/tags/add/`;
+      console.log(`[SCALESENDS-AUTO] Assigning tag for order ${orderId}: ${wsName}`);
+      const tagRes = await fetch(tagUrl, { method: "POST", headers, body: JSON.stringify({ tag: wsName }) });
+      if (tagRes.ok) {
+        tagInfo = `. Tag: ${wsName}`;
+        console.log(`[SCALESENDS-AUTO] Tag assigned: ${wsName}`);
+      } else {
+        console.log(`[SCALESENDS-AUTO] Tag assignment failed: HTTP ${tagRes.status}`);
+      }
+    }
+
     await base44.asServiceRole.entities.TenantLifecycle.update(tenant.id, {
       scalesends_status: "processing",
       scalesends_job_id: orderId,
@@ -255,7 +270,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.TenantAuditLog.create({
       action: "email_parsed",
       tenant_lifecycle_id: tenant.id,
-      detail: `Auto-submitted to Scalesends. Order ID: ${orderId}. Domain: ${order?.domain || "pending"}${providerInfo}${registrarInfo}.`,
+      detail: `Auto-submitted to Scalesends. Order ID: ${orderId}. Domain: ${order?.domain || "pending"}${providerInfo}${registrarInfo}${tagInfo}.`,
     });
 
     console.log(`[SCALESENDS-AUTO] Success! Order ${orderId} for ${tenant.ms_tenant_domain}`);

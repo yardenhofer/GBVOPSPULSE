@@ -165,6 +165,23 @@ async function createScalesendsOrder(apiKey, customerId, email, password, domain
   };
 }
 
+// ── Assign a tag to an order (separate API call) ──
+async function assignTag(apiKey, customerId, orderId, tag) {
+  if (!tag || !orderId) return { success: false, error: "No tag or orderId" };
+  const url = `${BASE_URL}/api/v1/simple/customers/${customerId}/orders/${orderId}/tags/add/`;
+  const payload = { tag };
+  console.log(`[SCALESENDS] POST ${url} — tag: ${tag}`);
+  const res = await fetch(url, { method: "POST", headers: getHeaders(apiKey), body: JSON.stringify(payload) });
+  const text = await res.text();
+  console.log(`[SCALESENDS] tags/add response: HTTP ${res.status} — ${text.substring(0, 300)}`);
+  if (!res.ok) {
+    return { success: false, error: `Set tag failed: HTTP ${res.status} — ${text.substring(0, 200)}` };
+  }
+  let json = null;
+  try { json = JSON.parse(text); } catch {}
+  return { success: true, data: json };
+}
+
 // ── Assign inbox provider to an order (separate API call) ──
 async function assignInboxProvider(apiKey, customerId, orderId, inboxProvider) {
   if (!inboxProvider || !orderId) return { success: false, error: "No provider or orderId" };
@@ -448,6 +465,13 @@ Deno.serve(async (req) => {
         if (!registrarResult.success) console.log(`[SCALESENDS] Warning: registrar assignment deferred for order ${result.orderId}: ${registrarResult.error}`);
       }
 
+      // Step 4: Assign workspace name as tag
+      let tagResult = null;
+      if (result.orderId && workspaceName) {
+        tagResult = await assignTag(apiKey, customerId, result.orderId, workspaceName);
+        if (!tagResult.success) console.log(`[SCALESENDS] Warning: tag assignment failed for order ${result.orderId}: ${tagResult.error}`);
+      }
+
       const updateData = {
         scalesends_status: "processing",
         scalesends_job_id: result.orderId,
@@ -465,11 +489,12 @@ Deno.serve(async (req) => {
 
       const providerInfo = providerResult?.success ? `. Provider: ${inboxProvider.name}` : "";
       const registrarInfo = registrarResult?.success ? `. Registrar: ${registrarResult.registrar?.name}` : "";
+      const tagInfo = tagResult?.success ? `. Tag: ${workspaceName}` : "";
       await base44.asServiceRole.entities.TenantAuditLog.create({
         action: "email_parsed",
         tenant_lifecycle_id: tenant.id,
         performed_by: user.email,
-        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}${workspaceName ? `. Workspace: ${workspaceName}` : ""}${providerInfo}${registrarInfo}`,
+        detail: `Submitted to Scalesends (${triggerType || "manual"}). Order ID: ${result.orderId}. Domain: ${result.domain || "pending"}${workspaceName ? `. Workspace: ${workspaceName}` : ""}${providerInfo}${registrarInfo}${tagInfo}`,
       });
 
       return Response.json({
@@ -603,6 +628,12 @@ Deno.serve(async (req) => {
         if (result.orderId) {
           const regRes = await autoAssignRegistrar(apiKey, customerId, result.orderId);
           if (!regRes.success) console.log(`[SCALESENDS] Bulk: registrar deferred for order ${result.orderId}: ${regRes.error}`);
+        }
+
+        // Step 4: Assign workspace name as tag
+        if (result.orderId && bulkWorkspaceName) {
+          const tagRes = await assignTag(apiKey, customerId, result.orderId, bulkWorkspaceName);
+          if (!tagRes.success) console.log(`[SCALESENDS] Bulk: tag assignment failed for order ${result.orderId}: ${tagRes.error}`);
         }
 
         const bulkUpdate = {
