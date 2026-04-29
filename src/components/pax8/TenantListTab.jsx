@@ -153,13 +153,16 @@ export default function TenantListTab() {
 
       {/* Backfill Result */}
       {backfillResult && (
-        <div className={`rounded-xl border p-3 text-xs ${backfillResult.error ? "bg-red-500/10 border-red-500/20 text-red-500" : "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400"}`}>
+        <div className={`rounded-xl border p-3 text-xs ${backfillResult.error ? "bg-red-500/10 border-red-500/20 text-red-500" : backfillResult.remaining > 0 ? "bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400" : "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400"}`}>
           {backfillResult.error ? (
             <p>{backfillResult.error}</p>
           ) : (
             <div className="space-y-1">
               <p className="font-semibold">
-                Backfill complete: found {backfillResult.found} emails, {backfillResult.newMessages} were unprocessed.
+                Processed {backfillResult.processed} emails this batch.
+                {backfillResult.remaining > 0
+                  ? ` ${backfillResult.remaining} still remaining — click "Backfill" again.`
+                  : " All caught up!"}
               </p>
               {backfillResult.summary && (
                 <p>
