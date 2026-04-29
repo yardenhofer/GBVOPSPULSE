@@ -93,9 +93,21 @@ function attemptParse(body) {
   }
 
   // Look for password near keywords (handles HTML tags like <strong>Password:</strong> value)
+  // The Pax8 email format is: <strong>Password:</strong> VALUE</li>
+  // We match everything up to the next HTML tag or whitespace, then strip only
+  // punctuation that's followed by a closing tag (sentence-ending), not standalone.
   const pwdMatch = body.match(/(?:initial password|temporary password|password)\s*(?:<[^>]*>)*[:\s]*(?:<[^>]*>)*\s*([^\s<\n\r]{4,40})/i);
   if (pwdMatch) {
-    result.adminPassword = pwdMatch[1].replace(/[.,;]$/, "");
+    // Only strip a trailing period/comma/semicolon if it's immediately followed by < (HTML tag)
+    // This avoids stripping punctuation that's actually part of the password
+    const pwdRaw = pwdMatch[1];
+    const pwdEndIdx = pwdMatch.index + pwdMatch[0].length;
+    const charAfter = body[pwdEndIdx] || "";
+    if (/[.,;]$/.test(pwdRaw) && charAfter === "<") {
+      result.adminPassword = pwdRaw.replace(/[.,;]$/, "");
+    } else {
+      result.adminPassword = pwdRaw;
+    }
   }
 
   result.parsed = !!(result.adminUsername || result.tenantId);
