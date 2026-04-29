@@ -77,7 +77,7 @@ async function findExistingOrder(apiKey, customerId, tenant) {
 function mapScalesendsStatus(order) {
   const mailboxCount = order.mailboxes?.length || 0;
   const onboard = (order.onboardStatus || "").toLowerCase();
-  if (mailboxCount > 0 && (onboard === "complete" || onboard === "onboarded" || onboard === "ready")) {
+  if (mailboxCount > 0 && (onboard === "complete" || onboard === "completed" || onboard === "onboarded" || onboard === "ready")) {
     return { scalesendsStatus: "complete", overallStatus: "inboxes_ready" };
   }
   if (mailboxCount > 0) {
@@ -721,7 +721,7 @@ Deno.serve(async (req) => {
       let newStatus = tenant.scalesends_status;
       let newOverall = tenant.overall_status;
 
-      if (hasMailboxes && (onboardStatus === "complete" || onboardStatus === "onboarded" || onboardStatus === "ready")) {
+      if (hasMailboxes && (onboardStatus === "complete" || onboardStatus === "completed" || onboardStatus === "onboarded" || onboardStatus === "ready")) {
         newStatus = "complete";
         newOverall = "inboxes_ready";
       } else if (hasMailboxes) {
