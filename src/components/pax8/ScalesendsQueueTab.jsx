@@ -119,8 +119,31 @@ export default function ScalesendsQueueTab() {
   async function handlePorkbunSync() {
     setPorkbunSyncing(true);
     setPorkbunResult(null);
-    const res = await base44.functions.invoke("porkbunNameservers", { action: "syncAll" });
-    setPorkbunResult(res.data);
+    let totalSuccess = 0, totalMatched = 0, totalErrors = 0, totalSkipped = 0, totalProcessed = 0;
+    let remaining = 1; // start truthy
+    let lastData = null;
+    while (remaining > 0) {
+      const res = await base44.functions.invoke("porkbunNameservers", { action: "syncAll", batchSize: 15 });
+      lastData = res.data;
+      if (lastData.skipped) break; // feature flag off
+      totalSuccess += lastData.successCount || 0;
+      totalMatched += lastData.alreadyMatchedCount || 0;
+      totalErrors += lastData.errorCount || 0;
+      totalSkipped += lastData.skippedCount || 0;
+      totalProcessed += lastData.processed || 0;
+      remaining = lastData.remaining || 0;
+      setPorkbunResult({
+        successCount: totalSuccess,
+        alreadyMatchedCount: totalMatched,
+        errorCount: totalErrors,
+        skippedCount: totalSkipped,
+        alreadyDone: lastData.alreadyDone,
+        totalWithJob: lastData.totalWithJob,
+        processed: totalProcessed,
+        remaining,
+      });
+    }
+    if (lastData?.skipped) setPorkbunResult(lastData);
     setPorkbunSyncing(false);
   }
 
@@ -238,7 +261,7 @@ export default function ScalesendsQueueTab() {
         )}
         {porkbunResult && (
           <span className="text-xs text-indigo-600 dark:text-indigo-400">
-            {porkbunResult.skipped ? porkbunResult.message : `Porkbun NS: ${porkbunResult.successCount} applied, ${porkbunResult.alreadyMatchedCount} matched, ${porkbunResult.errorCount} errors, ${porkbunResult.skippedCount} skipped · ${porkbunResult.alreadyDone || 0} already done${porkbunResult.orphanedProcessed ? ` · ${porkbunResult.orphanedProcessed} orphaned orders processed` : ""}`}
+            {porkbunResult.skipped ? porkbunResult.message : `Porkbun NS: ${porkbunResult.successCount} applied, ${porkbunResult.alreadyMatchedCount} matched, ${porkbunResult.errorCount} errors, ${porkbunResult.skippedCount} skipped · ${porkbunResult.alreadyDone || 0} already done${porkbunResult.remaining > 0 ? ` · ${porkbunResult.remaining} remaining…` : ""}`}
           </span>
         )}
       </div>
