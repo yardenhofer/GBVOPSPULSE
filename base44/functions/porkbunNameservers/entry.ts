@@ -319,14 +319,26 @@ Deno.serve(async (req) => {
 
   // ── verify: Re-check all "done" tenants against Porkbun to find mismatches ──
   if (action === "verify") {
-    const BATCH_SIZE = body.batchSize || 15;
-    const DELAY_MS = 1500;
+    const BATCH_SIZE = body.batchSize || 10;
+    const DELAY_MS = 800;
+    const resetVerified = body.resetVerified || false;
 
     const { apiKey, customerId } = getScalesendsCredentials();
     const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
 
+    // If resetVerified, clear all verification marks so we can re-run
+    if (resetVerified) {
+      const verified = allTenants.filter(t => t.porkbun_last_response === "ns_verified");
+      for (const t of verified) {
+        await base44.asServiceRole.entities.TenantLifecycle.update(t.id, { porkbun_last_response: null });
+      }
+      return Response.json({ reset: verified.length });
+    }
+
+    // Filter to tenants that are "done" but NOT yet verified in this run
     const doneTenants = allTenants.filter(t =>
       t.scalesends_job_id && t.sending_domain && t.porkbun_ns_applied_at && !t.porkbun_last_error
+      && t.porkbun_last_response !== "ns_verified"
     );
 
     const batch = doneTenants.slice(0, BATCH_SIZE);
@@ -335,35 +347,32 @@ Deno.serve(async (req) => {
 
     for (let i = 0; i < batch.length; i++) {
       const t = batch[i];
-      // Get required NS from Scalesends
       const ssResult = await getScalesendsNameservers(apiKey, customerId, t.scalesends_job_id);
       if (!ssResult.success || !ssResult.nameservers || ssResult.nameservers.length === 0) {
+        // Mark as verified (skip) so we don't re-check
+        await base44.asServiceRole.entities.TenantLifecycle.update(t.id, { porkbun_last_response: "ns_verified" });
         results.push({ tenantId: t.id, domain: t.sending_domain, status: "skipped", reason: "No NS from Scalesends" });
         if (i < batch.length - 1) await new Promise(r => setTimeout(r, DELAY_MS));
         continue;
       }
 
-      // Get actual current NS at Porkbun
       const pbResult = await getPorkbunNameservers(t.sending_domain);
       const currentNs = pbResult.data?.ns || [];
       const matched = nsMatch(currentNs, ssResult.nameservers);
 
       if (matched) {
+        // Mark as verified so next batch skips it
+        await base44.asServiceRole.entities.TenantLifecycle.update(t.id, { porkbun_last_response: "ns_verified" });
         results.push({ tenantId: t.id, domain: t.sending_domain, status: "verified", scalesendsNsStatus: ssResult.nameserversStatus });
       } else {
-        // NS don't actually match — reset porkbun_ns_applied_at so syncAll picks it up
         await base44.asServiceRole.entities.TenantLifecycle.update(t.id, {
           porkbun_ns_applied_at: null,
           porkbun_last_error: `Verification failed: Porkbun NS [${currentNs.join(", ")}] != required [${ssResult.nameservers.join(", ")}]`,
         });
         resetCount++;
         results.push({
-          tenantId: t.id,
-          domain: t.sending_domain,
-          status: "mismatch_reset",
-          currentNs,
-          requiredNs: ssResult.nameservers,
-          scalesendsNsStatus: ssResult.nameserversStatus,
+          tenantId: t.id, domain: t.sending_domain, status: "mismatch_reset",
+          currentNs, requiredNs: ssResult.nameservers, scalesendsNsStatus: ssResult.nameserversStatus,
         });
       }
       if (i < batch.length - 1) await new Promise(r => setTimeout(r, DELAY_MS));
