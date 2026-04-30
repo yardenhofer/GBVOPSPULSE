@@ -60,18 +60,14 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ── fix: Apply provider mapping to Scalesends orders based on tenant flags ──
+  // ── fix: Assign the correct Scalesends provider based on each tenant's flag ──
+  // The flag value IS the Scalesends provider name (e.g. "Omni Instantly", "Kapital Funding WKSP | GBV Instantly")
   if (action === "fix") {
-    const { mapping, dryRun } = body;
-    // mapping is an object like: { "Omni Instantly": "Kapital Funding WKSP | GBV Instantly", ... }
-    // Only fix tenants whose flag maps to a DIFFERENT provider than what's currently assigned
-    if (!mapping || typeof mapping !== "object") {
-      return Response.json({ error: "mapping object required, e.g. { 'Omni Instantly': 'Kapital Funding WKSP | GBV Instantly' }" }, { status: 400 });
-    }
+    const { dryRun } = body;
 
     const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
 
-    // Find tenants that need fixing based on the mapping
+    // Find all tenants with a provider flag and a Scalesends order
     const toFix = [];
     for (const t of allTenants) {
       if (!t.scalesends_job_id) continue;
@@ -80,16 +76,14 @@ Deno.serve(async (req) => {
       const providerFlag = providerMatch ? providerMatch[1].trim() : null;
       if (!providerFlag) continue;
 
-      const correctProvider = mapping[providerFlag];
-      if (!correctProvider) continue; // No mapping for this flag, skip
-
+      // The flag value IS the correct Scalesends provider name
       toFix.push({
         id: t.id,
         domain: t.ms_tenant_domain,
         company: t.pax8_company_name,
         orderId: t.scalesends_job_id,
         flag: providerFlag,
-        correctProvider,
+        correctProvider: providerFlag,
       });
     }
 
