@@ -38,6 +38,8 @@ export default function ScalesendsQueueTab() {
   const [porkbunResult, setPorkbunResult] = useState(null);
   const [fixingProviders, setFixingProviders] = useState(false);
   const [fixProvidersResult, setFixProvidersResult] = useState(null);
+  const [verifyingNs, setVerifyingNs] = useState(false);
+  const [verifyResult, setVerifyResult] = useState(null);
 
   async function loadAll() {
     setLoading(true);
@@ -114,6 +116,29 @@ export default function ScalesendsQueueTab() {
     const res = await base44.functions.invoke("scalesendsSubmit", { action: "fixAllProviders" });
     setFixProvidersResult(res.data);
     setFixingProviders(false);
+  }
+
+  async function handleVerifyNs() {
+    setVerifyingNs(true);
+    setVerifyResult(null);
+    let totalVerified = 0, totalMismatched = 0, totalSkipped = 0, totalChecked = 0;
+    let remaining = 1;
+    let lastData = null;
+    while (remaining > 0) {
+      const res = await base44.functions.invoke("porkbunNameservers", { action: "verify", batchSize: 30 });
+      lastData = res.data;
+      totalVerified += lastData.verified || 0;
+      totalMismatched += lastData.mismatched || 0;
+      totalSkipped += lastData.skipped || 0;
+      totalChecked += lastData.checked || 0;
+      remaining = lastData.remaining || 0;
+      setVerifyResult({ verified: totalVerified, mismatched: totalMismatched, skipped: totalSkipped, checked: totalChecked, remaining, totalDone: lastData.totalDone });
+    }
+    // If mismatches were found, auto-run syncAll to fix them
+    if (totalMismatched > 0) {
+      await handlePorkbunSync();
+    }
+    setVerifyingNs(false);
   }
 
   async function handlePorkbunSync() {
@@ -232,6 +257,10 @@ export default function ScalesendsQueueTab() {
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-500/20 font-medium disabled:opacity-50">
           <RotateCw className={`w-3 h-3 ${porkbunSyncing ? "animate-spin" : ""}`} /> Porkbun NS
         </button>
+        <button onClick={handleVerifyNs} disabled={verifyingNs}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-violet-100 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 hover:bg-violet-200 dark:hover:bg-violet-500/20 font-medium disabled:opacity-50">
+          <RotateCw className={`w-3 h-3 ${verifyingNs ? "animate-spin" : ""}`} /> Verify NS
+        </button>
         <button onClick={handleFixProviders} disabled={fixingProviders}
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-100 dark:bg-teal-500/10 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/20 font-medium disabled:opacity-50">
           <RotateCw className={`w-3 h-3 ${fixingProviders ? "animate-spin" : ""}`} /> Fix Providers
@@ -257,6 +286,11 @@ export default function ScalesendsQueueTab() {
         {fixProvidersResult && (
           <span className="text-xs text-teal-600 dark:text-teal-400">
             Providers: {fixProvidersResult.assigned}/{fixProvidersResult.total} assigned ({fixProvidersResult.provider?.name})
+          </span>
+        )}
+        {verifyResult && (
+          <span className="text-xs text-violet-600 dark:text-violet-400">
+            Verify: {verifyResult.verified} OK, {verifyResult.mismatched} mismatched{verifyResult.mismatched > 0 ? " (re-applied)" : ""}, {verifyResult.skipped} skipped{verifyResult.remaining > 0 ? ` · ${verifyResult.remaining} remaining…` : ` · ${verifyResult.checked} checked`}
           </span>
         )}
         {porkbunResult && (

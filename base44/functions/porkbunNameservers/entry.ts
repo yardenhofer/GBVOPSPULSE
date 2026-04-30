@@ -317,6 +317,69 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ── verify: Re-check all "done" tenants against Porkbun to find mismatches ──
+  if (action === "verify") {
+    const BATCH_SIZE = body.batchSize || 15;
+    const DELAY_MS = 1500;
+
+    const { apiKey, customerId } = getScalesendsCredentials();
+    const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
+
+    const doneTenants = allTenants.filter(t =>
+      t.scalesends_job_id && t.sending_domain && t.porkbun_ns_applied_at && !t.porkbun_last_error
+    );
+
+    const batch = doneTenants.slice(0, BATCH_SIZE);
+    const results = [];
+    let resetCount = 0;
+
+    for (let i = 0; i < batch.length; i++) {
+      const t = batch[i];
+      // Get required NS from Scalesends
+      const ssResult = await getScalesendsNameservers(apiKey, customerId, t.scalesends_job_id);
+      if (!ssResult.success || !ssResult.nameservers || ssResult.nameservers.length === 0) {
+        results.push({ tenantId: t.id, domain: t.sending_domain, status: "skipped", reason: "No NS from Scalesends" });
+        if (i < batch.length - 1) await new Promise(r => setTimeout(r, DELAY_MS));
+        continue;
+      }
+
+      // Get actual current NS at Porkbun
+      const pbResult = await getPorkbunNameservers(t.sending_domain);
+      const currentNs = pbResult.data?.ns || [];
+      const matched = nsMatch(currentNs, ssResult.nameservers);
+
+      if (matched) {
+        results.push({ tenantId: t.id, domain: t.sending_domain, status: "verified", scalesendsNsStatus: ssResult.nameserversStatus });
+      } else {
+        // NS don't actually match — reset porkbun_ns_applied_at so syncAll picks it up
+        await base44.asServiceRole.entities.TenantLifecycle.update(t.id, {
+          porkbun_ns_applied_at: null,
+          porkbun_last_error: `Verification failed: Porkbun NS [${currentNs.join(", ")}] != required [${ssResult.nameservers.join(", ")}]`,
+        });
+        resetCount++;
+        results.push({
+          tenantId: t.id,
+          domain: t.sending_domain,
+          status: "mismatch_reset",
+          currentNs,
+          requiredNs: ssResult.nameservers,
+          scalesendsNsStatus: ssResult.nameserversStatus,
+        });
+      }
+      if (i < batch.length - 1) await new Promise(r => setTimeout(r, DELAY_MS));
+    }
+
+    return Response.json({
+      checked: batch.length,
+      totalDone: doneTenants.length,
+      remaining: doneTenants.length - batch.length,
+      verified: results.filter(r => r.status === "verified").length,
+      mismatched: resetCount,
+      skipped: results.filter(r => r.status === "skipped").length,
+      results,
+    });
+  }
+
   return Response.json({ error: `Unknown action: ${action}` }, { status: 400 });
 });
 
