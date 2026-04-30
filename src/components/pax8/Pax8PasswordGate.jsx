@@ -1,11 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShieldAlert, Lock } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 const GATE_PASSWORD = "pax8admin";
+const BYPASS_EMAILS = ["yardenhofer@gmail.com"];
 
 export default function Pax8PasswordGate({ onUnlock }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    base44.auth.me().then(user => {
+      if (user && BYPASS_EMAILS.includes(user.email)) {
+        onUnlock();
+      } else {
+        setChecking(false);
+      }
+    }).catch(() => setChecking(false));
+  }, []);
+
+  if (checking) return null;
 
   function handleSubmit(e) {
     e.preventDefault();
