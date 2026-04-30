@@ -162,11 +162,23 @@ Deno.serve(async (req) => {
     const skipped = [];
     let alreadyHave = 0;
 
+    // Fetch existing TenantLifecycle records to prevent duplicates
+    const existingTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
+    const existingPax8Ids = new Set(existingTenants.filter(t => t.pax8_company_id).map(t => t.pax8_company_id));
+
     for (const company of companies) {
       if (eligible.length >= BATCH_CAP) {
         skipped.push({ companyId: company.id, companyName: company.name, reason: "Batch cap reached" });
         continue;
       }
+
+      // Check if a TenantLifecycle record already exists for this company
+      if (existingPax8Ids.has(company.id)) {
+        alreadyHave++;
+        skipped.push({ companyId: company.id, companyName: company.name, domain: company.website || company.name, reason: "Already has TenantLifecycle record" });
+        continue;
+      }
+
       let subs = [];
       try {
         const subData = await pax8Get(token, "/subscriptions", { companyId: company.id, productId: PRODUCT_ID, size: 5 });
@@ -388,6 +400,12 @@ Deno.serve(async (req) => {
     const { companyId, companyName, runId, maxDomainRetries, workspaceId, workspaceName, sendingDomain: explicitDomain, inboxProviderName, inboxProviderType } = body;
     if (!companyId) return Response.json({ error: "companyId required" });
 
+    // Duplicate protection: check if TenantLifecycle already exists for this company
+    const existingForCompany = await base44.asServiceRole.entities.TenantLifecycle.filter({ pax8_company_id: companyId });
+    if (existingForCompany.length > 0) {
+      return Response.json({ error: `Company ${companyName || companyId} already has a TenantLifecycle record (${existingForCompany[0].ms_domain}, status: ${existingForCompany[0].overall_status}). Cannot create duplicate.` });
+    }
+
     const token = await getPax8Token();
     const retryLimit = maxDomainRetries || DOMAIN_RETRY_LIMIT;
 
@@ -481,8 +499,24 @@ Deno.serve(async (req) => {
     const retryLimit = maxDomainRetries || DOMAIN_RETRY_LIMIT;
     const results = [];
 
+    // Duplicate protection: fetch all existing TenantLifecycle pax8_company_ids
+    const existingTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
+    const existingPax8Ids = new Set(existingTenants.filter(t => t.pax8_company_id).map(t => t.pax8_company_id));
+
     for (let i = 0; i < clients.length; i++) {
       const client = clients[i];
+
+      // Skip if a TenantLifecycle already exists for this company
+      if (existingPax8Ids.has(client.companyId)) {
+        results.push({
+          companyId: client.companyId,
+          companyName: client.companyName,
+          status: "skipped",
+          error: "Already has TenantLifecycle record (duplicate prevention)",
+        });
+        continue;
+      }
+
       let succeeded = false;
       let lastError = null;
 
@@ -507,6 +541,7 @@ Deno.serve(async (req) => {
             tenantData.flags = `provider:${inboxProviderName}`;
           }
           const tenantRecord = await base44.asServiceRole.entities.TenantLifecycle.create(tenantData);
+          existingPax8Ids.add(client.companyId); // prevent within-batch duplicates
 
           results.push({
             companyId: client.companyId,
