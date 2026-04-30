@@ -125,7 +125,7 @@ export default function ScalesendsQueueTab() {
     let remaining = 1;
     let lastData = null;
     while (remaining > 0) {
-      const res = await base44.functions.invoke("porkbunNameservers", { action: "verify", batchSize: 30 });
+      const res = await base44.functions.invoke("porkbunNameservers", { action: "verify", batchSize: 10 });
       lastData = res.data;
       totalVerified += lastData.verified || 0;
       totalMismatched += lastData.mismatched || 0;
@@ -148,7 +148,7 @@ export default function ScalesendsQueueTab() {
     let remaining = 1; // start truthy
     let lastData = null;
     while (remaining > 0) {
-      const res = await base44.functions.invoke("porkbunNameservers", { action: "syncAll", batchSize: 15 });
+      const res = await base44.functions.invoke("porkbunNameservers", { action: "syncAll", batchSize: 8 });
       lastData = res.data;
       if (lastData.skipped) break; // feature flag off
       totalSuccess += lastData.successCount || 0;
