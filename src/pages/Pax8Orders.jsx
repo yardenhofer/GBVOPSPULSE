@@ -19,6 +19,7 @@ import FailedOrdersFixer from "../components/pax8/FailedOrdersFixer.jsx";
 const SPEND_CAP = 1000; // $1000/month spend cap per run
 const ESTIMATED_MONTHLY_COST_PER_LICENSE = 4.2; // Exchange Online Plan 1 actual cost
 const MAX_DOMAIN_RETRIES = 1; // No retries for test run (normally 5)
+const MAX_BATCH_CLIENTS = 50; // Max clients per run
 
 const TABS = [
   { id: "orders", label: "License Orders", icon: ShieldAlert },
@@ -102,7 +103,7 @@ export default function Pax8Orders() {
     setPreflightLoading(false);
   }
 
-  const cappedEligible = preflightData?.eligible?.filter(c => selectedClientIds.has(c.companyId)) || [];
+  const cappedEligible = (preflightData?.eligible?.filter(c => selectedClientIds.has(c.companyId)) || []).slice(0, MAX_BATCH_CLIENTS);
 
   // ── Porkbun API access check ──
   async function runPorkbunCheck() {
@@ -312,7 +313,7 @@ export default function Pax8Orders() {
               <p className="text-xs text-red-400 mt-1">
                 This module places real Microsoft NCE license commitments. Every run starts in mock mode.
                 Live orders require admin role, dual confirmation, and cannot be undone.
-                Spend cap: ${SPEND_CAP.toLocaleString()}/month per run. Batch cap: 100 clients.
+                Spend cap: ${SPEND_CAP.toLocaleString()}/month per run. Batch cap: {MAX_BATCH_CLIENTS} clients.
               </p>
             </div>
           </div>
@@ -349,6 +350,11 @@ export default function Pax8Orders() {
               <p className="text-sm font-medium text-blue-700 dark:text-blue-300 text-center">
                 {cappedEligible.length} tenant{cappedEligible.length !== 1 ? "s" : ""} selected · Est. cost: ${(cappedEligible.length * ESTIMATED_MONTHLY_COST_PER_LICENSE).toFixed(2)}/mo
               </p>
+              {selectedClientIds.size > MAX_BATCH_CLIENTS && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
+                  ⚠ {selectedClientIds.size} selected but capped to {MAX_BATCH_CLIENTS} per run. Run again for the rest.
+                </p>
+              )}
               <div className="max-w-xs mx-auto">
                 <InboxProviderSelector value={selectedInboxProvider} onChange={setSelectedInboxProvider} />
               </div>
