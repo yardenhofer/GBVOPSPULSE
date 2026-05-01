@@ -1025,32 +1025,34 @@ Deno.serve(async (req) => {
   // ── checkMissingProviders: list orders missing inbox providers without fixing them ──
   // ── checkMissingProviders: removed — list API doesn't return inboxProviders field ──
 
-  // ── fixAllProviders: assign provider to ALL orders (use when Scalesends dashboard shows missing providers) ──
+  // ── fixAllProviders: assign correct provider to orders based on tenant flags ──
   if (action === "fixAllProviders") {
     const { apiKey, customerId } = getApiCredentials();
-    const allOrders = await fetchAllScalesendsOrders(apiKey, customerId);
+    const allTenants = await base44.asServiceRole.entities.TenantLifecycle.list("-created_date", 500);
 
-    // Resolve provider
-    let provider = null;
-    if (body.providerName) {
-      provider = { name: body.providerName, provider: body.providerType || "instantly" };
-    } else {
-      const defaultProviders = await base44.asServiceRole.entities.InboxProvider.filter({ is_default: true });
-      if (defaultProviders.length > 0) {
-        provider = { name: defaultProviders[0].provider_name, provider: defaultProviders[0].provider_type };
-      } else {
-        provider = { name: "Instantly - Growth Team", provider: "instantly" };
-      }
+    // Only fix tenants that have both a Scalesends order and a provider flag
+    const toFix = [];
+    for (const t of allTenants) {
+      if (!t.scalesends_job_id) continue;
+      const flags = t.flags || "";
+      const providerMatch = flags.match(/provider:([^,]+)/);
+      if (!providerMatch) continue;
+      const correctProvider = providerMatch[1].trim();
+      toFix.push({ orderId: t.scalesends_job_id, correctProvider, domain: t.ms_tenant_domain, company: t.pax8_company_name });
+    }
+
+    if (toFix.length === 0) {
+      return Response.json({ total: 0, assigned: 0, message: "No tenants with provider flags found" });
     }
 
     const results = [];
-    for (const order of allOrders) {
-      const result = await assignInboxProvider(apiKey, customerId, order._id, provider);
-      results.push({ orderId: order._id, email: order.email, domain: order.domain, ...result });
+    for (const item of toFix) {
+      const result = await assignInboxProvider(apiKey, customerId, item.orderId, { name: item.correctProvider, provider: "instantly" });
+      results.push({ orderId: item.orderId, domain: item.domain, company: item.company, assignedProvider: item.correctProvider, ...result });
     }
 
     const successCount = results.filter(r => r.success).length;
-    return Response.json({ total: allOrders.length, assigned: successCount, provider, results });
+    return Response.json({ total: toFix.length, assigned: successCount, results });
   }
 
   // ── removeProviderFromOrders: remove a specific inbox provider from specified orders ──
