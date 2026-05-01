@@ -22,6 +22,10 @@
       "type": "string",
       "description": "Email of assigned Account Manager"
     },
+    "assigned_pm": {
+      "type": "string",
+      "description": "Email of assigned Project Manager"
+    },
     "status": {
       "type": "string",
       "enum": [
@@ -68,6 +72,10 @@
       "type": "string",
       "format": "date",
       "description": "Contract renewal / expiry date"
+    },
+    "min_contract_months": {
+      "type": "number",
+      "description": "Minimum contract term in months"
     },
     "target_leads_per_week": {
       "type": "number"
@@ -151,91 +159,72 @@
         "Infrastructure Uploaded",
         "Infrastructure Live"
       ],
-      "description": "Current onboarding infrastructure stage (temporary, disappears after onboarding)"
+      "description": "Current onboarding infrastructure stage"
     },
     "onboarding_stage_date": {
       "type": "string",
-      "format": "date",
-      "description": "Date when the current onboarding stage was set (used to auto-hide Infrastructure Live after 2 days)"
+      "format": "date"
     },
     "instantly_api_key": {
-      "type": "string",
-      "description": "Client's Instantly.ai API key for their workspace"
+      "type": "string"
     },
     "instantly_cache_pct": {
-      "type": "number",
-      "description": "Cached sequence completion % from Instantly (updated every 5 min)"
+      "type": "number"
     },
     "instantly_cache_no_active": {
       "type": "boolean",
-      "default": false,
-      "description": "True if client has no active campaigns"
+      "default": false
     },
     "instantly_cache_error": {
-      "type": "string",
-      "description": "Error message if last Instantly sync failed"
+      "type": "string"
     },
     "instantly_cache_updated": {
       "type": "string",
-      "format": "date-time",
-      "description": "When the Instantly cache was last refreshed"
+      "format": "date-time"
     },
     "slack_channel_id": {
-      "type": "string",
-      "description": "Auto-matched or manually set Slack channel ID for this client"
+      "type": "string"
     },
     "slack_channel_name": {
-      "type": "string",
-      "description": "Manual override for Slack channel name if auto-match fails"
+      "type": "string"
     },
     "dq_link": {
-      "type": "string",
-      "description": "Discovery Questionnaire link for this client"
+      "type": "string"
     },
     "email_copy": {
-      "type": "string",
-      "description": "Current email sequence copy for reference"
+      "type": "string"
     },
     "inbox_placement_screenshot": {
-      "type": "string",
-      "description": "URL of the most recent inbox placement test screenshot"
+      "type": "string"
     },
     "inbox_placement_uploaded_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "When the inbox placement screenshot was last uploaded"
+      "format": "date-time"
     },
     "inbox_placement_uploaded_by": {
-      "type": "string",
-      "description": "Email of user who uploaded the screenshot"
+      "type": "string"
     },
     "terminated_date": {
       "type": "string",
-      "format": "date",
-      "description": "Date when the client was terminated/archived"
+      "format": "date"
     },
     "offboarding_slack_ts": {
-      "type": "string",
-      "description": "Slack message timestamp for offboarding checklist (used to check thread replies)"
+      "type": "string"
     },
     "offboarding_slack_channel": {
-      "type": "string",
-      "description": "Slack channel ID where offboarding message was posted"
+      "type": "string"
     },
     "offboarding_confirmed": {
       "type": "boolean",
-      "default": false,
-      "description": "True once a team member replies CONFIRMED in the Slack thread"
+      "default": false
     },
     "offboarding_date": {
       "type": "string",
-      "format": "date",
-      "description": "Date when offboarding was initiated"
+      "format": "date"
     },
     "last_offboard_reminder_date": {
       "type": "string",
-      "format": "date",
-      "description": "Date when the last offboarding Slack reminder was sent (prevents duplicate daily reminders)"
+      "format": "date"
     }
   },
   "required": [

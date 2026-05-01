@@ -1,0 +1,72 @@
+{
+  "name": "RetentionBonus",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "ID of the client"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Client name for display"
+    },
+    "am_email": {
+      "type": "string",
+      "description": "Account Manager email"
+    },
+    "pm_email": {
+      "type": "string",
+      "description": "Project Manager email"
+    },
+    "am_bonus_amount": {
+      "type": "number",
+      "default": 100,
+      "description": "AM bonus in dollars"
+    },
+    "pm_bonus_amount": {
+      "type": "number",
+      "default": 50,
+      "description": "PM bonus in dollars"
+    },
+    "min_contract_months": {
+      "type": "number",
+      "description": "Original minimum term in months"
+    },
+    "contract_end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Original contract end date"
+    },
+    "detected_date": {
+      "type": "string",
+      "format": "date",
+      "description": "When the extension was detected"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "denied"
+      ],
+      "default": "pending",
+      "description": "Admin approval status"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Admin who approved/denied"
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "admin_notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "client_id",
+    "client_name",
+    "status"
+  ]
+}

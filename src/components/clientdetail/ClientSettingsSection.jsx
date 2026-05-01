@@ -68,6 +68,8 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     revenue: client.revenue ?? "",
     start_date: client.start_date || "",
     contract_end_date: client.contract_end_date || "",
+    min_contract_months: client.min_contract_months ?? "",
+    assigned_pm: client.assigned_pm || "",
     last_am_touchpoint: client.last_am_touchpoint || "",
     last_client_reply_date: client.last_client_reply_date || "",
     waiting_on_leads: client.waiting_on_leads || false,
@@ -89,6 +91,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
       target_leads_per_week: form.target_leads_per_week !== "" ? Number(form.target_leads_per_week) : null,
       revenue: form.revenue !== "" ? Number(form.revenue) : null,
       group: form.group !== "" ? Number(form.group) : null,
+      min_contract_months: form.min_contract_months !== "" ? Number(form.min_contract_months) : null,
       contract_end_date: form.contract_end_date || null,
       status_override: form.status_override || null,
     };
@@ -157,6 +160,10 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
         <F label="Revenue (monthly $)"><input type="number" className={inputCls} value={form.revenue} onChange={e => setForm(f => ({ ...f, revenue: e.target.value }))} /></F>
         <F label="Start Date"><input type="date" className={inputCls} value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} /></F>
         <F label="Contract End Date"><input type="date" className={inputCls} value={form.contract_end_date} onChange={e => setForm(f => ({ ...f, contract_end_date: e.target.value }))} /></F>
+        <F label="Min Contract Term (months)"><input type="number" min="1" className={inputCls} value={form.min_contract_months} placeholder="e.g. 3" onChange={e => setForm(f => ({ ...f, min_contract_months: e.target.value }))} /></F>
+        <F label="Assigned PM (email)">
+          <Sel value={form.assigned_pm} onChange={e => setForm(f => ({ ...f, assigned_pm: e.target.value }))} options={amOptions} />
+        </F>
         <F label="Last AM Touchpoint"><input type="date" className={inputCls} value={form.last_am_touchpoint} onChange={e => setForm(f => ({ ...f, last_am_touchpoint: e.target.value }))} /></F>
         <F label="Last Client Reply"><input type="date" className={inputCls} value={form.last_client_reply_date} onChange={e => setForm(f => ({ ...f, last_client_reply_date: e.target.value }))} /></F>
       </div>
