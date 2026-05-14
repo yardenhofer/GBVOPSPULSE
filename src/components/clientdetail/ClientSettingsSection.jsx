@@ -65,6 +65,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     status: client.status || "Healthy",
     client_sentiment: client.client_sentiment || "Happy",
     target_leads_per_week: client.target_leads_per_week ?? "",
+    monthly_sends_target: client.monthly_sends_target ?? "",
     revenue: client.revenue ?? "",
     start_date: client.start_date || "",
     contract_end_date: client.contract_end_date || "",
@@ -89,6 +90,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
     const payload = {
       ...form,
       target_leads_per_week: form.target_leads_per_week !== "" ? Number(form.target_leads_per_week) : null,
+      monthly_sends_target: form.monthly_sends_target !== "" ? Number(form.monthly_sends_target) : null,
       revenue: form.revenue !== "" ? Number(form.revenue) : null,
       group: form.group !== "" ? Number(form.group) : null,
       min_contract_months: form.min_contract_months !== "" ? Number(form.min_contract_months) : null,
@@ -157,6 +159,7 @@ export default function ClientSettingsSection({ client, onClientUpdate }) {
           <Sel value={form.client_sentiment} onChange={e => setForm(f => ({ ...f, client_sentiment: e.target.value }))} options={SENTIMENTS} />
         </F>
         <F label="Target Leads / Week"><input type="number" className={inputCls} value={form.target_leads_per_week} onChange={e => setForm(f => ({ ...f, target_leads_per_week: e.target.value }))} /></F>
+        <F label="Monthly Sends Target"><input type="number" className={inputCls} value={form.monthly_sends_target} placeholder="e.g. 100000" onChange={e => setForm(f => ({ ...f, monthly_sends_target: e.target.value }))} /></F>
         <F label="Revenue (monthly $)"><input type="number" className={inputCls} value={form.revenue} onChange={e => setForm(f => ({ ...f, revenue: e.target.value }))} /></F>
         <F label="Start Date"><input type="date" className={inputCls} value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} /></F>
         <F label="Contract End Date"><input type="date" className={inputCls} value={form.contract_end_date} onChange={e => setForm(f => ({ ...f, contract_end_date: e.target.value }))} /></F>

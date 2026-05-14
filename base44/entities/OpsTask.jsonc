@@ -1,0 +1,115 @@
+{
+  "name": "OpsTask",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "Related client ID"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Client name for display"
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "below_kpi",
+        "low_leads",
+        "sentiment_drop",
+        "alert",
+        "manual"
+      ],
+      "description": "What triggered this task"
+    },
+    "trigger_detail": {
+      "type": "string",
+      "description": "Details about the trigger (e.g. '2 leads vs 5 target')"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "adjust_copy",
+        "expand_lead_list",
+        "fix_deliverability",
+        "review_targeting",
+        "other"
+      ],
+      "description": "Type of work needed"
+    },
+    "description": {
+      "type": "string",
+      "description": "What needs to be done"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "default": "medium"
+    },
+    "priority_score": {
+      "type": "number",
+      "description": "Auto-calculated priority score (higher = more urgent)"
+    },
+    "client_revenue": {
+      "type": "number",
+      "description": "Client revenue at time of task creation for sorting"
+    },
+    "assigned_to": {
+      "type": "string",
+      "description": "Email of person assigned (defaults to Zain)"
+    },
+    "assigned_by": {
+      "type": "string",
+      "description": "System or admin email"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "in_progress",
+        "completed",
+        "cancelled"
+      ],
+      "default": "open"
+    },
+    "feedback": {
+      "type": "string",
+      "description": "What was changed/done (required before completing)"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "am_email": {
+      "type": "string",
+      "description": "AM to notify when completed"
+    },
+    "am_seen": {
+      "type": "boolean",
+      "default": false,
+      "description": "AM acknowledged the feedback"
+    },
+    "am_seen_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "am_relayed_to_client": {
+      "type": "boolean",
+      "default": false,
+      "description": "AM confirmed they relayed to client"
+    },
+    "am_relayed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "client_id",
+    "client_name",
+    "status"
+  ]
+}

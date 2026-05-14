@@ -11,6 +11,7 @@ import LeadListApprovals from './pages/LeadListApprovals';
 import Pax8Orders from './pages/Pax8Orders';
 import InternalDashboard from './pages/InternalDashboard';
 import RetentionBonuses from './pages/RetentionBonuses';
+import OpsTaskBoard from './pages/OpsTaskBoard';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -75,6 +76,11 @@ const AuthenticatedApp = () => {
       <Route path="/InternalDashboard" element={
         <LayoutWrapper currentPageName="InternalDashboard">
           <InternalDashboard />
+        </LayoutWrapper>
+      } />
+      <Route path="/OpsTaskBoard" element={
+        <LayoutWrapper currentPageName="OpsTaskBoard">
+          <OpsTaskBoard />
         </LayoutWrapper>
       } />
       <Route path="/RetentionBonuses" element={

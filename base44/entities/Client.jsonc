@@ -77,6 +77,10 @@
       "type": "number",
       "description": "Minimum contract term in months"
     },
+    "monthly_sends_target": {
+      "type": "number",
+      "description": "Monthly email send target (e.g. 100000)"
+    },
     "target_leads_per_week": {
       "type": "number"
     },

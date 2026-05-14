@@ -93,6 +93,13 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
 
   const selectedClient = clients.find(c => c.id === clientId);
 
+  // Lead list size validation: monthly_sends_target / 3 = minimum list size
+  const minListSize = selectedClient?.monthly_sends_target
+    ? Math.ceil(selectedClient.monthly_sends_target / 3)
+    : null;
+  const leadCountNum = leadCount ? Number(leadCount) : 0;
+  const listTooSmall = minListSize && leadCountNum > 0 && leadCountNum < minListSize;
+
   async function handleFileChange(e) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -151,7 +158,7 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
 
   const inputCls = "w-full text-sm px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-  const isValid = clientId && listName && clientCopy.trim() && (listType === "file" ? !!fileUrl : !!linkUrl.trim());
+  const isValid = clientId && listName && clientCopy.trim() && (listType === "file" ? !!fileUrl : !!linkUrl.trim()) && !listTooSmall;
 
   return (
     <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
@@ -221,9 +228,26 @@ export default function SubmitListForm({ clients, user, onSubmitted }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Approx. Lead Count</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+            Approx. Lead Count *
+            {minListSize && (
+              <span className="ml-1 font-normal text-gray-400">(min: {minListSize.toLocaleString()})</span>
+            )}
+          </label>
           <input type="number" value={leadCount} onChange={e => setLeadCount(e.target.value)}
-            placeholder="e.g. 500" className={inputCls} />
+            placeholder="e.g. 500" className={`${inputCls} ${listTooSmall ? "border-red-400 dark:border-red-500" : ""}`} />
+          {listTooSmall && (
+            <div className="mt-1.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg px-3 py-2">
+              <p className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1">
+                ⛔ List too small — submission blocked
+              </p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">
+                {selectedClient?.name} sends {selectedClient.monthly_sends_target?.toLocaleString()} emails/month.
+                With 3 follow-ups, you need at least <strong>{minListSize.toLocaleString()}</strong> leads.
+                You entered {leadCountNum.toLocaleString()}.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
