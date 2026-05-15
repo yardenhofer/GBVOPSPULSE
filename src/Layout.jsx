@@ -10,7 +10,7 @@ const NAV = [
   { label: "Daily Entries",  page: "DailyEntries",   icon: ClipboardList, adminOnly: true },
   { label: "Executive View", page: "ExecutiveView",  icon: TrendingUp },
   { label: "Lead Approvals", page: "LeadListApprovals", icon: FileCheck },
-  { label: "Ops Tasks",     page: "OpsTaskBoard",     icon: ListTodo },
+  { label: "QA Tasks",      page: "OpsTaskBoard",     icon: ListTodo },
   { label: "Settings",       page: "Settings",       icon: Settings, adminOnly: true },
   { label: "Activity Log",   page: "ActivityLog",    icon: Activity, adminOnly: true },
   { label: "Bonuses",       page: "RetentionBonuses", icon: Award, adminOnly: true },
