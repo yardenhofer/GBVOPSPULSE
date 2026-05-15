@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash, Brain, Play, Trash2, Activity } from "lucide-react";
+import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash, Brain, Play, Trash2, Activity, CalendarDays } from "lucide-react";
 import ActivityLogSection from "../components/settings/ActivityLogSection";
+import ClientDatesSection from "../components/settings/ClientDatesSection";
 
 function BatchRunButton() {
   const [running, setRunning] = useState(false);
@@ -310,6 +311,15 @@ export default function Settings() {
             );
           })}
         </div>
+      </div>
+
+      {/* Client Dates */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <CalendarDays className="w-4 h-4 text-green-400" />
+          <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Client Contract Dates</h2>
+        </div>
+        <ClientDatesSection />
       </div>
 
       {/* Admin Actions */}
