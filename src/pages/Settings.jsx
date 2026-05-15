@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash, Brain, Play } from "lucide-react";
+import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash, Brain, Play, Trash2 } from "lucide-react";
 
 function BatchRunButton() {
   const [running, setRunning] = useState(false);
@@ -57,6 +57,7 @@ export default function Settings() {
     try { return JSON.parse(localStorage.getItem("opsctrl_pending_invites") || "[]"); } catch { return []; }
   });
   const [updating, setUpdating] = useState({});
+  const [deleting, setDeleting] = useState({});
 
   useEffect(() => {
     async function load() {
@@ -195,18 +196,19 @@ export default function Settings() {
         </div>
 
         {/* Header row */}
-        <div className="hidden lg:grid grid-cols-[1fr_80px_80px_repeat(3,80px)] gap-4 px-5 py-2 bg-gray-50 dark:bg-gray-800/50 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+        <div className="hidden lg:grid grid-cols-[1fr_80px_80px_repeat(3,80px)_60px] gap-4 px-5 py-2 bg-gray-50 dark:bg-gray-800/50 text-xs font-semibold text-gray-400 uppercase tracking-wider">
           <span>Member</span>
           <span className="text-center">Role</span>
           <span className="text-center">Group</span>
           {PERMISSIONS.map(p => <span key={p.key} className="text-center">{p.label}</span>)}
+          <span></span>
         </div>
 
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {users.map(u => {
             const isMe = u.id === currentUser?.id;
             return (
-              <div key={u.id} className="px-5 py-4 grid grid-cols-1 lg:grid-cols-[1fr_80px_80px_repeat(3,80px)] gap-3 lg:gap-4 items-center">
+              <div key={u.id} className="px-5 py-4 grid grid-cols-1 lg:grid-cols-[1fr_80px_80px_repeat(3,80px)_60px] gap-3 lg:gap-4 items-center">
                 {/* Identity */}
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
@@ -283,6 +285,26 @@ export default function Settings() {
                     </div>
                   );
                 })}
+
+                {/* Delete */}
+                <div className="flex justify-start lg:justify-center">
+                  {!isMe && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Remove ${u.full_name || u.email} from the team?`)) return;
+                        setDeleting(d => ({ ...d, [u.id]: true }));
+                        await base44.functions.invoke("listUsers", { action: "delete", user_id: u.id });
+                        setUsers(prev => prev.filter(x => x.id !== u.id));
+                        setDeleting(d => ({ ...d, [u.id]: false }));
+                      }}
+                      disabled={!!deleting[u.id]}
+                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                      title="Remove member"
+                    >
+                      {deleting[u.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
