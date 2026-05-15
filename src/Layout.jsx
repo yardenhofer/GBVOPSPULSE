@@ -92,7 +92,7 @@ export default function Layout({ children, currentPageName }) {
           </div>
 
           {/* Client / Internal toggle */}
-          {user?.role === "admin" && (
+          {user?.email === "yardenhofer@gmail.com" && (
             <div className="px-3 pt-3 pb-1">
               <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
                 <Link
