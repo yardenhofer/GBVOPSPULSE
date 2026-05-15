@@ -47,7 +47,7 @@ export default function DailyCheckIn() {
   const today = selectedDate;
 
   const [form, setForm] = useState({
-    inmails_sent: "",
+    linkedin_messages_sent: "",
     emails_sent: "",
     leads_generated: "",
     satisfaction_rate: "",
@@ -94,7 +94,7 @@ export default function DailyCheckIn() {
     const existing = checkIns.find(c => c.client_id === selectedClientId);
     if (existing) {
       setForm({
-        inmails_sent: existing.inmails_sent ?? "",
+        linkedin_messages_sent: existing.linkedin_messages_sent ?? "",
         emails_sent: existing.emails_sent ?? "",
         leads_generated: existing.leads_generated ?? "",
         satisfaction_rate: existing.satisfaction_rate ?? "",
@@ -102,7 +102,7 @@ export default function DailyCheckIn() {
       });
       setCheckInId(existing.id);
     } else {
-      setForm({ inmails_sent: "", emails_sent: "", leads_generated: "", satisfaction_rate: "", notes: "" });
+      setForm({ linkedin_messages_sent: "", emails_sent: "", leads_generated: "", satisfaction_rate: "", notes: "" });
       setCheckInId(null);
     }
     setSaved(false);
@@ -142,7 +142,7 @@ export default function DailyCheckIn() {
       client_name: selectedClient?.name || "",
       am_email: selectedAm,
       date: today,
-      inmails_sent: form.inmails_sent !== "" ? Number(form.inmails_sent) : 0,
+      linkedin_messages_sent: form.linkedin_messages_sent !== "" ? Number(form.linkedin_messages_sent) : 0,
       emails_sent: emailsSent,
       leads_generated: leadsGenerated,
       satisfaction_rate: form.satisfaction_rate !== "" ? Number(form.satisfaction_rate) : null,
@@ -216,7 +216,7 @@ export default function DailyCheckIn() {
       date: today,
       leads_generated: payload.leads_generated,
       emails_sent: payload.emails_sent,
-      inmails_sent: payload.inmails_sent,
+      linkedin_messages_sent: payload.linkedin_messages_sent,
       on_behalf: selectedAm !== user.email,
     }).catch(() => {});
 
@@ -389,10 +389,10 @@ export default function DailyCheckIn() {
               {/* Metrics Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">InMails Sent</label>
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1.5">LinkedIn Messages Sent</label>
                   <input type="number" min="0" className={inputCls} placeholder="0"
-                    value={form.inmails_sent}
-                    onChange={e => { setForm(f => ({ ...f, inmails_sent: e.target.value })); setSaved(false); }} />
+                    value={form.linkedin_messages_sent}
+                    onChange={e => { setForm(f => ({ ...f, linkedin_messages_sent: e.target.value })); setSaved(false); }} />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-red-500 dark:text-red-400 block mb-1.5">

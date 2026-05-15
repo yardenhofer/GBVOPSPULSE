@@ -16,10 +16,15 @@
       "type": "string",
       "format": "date"
     },
+    "linkedin_messages_sent": {
+      "type": "number",
+      "default": 0,
+      "description": "Total LinkedIn messages sent (InMails + connection requests)"
+    },
     "inmails_sent": {
       "type": "number",
       "default": 0,
-      "description": "Number of InMails sent"
+      "description": "Legacy - Number of InMails sent"
     },
     "emails_sent": {
       "type": "number",
@@ -42,11 +47,6 @@
     "completed": {
       "type": "boolean",
       "default": false
-    },
-    "linkedin_messages_sent": {
-      "type": "number",
-      "default": 0,
-      "description": "Legacy - LinkedIn messages sent"
     },
     "positive_responses": {
       "type": "number",
