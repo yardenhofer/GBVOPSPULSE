@@ -32,6 +32,15 @@
       "type": "number",
       "description": "Original minimum term in months"
     },
+    "renewal_month": {
+      "type": "number",
+      "description": "Which month of service this bonus is for (e.g. 4 means the 4th month)"
+    },
+    "renewal_due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "The date this renewal month payment is due"
+    },
     "contract_end_date": {
       "type": "string",
       "format": "date",
@@ -40,7 +49,7 @@
     "detected_date": {
       "type": "string",
       "format": "date",
-      "description": "When the extension was detected"
+      "description": "When the renewal was detected"
     },
     "status": {
       "type": "string",
@@ -50,7 +59,7 @@
         "denied"
       ],
       "default": "pending",
-      "description": "Admin approval status"
+      "description": "Admin approval status \u2014 pending means awaiting payment confirmation"
     },
     "reviewed_by": {
       "type": "string",

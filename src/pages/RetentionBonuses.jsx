@@ -1,32 +1,21 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Award, CheckCircle2, XCircle, Clock, RefreshCw, DollarSign } from "lucide-react";
+import { Award, CheckCircle2, XCircle, Clock, RefreshCw, DollarSign, Info } from "lucide-react";
 import BonusCard from "../components/bonuses/BonusCard";
 
 export default function RetentionBonuses() {
   const [bonuses, setBonuses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState(null);
   const [filter, setFilter] = useState("pending");
 
   async function loadBonuses() {
     setLoading(true);
-    const data = await base44.entities.RetentionBonus.list("-created_date", 200);
+    const data = await base44.entities.RetentionBonus.list("-created_date", 500);
     setBonuses(data);
     setLoading(false);
   }
 
   useEffect(() => { loadBonuses(); }, []);
-
-  async function handleScan() {
-    setScanning(true);
-    setScanResult(null);
-    const res = await base44.functions.invoke("checkRetentionBonuses", {});
-    setScanResult(res.data);
-    setScanning(false);
-    await loadBonuses();
-  }
 
   async function handleApprove(bonusId, notes) {
     const user = await base44.auth.me();
@@ -63,18 +52,15 @@ export default function RetentionBonuses() {
           <Award className="w-5 h-5 text-yellow-500" />
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Retention Bonuses</h1>
         </div>
-        <button onClick={handleScan} disabled={scanning}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium disabled:opacity-50">
-          <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
-          {scanning ? "Scanning…" : "Scan for Bonuses"}
-        </button>
       </div>
 
-      {scanResult && (
-        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 text-sm text-blue-700 dark:text-blue-400">
-          Scanned {scanResult.checked} clients — found {scanResult.newBonuses} new bonus{scanResult.newBonuses !== 1 ? "es" : ""}.
-        </div>
-      )}
+      <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 flex items-start gap-2">
+        <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+        <p className="text-xs text-blue-700 dark:text-blue-400">
+          Bonuses are detected automatically every day. When a client reaches a month beyond their minimum contract term,
+          it appears here asking if the client has paid. Confirming payment approves the AM/PM bonus.
+        </p>
+      </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
