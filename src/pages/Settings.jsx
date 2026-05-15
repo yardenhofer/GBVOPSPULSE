@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash, Brain, Play, Trash2 } from "lucide-react";
+import { UserPlus, Shield, ShieldOff, Crown, User, Mail, Loader2, Hash, Brain, Play, Trash2, Activity } from "lucide-react";
+import ActivityLogSection from "../components/settings/ActivityLogSection";
 
 function BatchRunButton() {
   const [running, setRunning] = useState(false);
@@ -328,6 +329,15 @@ export default function Settings() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{desc}</p>
           </div>
         ))}
+      </div>
+
+      {/* Activity Log */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-4 h-4 text-blue-400" />
+          <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Activity Log</h2>
+        </div>
+        <ActivityLogSection />
       </div>
     </div>
   );

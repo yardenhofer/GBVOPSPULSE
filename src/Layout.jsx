@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Sun, Moon, Menu, Zap, Settings, LogOut, Activity, FileCheck, Users, Linkedin, Award, ListTodo } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Sun, Moon, Menu, Zap, Settings, LogOut, FileCheck, Users, Linkedin, Award, ListTodo } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const NAV = [
@@ -12,7 +12,6 @@ const NAV = [
   { label: "Lead Approvals", page: "LeadListApprovals", icon: FileCheck },
   { label: "QA Tasks",      page: "OpsTaskBoard",     icon: ListTodo },
   { label: "Settings",       page: "Settings",       icon: Settings, adminOnly: true },
-  { label: "Activity Log",   page: "ActivityLog",    icon: Activity, adminOnly: true },
   { label: "Bonuses",       page: "RetentionBonuses", icon: Award, adminOnly: true },
 ];
 
