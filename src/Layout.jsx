@@ -1,20 +1,18 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Bell, Sun, Moon, Menu, Zap, Settings, LogOut, Activity, FileCheck, ShieldAlert, Users, Linkedin, Award, ListTodo } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, ClipboardList, TrendingUp, Sun, Moon, Menu, Zap, Settings, LogOut, Activity, FileCheck, Users, Linkedin, Award, ListTodo } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const NAV = [
   { label: "Dashboard",      page: "Dashboard",     icon: LayoutDashboard },
   { label: "Daily Check-In", page: "DailyCheckIn",  icon: ClipboardCheck },
   { label: "Daily Entries",  page: "DailyEntries",   icon: ClipboardList, adminOnly: true },
-  { label: "Alerts",         page: "Alerts",         icon: Bell },
   { label: "Executive View", page: "ExecutiveView",  icon: TrendingUp },
   { label: "Lead Approvals", page: "LeadListApprovals", icon: FileCheck },
-  { label: "Activity Log",   page: "ActivityLog",    icon: Activity, adminOnly: true },
-  { label: "Settings",       page: "Settings",       icon: Settings, adminOnly: true },
-  { label: "Pax8 Orders",   page: "Pax8Orders",    icon: ShieldAlert, adminOnly: true },
   { label: "Ops Tasks",     page: "OpsTaskBoard",     icon: ListTodo },
+  { label: "Settings",       page: "Settings",       icon: Settings, adminOnly: true },
+  { label: "Activity Log",   page: "ActivityLog",    icon: Activity, adminOnly: true },
   { label: "Bonuses",       page: "RetentionBonuses", icon: Award, adminOnly: true },
 ];
 
