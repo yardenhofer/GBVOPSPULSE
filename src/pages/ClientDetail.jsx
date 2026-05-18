@@ -31,6 +31,16 @@ export default function ClientDetail() {
   const [newPackage, setNewPackage] = useState("Email");
   const [creating, setCreating] = useState(false);
   const [inboxHealth, setInboxHealth] = useState(null);
+  const [newRevenue, setNewRevenue] = useState("");
+  const [newMonthlySends, setNewMonthlySends] = useState("");
+  const [newTargetLeads, setNewTargetLeads] = useState("");
+  const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newContractEnd, setNewContractEnd] = useState("");
+  const [newMinMonths, setNewMinMonths] = useState("");
+  const [newAm, setNewAm] = useState("");
+  const [newPm, setNewPm] = useState("");
+  const [amUsers, setAmUsers] = useState([]);
+  const [formErrors, setFormErrors] = useState([]);
   const navigate = useNavigate();
 
   const clientId = new URLSearchParams(window.location.search).get("id");
@@ -48,8 +58,30 @@ export default function ClientDetail() {
     }
   }, [clientId]);
 
+  useEffect(() => {
+    if (isNew) {
+      base44.functions.invoke("listUsers", {}).then(r => {
+        const users = r.data.users || [];
+        setAmUsers(users);
+      }).catch(() => {});
+    }
+  }, [isNew]);
+
   async function confirmNewClient() {
-    if (!newName.trim()) return;
+    const errors = [];
+    if (!newName.trim()) errors.push("Client name is required");
+    if (!newRevenue || Number(newRevenue) <= 0) errors.push("Monthly revenue is required");
+    if (!newMonthlySends || Number(newMonthlySends) <= 0) errors.push("Monthly send target is required");
+    if (!newTargetLeads || Number(newTargetLeads) <= 0) errors.push("Weekly lead target is required");
+    if (!newStartDate) errors.push("Start date is required");
+    if (!newMinMonths || Number(newMinMonths) <= 0) errors.push("Min contract months is required");
+    if (!newAm) errors.push("Assigned AM is required");
+
+    if (errors.length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors([]);
     setCreating(true);
     const today = new Date().toISOString().split("T")[0];
     const created = await base44.entities.Client.create({
@@ -57,6 +89,14 @@ export default function ClientDetail() {
       status: "Healthy",
       client_sentiment: "Happy",
       package_type: newPackage,
+      revenue: Number(newRevenue),
+      monthly_sends_target: Number(newMonthlySends),
+      target_leads_per_week: Number(newTargetLeads),
+      start_date: newStartDate,
+      contract_end_date: newContractEnd || undefined,
+      min_contract_months: Number(newMinMonths),
+      assigned_am: newAm,
+      assigned_pm: newPm || undefined,
       onboarding_stage: "Infrastructure Ordered",
       onboarding_stage_date: today,
     });
@@ -97,7 +137,7 @@ export default function ClientDetail() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Package Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Package Type *</label>
             <Select value={newPackage} onValueChange={setNewPackage}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select package" />
@@ -109,6 +149,67 @@ export default function ClientDetail() {
               </SelectContent>
             </Select>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monthly Revenue ($) *</label>
+              <input type="number" min="0" value={newRevenue} onChange={e => setNewRevenue(e.target.value)} placeholder="e.g. 5000"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monthly Send Target *</label>
+              <input type="number" min="0" value={newMonthlySends} onChange={e => setNewMonthlySends(e.target.value)} placeholder="e.g. 100000"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Leads/Week *</label>
+              <input type="number" min="0" value={newTargetLeads} onChange={e => setNewTargetLeads(e.target.value)} placeholder="e.g. 10"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Min Contract Months *</label>
+              <input type="number" min="1" value={newMinMonths} onChange={e => setNewMinMonths(e.target.value)} placeholder="e.g. 3"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date *</label>
+              <input type="date" value={newStartDate} onChange={e => setNewStartDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contract End Date</label>
+              <input type="date" value={newContractEnd} onChange={e => setNewContractEnd(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assigned AM *</label>
+              <select value={newAm} onChange={e => setNewAm(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">Select AM…</option>
+                {amUsers.map(u => <option key={u.id} value={u.email}>{u.full_name || u.email}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assigned PM</label>
+              <select value={newPm} onChange={e => setNewPm(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">Select PM…</option>
+                {amUsers.map(u => <option key={u.id} value={u.email}>{u.full_name || u.email}</option>)}
+              </select>
+            </div>
+          </div>
+          {formErrors.length > 0 && (
+            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg px-3 py-2">
+              {formErrors.map((err, i) => (
+                <p key={i} className="text-xs text-red-600 dark:text-red-400">• {err}</p>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-3 pt-2">
             <button
               onClick={confirmNewClient}

@@ -176,7 +176,15 @@ export default function DailyCheckIn() {
       const alreadyHasToday = openTasks.some(t => t.trigger_detail && t.trigger_detail.includes(todayStr));
       
       if (!alreadyHasToday) {
-        const score = calcPriorityScore(selectedClient?.revenue, openTasks.length);
+        // Auto-close any existing open tasks for this client before creating a new one
+        for (const task of openTasks) {
+          await base44.entities.OpsTask.update(task.id, {
+            status: "cancelled",
+            feedback: "Auto-closed: superseded by newer daily check-in task",
+          });
+        }
+
+        const score = calcPriorityScore(selectedClient?.revenue, 0);
         const priority = getPriorityFromScore(score);
         
         const triggers = [];
