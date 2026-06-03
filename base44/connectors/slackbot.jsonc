@@ -1,0 +1,14 @@
+{
+  "type": "slackbot",
+  "scopes": [
+    "channels:read",
+    "channels:history",
+    "groups:read",
+    "groups:history",
+    "chat:write",
+    "chat:write.public",
+    "chat:write.customize",
+    "users:read.email",
+    "users:read"
+  ]
+}
