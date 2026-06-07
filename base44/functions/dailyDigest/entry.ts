@@ -1,19 +1,16 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-// Emails of leadership who should receive the digest
-// Must be registered app users for email delivery to work
 const LEADERSHIP_EMAILS = [
   'yarden@growbigventures.com',
   'ibraheem@growbigventures.com',
   'zain@growbigventures.com',
-  'yardenhofer@gmail.com', // fallback / owner account
+  'yardenhofer@gmail.com',
 ];
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Allow scheduled (no auth) or admin
     try {
       const user = await base44.auth.me();
       if (user?.role !== 'admin') {
@@ -23,20 +20,21 @@ Deno.serve(async (req) => {
 
     const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
-    // ── Load all data in parallel ──
-    const [rawClients, rawTasks, rawBonuses, rawCheckIns, rawAlerts, rawInsights] = await Promise.all([
+    // ── Load all data ──
+    const [rawClients, rawTasks, rawBonuses, rawCheckIns, rawAlerts, rawInsights, rawActivityLogs] = await Promise.all([
       base44.asServiceRole.entities.Client.list('-updated_date', 300),
-      base44.asServiceRole.entities.OpsTask.list('-created_date', 200),
+      base44.asServiceRole.entities.OpsTask.list('-created_date', 500),
       base44.asServiceRole.entities.RetentionBonus.list('-created_date', 100),
-      base44.asServiceRole.entities.DailyCheckIn.list('-date', 200),
-      base44.asServiceRole.entities.Alert.list('-triggered_date', 200),
-      base44.asServiceRole.entities.SlackInsight.list('-analysis_date', 200),
+      base44.asServiceRole.entities.DailyCheckIn.list('-date', 300),
+      base44.asServiceRole.entities.Alert.list('-triggered_date', 300),
+      base44.asServiceRole.entities.SlackInsight.list('-analysis_date', 300),
+      base44.asServiceRole.entities.ActivityLog.list('-date', 300),
     ]);
 
-    function unwrap(raw) {
-      if (Array.isArray(raw)) return raw;
-      return raw?.items || raw?.data || raw?.results || [];
+    function unwrap(r) {
+      return Array.isArray(r) ? r : (r?.items || r?.data || r?.results || []);
     }
 
     const clients = unwrap(rawClients).filter(c => c.status !== 'Terminated');
@@ -45,148 +43,209 @@ Deno.serve(async (req) => {
     const checkIns = unwrap(rawCheckIns);
     const alerts = unwrap(rawAlerts);
     const insights = unwrap(rawInsights);
+    const activityLogs = unwrap(rawActivityLogs);
 
-    // ── Derived data ──
+    // Derived
     const activeClients = clients.filter(c => c.status !== 'Off-Boarding');
     const critical = clients.filter(c => c.status === 'Critical' || c.is_escalated);
     const atRisk = clients.filter(c => c.status === 'At Risk');
     const monitor = clients.filter(c => c.status === 'Monitor');
     const healthy = clients.filter(c => c.status === 'Healthy');
     const offboarding = clients.filter(c => c.status === 'Off-Boarding');
-
-    const todayCheckIns = checkIns.filter(ci => ci.date === today);
-    const yesterdayCheckIns = checkIns.filter(ci => ci.date === yesterday);
-
     const openTasks = tasks.filter(t => t.status === 'open' || t.status === 'in_progress');
     const completedYesterday = tasks.filter(t => t.completed_at?.startsWith(yesterday));
-
     const pendingBonuses = bonuses.filter(b => b.status === 'pending');
     const activeAlerts = alerts.filter(a => a.is_active);
-
-    const latestInsightByClient = {};
-    for (const ins of insights) {
-      if (!latestInsightByClient[ins.client_id]) latestInsightByClient[ins.client_id] = ins;
-    }
-
-    // ── Build rich context for AI ──
-    const clientSummaries = activeClients.map(c => {
-      const insight = latestInsightByClient[c.id];
-      const daysSinceTouch = c.last_am_touchpoint
-        ? Math.floor((Date.now() - new Date(c.last_am_touchpoint)) / 86400000)
-        : null;
-      const daysSinceReply = c.last_client_reply_date
-        ? Math.floor((Date.now() - new Date(c.last_client_reply_date)) / 86400000)
-        : null;
-      const clientOpenTasks = openTasks.filter(t => t.client_id === c.id);
-      return {
-        name: c.name,
-        status: c.status,
-        package: c.package_type,
-        am: c.assigned_am,
-        pm: c.assigned_pm,
-        revenue: c.revenue,
-        sentiment: c.client_sentiment,
-        leads_this_week: c.leads_this_week,
-        target_leads_per_week: c.target_leads_per_week,
-        leads_last_week: c.leads_last_week,
-        escalated: c.is_escalated,
-        waiting_on_leads: c.waiting_on_leads,
-        days_since_am_touchpoint: daysSinceTouch,
-        days_since_client_reply: daysSinceReply,
-        open_ops_tasks: clientOpenTasks.length,
-        slack_sentiment: insight?.sentiment,
-        slack_summary: insight?.summary,
-        slack_risk_signals: insight?.risk_signals,
-        slack_upsell: insight?.upsell_opportunities,
-        contract_end_date: c.contract_end_date,
-      };
-    });
-
-    const checkInSummary = yesterdayCheckIns.map(ci => ({
-      client: ci.client_name,
-      am: ci.am_email,
-      emails_sent: ci.emails_sent,
-      leads: ci.leads_generated,
-      satisfaction: ci.satisfaction_rate,
-      notes: ci.notes,
-    }));
-
-    // ── AI Analysis ──
-    console.log(`Calling AI with ${activeClients.length} clients, ${openTasks.length} open tasks, ${pendingBonuses.length} pending bonuses...`);
-
-    const aiResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      model: 'claude_sonnet_4_6',
-      prompt: `You are the chief operations analyst for GrowBig Ventures (GBV), a B2B lead generation agency. 
-Write a daily digest report for the leadership team (Yarden, Ibraheem, Zain). 
-Today is ${today}. Be concise, sharp, and actionable. Use emojis sparingly but effectively.
-
----
-COMPANY DATA:
-Total active clients: ${activeClients.length}
-- Critical/Escalated: ${critical.length} clients: ${critical.map(c => c.name).join(', ') || 'none'}
-- At Risk: ${atRisk.length} clients: ${atRisk.map(c => c.name).join(', ') || 'none'}
-- Monitor: ${monitor.length} clients: ${monitor.map(c => c.name).join(', ') || 'none'}
-- Healthy: ${healthy.length} clients
-- Off-Boarding: ${offboarding.length} clients: ${offboarding.map(c => c.name).join(', ') || 'none'}
-
-Total MRR: $${activeClients.reduce((s, c) => s + (c.revenue || 0), 0).toLocaleString()}
-Revenue at risk (Critical + At Risk): $${[...critical, ...atRisk].reduce((s, c) => s + (c.revenue || 0), 0).toLocaleString()}
-
-Open Ops Tasks: ${openTasks.length}
-- Critical priority: ${openTasks.filter(t => t.priority === 'critical').length}
-- High priority: ${openTasks.filter(t => t.priority === 'high').length}
-Ops tasks completed yesterday: ${completedYesterday.length}
-
-Pending retention bonuses awaiting approval: ${pendingBonuses.length}
-Total pending bonus payout: $${pendingBonuses.reduce((s, b) => s + (b.am_bonus_amount || 0) + (b.pm_bonus_amount || 0), 0)}
-
-Active alerts: ${activeAlerts.length}
-- Red alerts: ${activeAlerts.filter(a => a.severity === 'Red').length}
-- Yellow alerts: ${activeAlerts.filter(a => a.severity === 'Yellow').length}
-
-Yesterday's check-ins submitted: ${yesterdayCheckIns.length} / ${activeClients.length} expected
-Today's check-ins so far: ${todayCheckIns.length}
-
----
-CLIENT DETAILS (all active clients):
-${JSON.stringify(clientSummaries, null, 2)}
-
----
-YESTERDAY'S CHECK-IN DATA:
-${JSON.stringify(checkInSummary, null, 2)}
-
----
-Write the report with these SECTIONS (use clear HTML headings, keep each section tight):
-1. EXECUTIVE SUMMARY — 3-4 sentences covering the overall health of the business today. Mention MRR, biggest wins, biggest risks.
-2. 🚨 URGENT ATTENTION — Clients needing immediate action today (Critical, escalated, or severe drops). Be specific about what's wrong.
-3. 📊 PERFORMANCE SNAPSHOT — Lead generation performance vs targets across the book. Highlight over-performers and under-performers. Note any clients with 0 leads.
-4. 💬 SENTIMENT & CLIENT HEALTH — Based on Slack data and check-ins, how are clients feeling? Flag any sentiment drops, risk signals, or upsell opportunities spotted.
-5. ✅ OPS TASKS UPDATE — Open task backlog summary. What got done yesterday? What's still open and needs attention?
-6. 📅 TODAY'S PRIORITIES — A crisp, ranked action list (max 5 items) for what the team should focus on today.
-7. 💰 BONUS PIPELINE — Pending retention bonuses awaiting admin approval.
-
-FORMAT: Return clean HTML suitable for email. Use tables where helpful. Keep it under 800 words total. No fluff.`,
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          executive_summary: { type: 'string' },
-          urgent_attention: { type: 'string' },
-          performance_snapshot: { type: 'string' },
-          sentiment_health: { type: 'string' },
-          ops_tasks_update: { type: 'string' },
-          todays_priorities: { type: 'string' },
-          bonus_pipeline: { type: 'string' },
-          subject_line: { type: 'string', description: 'Email subject line summarizing the day in one line' },
-        },
-      },
-    });
-
-    console.log('AI analysis complete, building email...');
-
-    // ── Build HTML Email ──
+    const yesterdayCheckIns = checkIns.filter(ci => ci.date === yesterday);
     const totalMRR = activeClients.reduce((s, c) => s + (c.revenue || 0), 0);
     const revenueAtRisk = [...critical, ...atRisk].reduce((s, c) => s + (c.revenue || 0), 0);
 
+    // Build lookup maps
+    const insightMap = {};
+    for (const ins of insights) {
+      if (!insightMap[ins.client_id]) insightMap[ins.client_id] = ins;
+    }
+    const tasksByClient = {};
+    for (const t of tasks) {
+      if (!tasksByClient[t.client_id]) tasksByClient[t.client_id] = [];
+      tasksByClient[t.client_id].push(t);
+    }
+    const alertsByClient = {};
+    for (const a of alerts) {
+      if (!alertsByClient[a.client_id]) alertsByClient[a.client_id] = [];
+      alertsByClient[a.client_id].push(a);
+    }
+    const recentCIByClient = {};
+    for (const ci of checkIns) {
+      if (!recentCIByClient[ci.client_id]) recentCIByClient[ci.client_id] = ci;
+    }
+    const recentActivityByClient = {};
+    for (const a of activityLogs) {
+      if (!recentActivityByClient[a.client_id]) recentActivityByClient[a.client_id] = a;
+    }
+
+    // Build per-client profile (compact)
+    function buildProfile(c) {
+      const ins = insightMap[c.id];
+      const clientTasks = tasksByClient[c.id] || [];
+      const clientAlerts = (alertsByClient[c.id] || []).filter(a => a.is_active);
+      const recentCI = recentCIByClient[c.id];
+      const recentAct = recentActivityByClient[c.id];
+      const daysSinceTouch = c.last_am_touchpoint ? Math.floor((Date.now() - new Date(c.last_am_touchpoint)) / 86400000) : null;
+      const daysSinceReply = c.last_client_reply_date ? Math.floor((Date.now() - new Date(c.last_client_reply_date)) / 86400000) : null;
+      const openCT = clientTasks.filter(t => t.status === 'open' || t.status === 'in_progress');
+      const leadsTarget = c.target_leads_per_week || 0;
+      const leadsW1 = c.leads_this_week || 0;
+      const leadsW2 = c.leads_last_week || 0;
+      const leadsW3 = c.leads_week_3 || 0;
+      const leadsW4 = c.leads_week_4 || 0;
+      const daysUntilEnd = c.contract_end_date ? Math.floor((new Date(c.contract_end_date) - Date.now()) / 86400000) : null;
+
+      return {
+        name: c.name,
+        status: c.status,
+        pkg: c.package_type,
+        am: c.assigned_am?.split('@')[0],
+        rev: `$${c.revenue || 0}`,
+        sentiment: c.client_sentiment,
+        slack_sentiment: ins?.sentiment,
+        slack_trend: ins?.sentiment_trend,
+        slack_summary: ins?.summary ? ins.summary.slice(0, 200) : null,
+        slack_risks: ins?.risk_signals ? ins.risk_signals.slice(0, 150) : null,
+        slack_upsell: ins?.upsell_opportunities ? ins.upsell_opportunities.slice(0, 100) : null,
+        leads: `${leadsW1}/${leadsTarget || '?'} (W2:${leadsW2} W3:${leadsW3} W4:${leadsW4})`,
+        meetings: c.meetings_booked || 0,
+        touch_days: daysSinceTouch,
+        reply_days: daysSinceReply,
+        open_tasks: openCT.length,
+        task_list: openCT.slice(0, 3).map(t => `[${t.priority}] ${t.task_type}: ${(t.description || t.trigger_detail || '').slice(0, 80)}`),
+        alerts: clientAlerts.slice(0, 3).map(a => `${a.severity}: ${a.message.slice(0, 80)}`),
+        contract_days: daysUntilEnd,
+        stage: c.onboarding_stage,
+        escalated: c.is_escalated || false,
+        waiting_leads: c.waiting_on_leads || false,
+        inbox_pct: c.instantly_cache_pct,
+        notes: c.notes ? c.notes.slice(0, 150) : null,
+        feedback: c.client_feedback ? c.client_feedback.slice(0, 150) : null,
+        last_ci_notes: recentCI?.notes ? recentCI.notes.slice(0, 100) : null,
+        last_activity: recentAct ? `${recentAct.type}: ${recentAct.note?.slice(0, 100)}` : null,
+      };
+    }
+
+    // Sort by urgency then revenue
+    const statusOrder = { Critical: 0, 'At Risk': 1, Monitor: 2, 'Off-Boarding': 3, Healthy: 4 };
+    const sortedClients = [...clients].sort((a, b) => {
+      const so = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+      return so !== 0 ? so : (b.revenue || 0) - (a.revenue || 0);
+    });
+
+    // Split into urgent (critical/at-risk/monitor/escalated) vs healthy for separate AI calls
+    const urgentClients = sortedClients.filter(c => ['Critical', 'At Risk', 'Monitor'].includes(c.status) || c.is_escalated || c.status === 'Off-Boarding');
+    const healthyClients = sortedClients.filter(c => c.status === 'Healthy' && !c.is_escalated);
+
+    const urgentProfiles = urgentClients.map(buildProfile);
+    const healthyProfiles = healthyClients.map(buildProfile);
+
+    console.log(`Running AI — ${urgentClients.length} urgent, ${healthyClients.length} healthy, ${openTasks.length} tasks...`);
+
+    const companyContext = `
+TODAY: ${today}
+COMPANY: ${activeClients.length} active clients | MRR: $${totalMRR.toLocaleString()} | At-risk revenue: $${revenueAtRisk.toLocaleString()}
+STATUS: ${critical.length} Critical, ${atRisk.length} At Risk, ${monitor.length} Monitor, ${healthy.length} Healthy, ${offboarding.length} Off-Boarding
+TASKS: ${openTasks.length} open (${openTasks.filter(t=>t.priority==='critical').length} critical) | ${completedYesterday.length} completed yesterday
+ALERTS: ${activeAlerts.length} active (${activeAlerts.filter(a=>a.severity==='Red').length} red)
+CHECK-INS: ${yesterdayCheckIns.length}/${activeClients.length} submitted yesterday
+BONUSES: ${pendingBonuses.length} pending ($${pendingBonuses.reduce((s,b)=>s+(b.am_bonus_amount||0)+(b.pm_bonus_amount||0),0)} total)`;
+
+    // Run both AI calls in parallel
+    const [urgentAI, healthyAI] = await Promise.all([
+      base44.asServiceRole.integrations.Core.InvokeLLM({
+        model: 'claude_sonnet_4_6',
+        prompt: `You are the chief ops analyst at GrowBig Ventures (GBV), a B2B lead gen agency.
+${companyContext}
+
+Write a DEEP-DIVE briefing for leadership (Yarden, Ibraheem, Zain). No fluff. Be specific, factual, and direct.
+
+URGENT/WATCH CLIENTS DATA:
+${JSON.stringify(urgentProfiles, null, 1)}
+
+OPEN OPS TASKS (top 20):
+${JSON.stringify(openTasks.slice(0, 20).map(t => ({ client: t.client_name, priority: t.priority, type: t.task_type, desc: (t.description || t.trigger_detail || '').slice(0, 100), status: t.status, assigned: t.assigned_to?.split('@')[0] })), null, 1)}
+
+COMPLETED YESTERDAY:
+${JSON.stringify(completedYesterday.slice(0, 10).map(t => ({ client: t.client_name, type: t.task_type, feedback: (t.feedback || '').slice(0, 100) })), null, 1)}
+
+PENDING BONUSES:
+${JSON.stringify(pendingBonuses.map(b => ({ client: b.client_name, month: b.renewal_month, am: b.am_email?.split('@')[0], am_bonus: b.am_bonus_amount, pm_bonus: b.pm_bonus_amount })), null, 1)}
+
+Write HTML sections (no doctype/head/body/style tags — just the content divs):
+
+1. <div id="briefing"> — LEADERSHIP BRIEFING: 3-4 sentences on overall business state. MRR, biggest threats, overall sentiment trend.
+
+2. <div id="urgent"> — URGENT CLIENTS: For EACH urgent/watch client, write a detailed block:
+   - Client name + status badge + revenue + AM
+   - Lead performance (specific numbers vs target, trend over 4 weeks)
+   - Sentiment: what dashboard says vs what Slack analysis shows. Quote any notable client sentiment or risk signals.
+   - Days since last AM touchpoint and client reply
+   - Open ops tasks listed out
+   - Contract renewal if <90 days
+   - ACTION NEEDED: exactly what the team needs to do today for this client (be specific, not generic)
+   
+3. <div id="tasks"> — OPS TASKS ROUNDUP:
+   - What was completed yesterday (list with client names and what was done)
+   - What's still open by priority (critical → high → medium)
+   - Flag any tasks stale >5 days
+   
+4. <div id="priorities"> — TODAY'S TOP 5: Ranked specific actions. Name clients. Be direct.
+
+5. <div id="bonuses"> — BONUS PIPELINE: Table of pending bonuses.
+
+Use HTML tables, badges, and clear formatting. Be comprehensive but scannable.`,
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            subject_line: { type: 'string' },
+            briefing: { type: 'string' },
+            urgent_clients: { type: 'string' },
+            tasks_roundup: { type: 'string' },
+            priorities: { type: 'string' },
+            bonuses: { type: 'string' },
+          },
+        },
+      }),
+
+      base44.asServiceRole.integrations.Core.InvokeLLM({
+        model: 'claude_sonnet_4_6',
+        prompt: `You are the chief ops analyst at GrowBig Ventures (GBV). Today is ${today}.
+
+These are the HEALTHY clients. Write a concise status update for each. Be direct and factual.
+
+HEALTHY CLIENT DATA (${healthyProfiles.length} clients):
+${JSON.stringify(healthyProfiles, null, 1)}
+
+Generate an HTML table with one row per client. Columns:
+Client | AM | Package | Revenue | Leads (W1/Target) | 4-Week Trend | Sentiment | Slack Insight | Touchpoint | Status / Note
+
+- Leads trend: use ↑↓→ symbols
+- Sentiment: combine dashboard + Slack sentiment concisely
+- Status/Note: 1 sentence — is this client fine, needs watch, or has an upsell opportunity?
+- Use inline badge styles for sentiments: happy=green, neutral=gray, concerned=yellow, unhappy=red
+
+Below the table, add a brief "⚠️ Watch List" paragraph listing any healthy clients that are trending down on leads, haven't had AM contact in >7 days, or have notable risk signals from Slack.
+
+Return a single HTML string (no doctype/head/body tags) as "healthy_clients".`,
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            healthy_clients: { type: 'string' },
+          },
+        },
+      }),
+    ]);
+
+    console.log('Both AI calls complete, building email...');
+
+    // ── Build HTML Email ──
     const urgencyColor = critical.length > 0 ? '#ef4444' : atRisk.length > 0 ? '#f97316' : '#22c55e';
     const urgencyLabel = critical.length > 0 ? `${critical.length} CRITICAL` : atRisk.length > 0 ? `${atRisk.length} AT RISK` : 'ALL CLEAR';
 
@@ -195,216 +254,161 @@ FORMAT: Return clean HTML suitable for email. Use tables where helpful. Keep it 
 <head>
 <meta charset="utf-8">
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 0; color: #1e293b; }
-  .wrapper { max-width: 680px; margin: 0 auto; }
-  .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 28px 32px; }
-  .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-  .header p { margin: 6px 0 0; font-size: 13px; color: #94a3b8; }
-  .stat-bar { background: white; border-bottom: 1px solid #e2e8f0; padding: 16px 32px; display: flex; gap: 24px; }
-  .stat { text-align: center; }
-  .stat .val { font-size: 22px; font-weight: 700; line-height: 1; }
-  .stat .lbl { font-size: 11px; color: #64748b; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .body { padding: 24px 32px; background: #f8fafc; }
-  .section { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; }
-  .section h2 { margin: 0 0 12px; font-size: 15px; font-weight: 700; color: #1e293b; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; }
-  .section p, .section li { font-size: 13.5px; line-height: 1.6; color: #334155; margin: 6px 0; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-  .badge-red { background: #fee2e2; color: #dc2626; }
-  .badge-orange { background: #ffedd5; color: #ea580c; }
-  .badge-yellow { background: #fef9c3; color: #ca8a04; }
-  .badge-green { background: #dcfce7; color: #16a34a; }
-  .urgency-banner { background: ${urgencyColor}15; border: 1px solid ${urgencyColor}40; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; text-align: center; font-weight: 700; color: ${urgencyColor}; font-size: 14px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  th { background: #f8fafc; padding: 6px 10px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
-  td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
-  tr:last-child td { border-bottom: none; }
-  .footer { padding: 20px 32px; text-align: center; font-size: 11px; color: #94a3b8; }
-  ul { padding-left: 20px; }
-  ol { padding-left: 20px; }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:0;color:#1e293b}
+  .wrapper{max-width:760px;margin:0 auto}
+  .header{background:linear-gradient(135deg,#1e293b 0%,#334155 100%);color:white;padding:28px 32px}
+  .header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.5px}
+  .header p{margin:6px 0 0;font-size:13px;color:#94a3b8}
+  .stat-bar{background:white;border-bottom:2px solid #e2e8f0;padding:16px 32px;display:flex;gap:0}
+  .stat{text-align:center;flex:1;border-right:1px solid #e2e8f0;padding:0 8px}
+  .stat:last-child{border-right:none}
+  .stat .val{font-size:22px;font-weight:800;line-height:1}
+  .stat .lbl{font-size:10px;color:#64748b;margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+  .body{padding:24px 32px;background:#f8fafc}
+  .section{background:white;border:1px solid #e2e8f0;border-radius:10px;padding:20px 24px;margin-bottom:16px}
+  .section h2{margin:0 0 14px;font-size:16px;font-weight:700;color:#1e293b;border-bottom:2px solid #f1f5f9;padding-bottom:10px}
+  .section h3{margin:16px 0 6px;font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px}
+  .section p,.section li{font-size:13.5px;line-height:1.65;color:#334155;margin:5px 0}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+  .badge-red{background:#fee2e2;color:#dc2626}
+  .badge-orange{background:#ffedd5;color:#ea580c}
+  .badge-yellow{background:#fef9c3;color:#ca8a04}
+  .badge-green{background:#dcfce7;color:#16a34a}
+  .badge-purple{background:#f3e8ff;color:#9333ea}
+  .badge-blue{background:#dbeafe;color:#2563eb}
+  .banner{border-radius:8px;padding:10px 16px;margin-bottom:16px;text-align:center;font-weight:700;font-size:14px;background:${urgencyColor}15;border:1px solid ${urgencyColor}40;color:${urgencyColor}}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{background:#f1f5f9;padding:7px 10px;text-align:left;color:#475569;font-weight:700;border-bottom:2px solid #e2e8f0;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#334155;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .client-block{border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:12px}
+  .action-box{background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:12.5px;font-weight:600;color:#92400e}
+  .footer{padding:20px 32px;text-align:center;font-size:11px;color:#94a3b8}
+  ul{padding-left:18px;margin:6px 0}
+  ol{padding-left:18px;margin:6px 0}
+  strong{color:#1e293b}
+  hr{border:none;border-top:1px solid #f1f5f9;margin:14px 0}
 </style>
 </head>
 <body>
 <div class="wrapper">
   <div class="header">
-    <h1>📊 GBV Daily Operations Digest</h1>
-    <p>${today} · Prepared by AI Ops Analyst</p>
+    <h1>📋 GBV Daily Deep-Dive Briefing</h1>
+    <p>${today} · Full client-by-client update · ${clients.length} clients covered</p>
   </div>
 
   <div class="stat-bar">
-    <div class="stat">
-      <div class="val" style="color:#1e293b">${activeClients.length}</div>
-      <div class="lbl">Active Clients</div>
-    </div>
-    <div class="stat">
-      <div class="val" style="color:#1e293b">$${(totalMRR / 1000).toFixed(0)}k</div>
-      <div class="lbl">Monthly MRR</div>
-    </div>
-    <div class="stat">
-      <div class="val" style="color:#ef4444">${critical.length + atRisk.length}</div>
-      <div class="lbl">Need Attention</div>
-    </div>
-    <div class="stat">
-      <div class="val" style="color:#f97316">${openTasks.length}</div>
-      <div class="lbl">Open Tasks</div>
-    </div>
-    <div class="stat">
-      <div class="val" style="color:#8b5cf6">${pendingBonuses.length}</div>
-      <div class="lbl">Pending Bonuses</div>
-    </div>
+    <div class="stat"><div class="val">${activeClients.length}</div><div class="lbl">Active</div></div>
+    <div class="stat"><div class="val">$${(totalMRR/1000).toFixed(0)}k</div><div class="lbl">MRR</div></div>
+    <div class="stat"><div class="val" style="color:${critical.length>0?'#ef4444':'#94a3b8'}">${critical.length}</div><div class="lbl">Critical</div></div>
+    <div class="stat"><div class="val" style="color:${atRisk.length>0?'#f97316':'#94a3b8'}">${atRisk.length}</div><div class="lbl">At Risk</div></div>
+    <div class="stat"><div class="val" style="color:#eab308">${monitor.length}</div><div class="lbl">Monitor</div></div>
+    <div class="stat"><div class="val" style="color:#22c55e">${healthy.length}</div><div class="lbl">Healthy</div></div>
+    <div class="stat"><div class="val" style="color:#f97316">${openTasks.length}</div><div class="lbl">Tasks</div></div>
   </div>
 
   <div class="body">
-    ${critical.length > 0 || atRisk.length > 0 ? `<div class="urgency-banner">⚠️ ${urgencyLabel} — Revenue at risk: $${revenueAtRisk.toLocaleString()}/mo</div>` : `<div class="urgency-banner" style="background:#dcfce715;border-color:#22c55e40;color:#16a34a">✅ ${urgencyLabel} — Business healthy</div>`}
-
-    <div class="section">
-      <h2>📋 Executive Summary</h2>
-      ${aiResult.executive_summary}
+    <div class="banner">
+      ${critical.length > 0 || atRisk.length > 0
+        ? `⚠️ ${urgencyLabel} — $${revenueAtRisk.toLocaleString()}/mo at risk`
+        : `✅ ${urgencyLabel} — No critical or at-risk clients`}
     </div>
 
-    ${(critical.length > 0 || atRisk.length > 0 || openTasks.filter(t => t.priority === 'critical').length > 0) ? `
+    <!-- LEADERSHIP BRIEFING -->
+    <div class="section">
+      <h2>📋 Leadership Briefing</h2>
+      ${urgentAI.briefing || ''}
+    </div>
+
+    <!-- URGENT CLIENTS -->
+    ${urgentClients.length > 0 ? `
     <div class="section" style="border-color:#fca5a5">
-      <h2>🚨 Urgent Attention Required</h2>
-      ${aiResult.urgent_attention}
+      <h2>🔥 Clients Needing Attention (${urgentClients.length})</h2>
+      ${urgentAI.urgent_clients || ''}
     </div>` : ''}
 
+    <!-- HEALTHY CLIENTS -->
     <div class="section">
-      <h2>📊 Performance Snapshot</h2>
-      ${aiResult.performance_snapshot}
+      <h2>✅ Healthy Clients (${healthyClients.length})</h2>
+      ${healthyAI.healthy_clients || ''}
     </div>
 
+    <!-- OPS TASKS -->
     <div class="section">
-      <h2>💬 Sentiment & Client Health</h2>
-      ${aiResult.sentiment_health}
+      <h2>🛠️ Ops Tasks Roundup</h2>
+      ${urgentAI.tasks_roundup || ''}
     </div>
 
-    <div class="section">
-      <h2>✅ Ops Tasks Update</h2>
-      ${aiResult.ops_tasks_update}
+    <!-- PRIORITIES -->
+    <div class="section" style="border-color:#93c5fd;background:#eff6ff08">
+      <h2>📅 Today's Top 5 Priorities</h2>
+      ${urgentAI.priorities || ''}
     </div>
 
-    <div class="section" style="border-color:#93c5fd; background: #eff6ff08;">
-      <h2>📅 Today's Priorities</h2>
-      ${aiResult.todays_priorities}
-    </div>
-
+    <!-- BONUSES -->
     ${pendingBonuses.length > 0 ? `
     <div class="section">
       <h2>💰 Bonus Pipeline (${pendingBonuses.length} pending)</h2>
-      ${aiResult.bonus_pipeline}
-      <table style="margin-top:10px">
-        <tr><th>Client</th><th>Month</th><th>AM</th><th>AM Bonus</th><th>PM Bonus</th></tr>
-        ${pendingBonuses.slice(0, 10).map(b => `
-          <tr>
-            <td>${b.client_name}</td>
-            <td>Month ${b.renewal_month}</td>
-            <td>${b.am_email || '—'}</td>
-            <td>$${b.am_bonus_amount || 100}</td>
-            <td>$${b.pm_bonus_amount || 50}</td>
-          </tr>`).join('')}
-      </table>
+      ${urgentAI.bonuses || ''}
     </div>` : ''}
 
   </div>
   <div class="footer">
-    GrowBig Ventures · AI Ops Digest · ${today}<br>
-    <span style="color:#cbd5e1">This report is AI-generated from live dashboard data.</span>
+    GrowBig Ventures · Daily Deep-Dive · ${today}<br>
+    <span style="color:#cbd5e1">AI-generated from live dashboard data · ${clients.length} clients analyzed</span>
   </div>
 </div>
 </body>
 </html>`;
 
-    // ── Determine registered recipients ──
+    // ── Send emails ──
     const rawUsers = await base44.asServiceRole.entities.User.list('-created_date', 200);
     const appUsers = unwrap(rawUsers);
     const appUserEmails = new Set(appUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
-
-    const subject = aiResult.subject_line || `GBV Daily Digest — ${today} · ${critical.length + atRisk.length} need attention`;
-
-    // Send email only to recipients who are registered app users
+    const subject = urgentAI.subject_line || `GBV Daily Briefing — ${today} · ${clients.length} clients`;
     const emailRecipients = LEADERSHIP_EMAILS.filter(e => appUserEmails.has(e.toLowerCase()));
-    console.log(`Registered recipients: ${emailRecipients.join(', ')}`);
 
     const emailResults = await Promise.allSettled(
-      emailRecipients.map(to =>
-        base44.asServiceRole.integrations.Core.SendEmail({ to, subject, body: html })
-      )
+      emailRecipients.map(to => base44.asServiceRole.integrations.Core.SendEmail({ to, subject, body: html }))
     );
 
-    // Also post a Slack summary to the ops alerts channel
-    const slackWebhookUrl = Deno.env.get('SLACK_WEBHOOK_URL_OPS_ALERTS') || Deno.env.get('SLACK_WEBHOOK_URL');
-    if (slackWebhookUrl) {
-      const priorities = aiResult.todays_priorities
-        ? aiResult.todays_priorities.replace(/<[^>]+>/g, '').trim().slice(0, 400)
-        : '';
+    // ── Slack summary ──
+    const slackUrl = Deno.env.get('SLACK_WEBHOOK_URL_OPS_ALERTS') || Deno.env.get('SLACK_WEBHOOK_URL');
+    if (slackUrl) {
+      const urgentNames = [...critical, ...atRisk].map(c => c.name);
       const slackMsg = {
-        text: `📊 *GBV Daily Digest — ${today}*`,
+        text: `📋 *GBV Daily Briefing — ${today}*`,
         blocks: [
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: `📊 GBV Daily Digest — ${today}`, emoji: true },
-          },
+          { type: 'header', text: { type: 'plain_text', text: `📋 GBV Daily Briefing — ${today}`, emoji: true } },
           {
             type: 'section',
             fields: [
               { type: 'mrkdwn', text: `*Active Clients*\n${activeClients.length}` },
-              { type: 'mrkdwn', text: `*Monthly MRR*\n$${totalMRR.toLocaleString()}` },
-              { type: 'mrkdwn', text: `*Need Attention*\n${critical.length + atRisk.length} (${critical.length} critical, ${atRisk.length} at risk)` },
-              { type: 'mrkdwn', text: `*Open Tasks*\n${openTasks.length} (${openTasks.filter(t => t.priority === 'critical').length} critical)` },
-              { type: 'mrkdwn', text: `*Revenue at Risk*\n$${revenueAtRisk.toLocaleString()}/mo` },
-              { type: 'mrkdwn', text: `*Pending Bonuses*\n${pendingBonuses.length} awaiting approval` },
+              { type: 'mrkdwn', text: `*MRR*\n$${totalMRR.toLocaleString()}` },
+              { type: 'mrkdwn', text: `*Needs Attention*\n${critical.length + atRisk.length} clients` },
+              { type: 'mrkdwn', text: `*Revenue at Risk*\n$${revenueAtRisk.toLocaleString()}` },
+              { type: 'mrkdwn', text: `*Open Tasks*\n${openTasks.length}` },
+              { type: 'mrkdwn', text: `*Monitor*\n${monitor.length} clients` },
             ],
           },
-          ...(critical.length > 0 ? [{
-            type: 'section',
-            text: { type: 'mrkdwn', text: `🚨 *CRITICAL:* ${critical.map(c => c.name).join(', ')}` },
-          }] : []),
-          ...(atRisk.length > 0 ? [{
-            type: 'section',
-            text: { type: 'mrkdwn', text: `🟠 *At Risk:* ${atRisk.map(c => c.name).join(', ')}` },
-          }] : []),
-          ...(priorities ? [{
-            type: 'section',
-            text: { type: 'mrkdwn', text: `*📅 Today's Priorities:*\n${priorities}` },
-          }] : []),
-          {
-            type: 'context',
-            elements: [{ type: 'mrkdwn', text: `AI-generated digest · ${emailRecipients.length} email(s) sent` }],
-          },
+          ...(urgentNames.length > 0 ? [{ type: 'section', text: { type: 'mrkdwn', text: `🚨 *Needs action:* ${urgentNames.join(', ')}` } }] : []),
+          { type: 'context', elements: [{ type: 'mrkdwn', text: `Full deep-dive emailed to ${emailRecipients.length} recipient(s)` }] },
         ],
       };
-
       try {
-        await fetch(slackWebhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(slackMsg),
-        });
-        console.log('Slack digest posted successfully');
-      } catch (slackErr) {
-        console.error('Slack post failed:', slackErr.message);
-      }
+        await fetch(slackUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(slackMsg) });
+      } catch (e) { console.error('Slack failed:', e.message); }
     }
 
     const emailSent = emailResults.filter(r => r.status === 'fulfilled').length;
-    const emailFailed = emailResults.filter(r => r.status === 'rejected').length;
-    console.log(`Email: ${emailSent} sent, ${emailFailed} failed`);
+    console.log(`Done — ${emailSent} emails sent`);
 
     return Response.json({
       success: true,
       email_recipients: emailRecipients,
       emails_sent: emailSent,
-      emails_failed: emailFailed,
-      slack_posted: !!slackWebhookUrl,
       subject,
-      stats: {
-        active_clients: activeClients.length,
-        critical: critical.length,
-        at_risk: atRisk.length,
-        open_tasks: openTasks.length,
-        pending_bonuses: pendingBonuses.length,
-        total_mrr: totalMRR,
-        revenue_at_risk: revenueAtRisk,
-      },
+      stats: { active_clients: activeClients.length, critical: critical.length, at_risk: atRisk.length, open_tasks: openTasks.length, total_mrr: totalMRR },
     });
 
   } catch (error) {
