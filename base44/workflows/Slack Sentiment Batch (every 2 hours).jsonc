@@ -1,0 +1,46 @@
+{
+  "name": "Slack Sentiment Batch (every 2 hours)",
+  "description": "Processes up to 4 clients per run. Prioritizes clients with cached channel IDs to avoid rate limits. Skips clients already analyzed today. Runs every 2 hours = ~48 slots/day for ~36 clients.\"",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 2,
+      "interval_unit": "hours",
+      "interval_anchor": "2026-03-25T19:41:50.951000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "slack_sentiment_batch_every_2_hours",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "slackSentimentBatch",
+            "args": {
+              "batch_size": 4
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "slackSentimentBatch"
+  }
+}

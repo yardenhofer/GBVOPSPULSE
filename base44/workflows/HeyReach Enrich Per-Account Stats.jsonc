@@ -1,0 +1,44 @@
+{
+  "name": "HeyReach Enrich Per-Account Stats",
+  "description": "Enriches per-account stats (InMails, Connections, Messages) for one short period per run, cycling through 1d \u2192 7d \u2192 14d. Each period gets refreshed every 15 minutes.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 30,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-04-24T02:44:25.963000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "heyreach_enrich_per_account_stats",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "heyReachEnrichPeriod",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "heyReachEnrichPeriod"
+  }
+}
